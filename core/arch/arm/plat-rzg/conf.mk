@@ -47,3 +47,5 @@ endif
 CFG_DT ?= y
 RZG_DRAM_ECC ?= 0
 RZG_ECC_FULL ?= 0
+
+CFG_RZG_SEC_IP_DRV ?= n
