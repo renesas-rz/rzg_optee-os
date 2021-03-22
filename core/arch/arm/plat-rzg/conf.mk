@@ -46,3 +46,11 @@ RZG_DRAM_ECC ?= 0
 RZG_ECC_FULL ?= 0
 
 CFG_RZG_SEC_IP_DRV ?= n
+CFG_RZG_SEC_IP_RNG ?= n
+
+ifeq ($(CFG_RZG_SEC_IP_DRV),n)
+$(call force,CFG_RZG_SEC_IP_RNG,n)
+endif
+ifeq ($(CFG_RZG_SEC_IP_RNG),y)
+$(call force,CFG_WITH_SOFTWARE_PRNG,n)
+endif
