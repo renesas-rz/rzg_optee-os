@@ -12,6 +12,9 @@
 /* Make stacks aligned to data cache line length */
 #define STACK_ALIGNMENT		64
 
+#define DEVICE0_BASE		0xE6000000
+#define DEVICE0_SIZE		0x002FFFFF
+
 #define GIC_BASE		0xF1000000
 #define GICC_BASE		0xF1020000
 #define GICD_BASE		0xF1010000
