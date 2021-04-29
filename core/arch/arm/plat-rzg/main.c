@@ -11,6 +11,8 @@
 #include <mm/core_memprot.h>
 #include <platform_config.h>
 
+#include "rzg_common.h"
+
 register_phys_mem_pgdir(MEM_AREA_IO_SEC, DEVICE0_BASE, DEVICE0_SIZE);
 register_phys_mem_pgdir(MEM_AREA_IO_SEC, CONSOLE_UART_BASE, SCIF_REG_SIZE);
 register_phys_mem_pgdir(MEM_AREA_IO_SEC, GICD_BASE, GIC_DIST_REG_SIZE);
