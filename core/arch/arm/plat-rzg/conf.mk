@@ -28,6 +28,7 @@ $(call force,CFG_CORE_CLUSTER_SHIFT,1)
 endif
 ifeq ($(PLATFORM_FLAVOR),hihope_rzg2n)
 $(call force,CFG_TEE_CORE_NB_CORE,2)
+PMIC_ROHM_BD9571 ?= 0
 endif
 ifeq ($(PLATFORM_FLAVOR),hihope_rzg2h)
 $(call force,CFG_TEE_CORE_NB_CORE,8)
