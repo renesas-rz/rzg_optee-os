@@ -91,4 +91,12 @@
 #error "Unknown platform flavor"
 #endif
 
+#if defined(PLATFORM_FLAVOR_hihope_rzg2n)
+#if (PMIC_ROHM_BD9571)
+/* Parameters value passed from ARM Trusted FW */
+#define TFW_ARG_CPU_SUSPEND	(0x0UL)
+#define TFW_ARG_SYSTEM_SUSPEND	(0x1UL)
+#endif
+#endif
+
 #endif /* RZG_COMMON_H */
