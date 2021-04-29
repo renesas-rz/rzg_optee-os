@@ -21,35 +21,6 @@
 
 #define CONSOLE_UART_BASE	0xE6E88000
 
-#if defined(PLATFORM_FLAVOR_ek874)
-#define NSEC_DDR_0_BASE		0x47E00000U
-#define NSEC_DDR_0_SIZE		0x78200000
-
-#elif defined(PLATFORM_FLAVOR_hihope_rzg2h)
-
-#define NSEC_DDR_0_BASE		0x47E00000U
-#define NSEC_DDR_0_SIZE		0x78200000
-#define NSEC_DDR_1_BASE		0x500000000U
-#define NSEC_DDR_1_SIZE		0x80000000
-
-#elif defined(PLATFORM_FLAVOR_hihope_rzg2m)
-
-#define NSEC_DDR_0_BASE		0x47E00000U
-#define NSEC_DDR_0_SIZE		0x78200000
-#define NSEC_DDR_1_BASE		0x600000000U
-#define NSEC_DDR_1_SIZE		0x80000000
-
-#elif defined(PLATFORM_FLAVOR_hihope_rzg2n)
-
-#define NSEC_DDR_0_BASE		0x47E00000U
-#define NSEC_DDR_0_SIZE		0x78200000
-#define NSEC_DDR_1_BASE		0x480000000U
-#define NSEC_DDR_1_SIZE		0x80000000
-
-#else
-#error "Unknown platform flavor"
-#endif
-
 #define TEE_SHMEM_START		(TZDRAM_BASE + TZDRAM_SIZE)
 #define TEE_SHMEM_SIZE		0x100000
 

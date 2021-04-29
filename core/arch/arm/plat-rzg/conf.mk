@@ -44,3 +44,5 @@ $(call force,CFG_ARM32_core,y)
 endif
 
 CFG_DT ?= y
+RZG_DRAM_ECC ?= 0
+RZG_ECC_FULL ?= 0
