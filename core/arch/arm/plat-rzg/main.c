@@ -96,3 +96,21 @@ void console_init(void)
 	scif_uart_init(&console_data, CONSOLE_UART_BASE);
 	register_serial_console(&console_data.chip);
 }
+
+#if defined(PLATFORM_FLAVOR_hihope_rzg2n)
+#if (PMIC_ROHM_BD9571)
+static void scif_backup_cb(enum suspend_to_ram_state state,
+			   uint32_t cpu_id __unused)
+{
+	if (state == SUS2RAM_STATE_SUSPEND) {
+		/* We must un-assign console chip to avoid other using. */
+		register_serial_console(NULL);
+	} else if (state == SUS2RAM_STATE_RESUME) {
+		/* We must re-init the console before using it. */
+		console_init();
+	}
+}
+
+suspend_to_ram_cbfunc(scif_backup_cb);
+#endif
+#endif
