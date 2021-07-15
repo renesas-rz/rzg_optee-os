@@ -32,6 +32,11 @@ register_phys_mem_pgdir(MEM_AREA_IO_SEC, TSIP_BASE_ADDR, TSIP_SIZE);
 register_phys_mem_pgdir(MEM_AREA_IO_SEC, S_INST_DATA_ADDR, S_INST_DATA_SIZE);
 #endif
 
+#if defined(CFG_RZG_SPI_DRV)
+register_phys_mem_pgdir(MEM_AREA_IO_SEC, PRR_BASE, PRR_REG_SIZE);
+register_phys_mem_pgdir(MEM_AREA_IO_NSEC, RPC_BASE, RPC_REG_SIZE);
+#endif
+
 register_dynamic_shm(NSEC_DDR_0_BASE, NSEC_DDR_0_SIZE);
 #ifdef NSEC_DDR_1_BASE
 register_dynamic_shm(NSEC_DDR_1_BASE, NSEC_DDR_1_SIZE);
