@@ -12,3 +12,4 @@ endif
 
 cppflags-y += -DLTC_NO_PROTOTYPES -DRZG_DRAM_ECC=$(RZG_DRAM_ECC) -DRZG_ECC_FULL=$(RZG_ECC_FULL) -DPMIC_ROHM_BD9571=$(PMIC_ROHM_BD9571)
 subdirs-y += drivers
+subdirs-y += pta
