@@ -57,3 +57,7 @@ endif
 ifeq ($(CFG_RZG_SEC_IP_RNG),y)
 $(call force,CFG_WITH_SOFTWARE_PRNG,n)
 endif
+
+CFG_RZG_SPI_DRV ?= n
+
+CFG_MMAP_REGIONS ?= 15
