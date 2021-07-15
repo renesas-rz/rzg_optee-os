@@ -27,13 +27,13 @@
 #include "proc/TSIP_Procedure.h"
 #include "stub/TSIP_Stub_API.h"
 
-static unsigned char OutPut_S_INST[1296U];
+static uint32_t OutPut_S_INST[324U];
 
 /*! @var TSIP_Core_Share_InData_IV
     @brief IV for Keyring injection
 */
-static const uint8_t TSIP_Core_Share_InData_IV[] = {
-    0x85, 0xc1, 0x67, 0x34, 0x83, 0xd5, 0xd2, 0x91,  0xf0, 0xd0, 0x71, 0x3e,  0x3e, 0xa4, 0x34, 0xa3,
+static const uint32_t TSIP_Core_Share_InData_IV[] = {
+	0x3467c185, 0x91d2d583, 0x3e71d0f0, 0xa334a43e,
 };
 
 /*! *****************************************************************************
@@ -190,9 +190,9 @@ uint32_t TSIP_Core_Prc_p04(const uint32_t *InData_CustomerKeyOperationCode, cons
     uint32_t  InData_SharedKeyIndex[1];
     uint32_t  InData_SessionKey[8];
     uint32_t  i;
-    uint8_t   *workp;
+    uint32_t  *workp;
     
-    for(i = 0; i < sizeof(OutPut_S_INST); i++) {
+    for(i = 0; i < (sizeof(OutPut_S_INST)) / 4; i++) {
         OutPut_S_INST[i] = 0U;
     }
     InData_SharedKeyIndex[0] = InData_CustomerKeyOperationCode[0];
@@ -202,8 +202,8 @@ uint32_t TSIP_Core_Prc_p04(const uint32_t *InData_CustomerKeyOperationCode, cons
     Ret = TSIPPrc_p04(InData_SharedKeyIndex, InData_SessionKey, (const uint32_t *)TSIP_Core_Share_InData_IV, InData_KeyRingOperationCode, (uint32_t *)OutPut_S_INST);  /* PRQA S 3305 */
     if(Ret == RETURN_OK) {
         RetCode = R_PASS;
-        workp = (uint8_t *)S_INST;
-        for(i = 0; i < sizeof(OutPut_S_INST); i++) {
+	workp = (uint32_t *)S_INST;
+        for(i = 0; i < (sizeof(OutPut_S_INST)) / 4; i++) {
              workp[i] = OutPut_S_INST[i];
         }
     }
