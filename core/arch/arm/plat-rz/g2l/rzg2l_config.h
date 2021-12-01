@@ -4,8 +4,8 @@
  * Copyright (c) 2021, Renesas Electronics
  */
 
-#ifndef RZG2L_DEF_H
-#define RZG2L_DEF_H
+#ifndef RZG2L_CONFIG_H
+#define RZG2L_CONFIG_H
 
 #include <mm/generic_ram_layout.h>
 
@@ -58,4 +58,4 @@
 #define TEE_SHMEM_START		(TZDRAM_BASE + TZDRAM_SIZE)
 #define TEE_SHMEM_SIZE		0x100000
 
-#endif /*RZG2L_DEF_H*/
+#endif /*RZG2L_CONFIG_H*/
