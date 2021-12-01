@@ -20,10 +20,10 @@ register_phys_mem_pgdir(MEM_AREA_IO_SEC, CHIPID_BASE, CHIPID_SIZE);
 static void read_chipid(uint8_t *chipid)
 {
 	uint32_t i;
-	uint32_t addr_va;
+	vaddr_t  addr_va;
 	uint32_t read_num = CHIPID_SIZE / REGISTER_SIZE;
 
-	addr_va = (uint32_t)phys_to_virt_io(CHIPID_BASE);
+	addr_va = (vaddr_t)phys_to_virt_io(CHIPID_BASE);
 
 	for (i = 0U; i < read_num; i++) {
 		uint32_t read_data = io_read32(addr_va);
