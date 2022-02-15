@@ -6,7 +6,7 @@
 #ifndef R_SCE_H
 #define R_SCE_H
 
-#include <r_sce_api.h>
+#include <r_sce_private.h>
 
 /** SCE Control block. Allocate an instance specific control block to pass into the API calls.
  * @par Implemented as
