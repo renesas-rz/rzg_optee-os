@@ -37,7 +37,7 @@
 #define NSEC_DDR_1_BASE		0xC0000000U
 #define NSEC_DDR_1_SIZE		0x80000000
 
-#elif defined(PLATFORM_FLAVOR_g2l_smarc_1)
+#elif defined(PLATFORM_FLAVOR_g2lc_smarc_1)
 /* DDR 1Gbyte x1 */
 #define NSEC_DDR_0_BASE		0x47E00000U
 #define NSEC_DDR_0_SIZE		0x38200000
@@ -55,6 +55,11 @@
 #define NSEC_DDR_0_SIZE		0x78200000
 #define NSEC_DDR_1_BASE		0xC0000000U
 #define NSEC_DDR_1_SIZE		0x80000000
+
+#elif defined(PLATFORM_FLAVOR_g2ul_smarc)
+/* DDR 1Gbyte x1 */
+#define NSEC_DDR_0_BASE		0x47E00000U
+#define NSEC_DDR_0_SIZE		0x38200000
 
 #else
 #error "Unknown platform flavor"

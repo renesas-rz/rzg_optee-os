@@ -10,17 +10,12 @@ $(call force,CFG_CORE_LARGE_PHYS_ADDR,y)
 $(call force,CFG_CORE_ARM64_PA_BITS,36)
 $(call force,CFG_GIC,y)
 $(call force,CFG_ARM_GICV3,y)
-
-# Disable core ASLR for two reasons:
-# 1. There is no source for ASLR seed, as RZ/G2L platform
-#    does not provide DTB to OP-TEE. Also, there is no
-#    publicly available documentation on integrated
-#    hardware RNG, so we can't use it either.
-# 2. OP-TEE crashes during boot with enabled CFG_CORE_ASLR.
 $(call force,CFG_CORE_ASLR,n)
 
-ifeq ($(CFG_PLATFORM_GROUP_g2l),y)
-$(call force,CFG_TEE_CORE_NB_CORE,2)
+ifeq ($(PLATFORM_FLAVOR),g2ul_smarc)
+CFG_TEE_CORE_NB_CORE ?= 1
+else
+CFG_TEE_CORE_NB_CORE ?= 2
 endif
 
 CFG_TZDRAM_START ?= 0x44100000
