@@ -40,6 +40,18 @@ PYTHON3 ?= python3
 
 # Define DEBUG=1 to compile without optimization (forces -O0)
 # DEBUG=1
+ifeq ($(DEBUG),1)
+# For backwards compatibility
+$(call force,CFG_CC_OPT_LEVEL,0)
+$(call force,CFG_DEBUG_INFO,y)
+endif
+
+# CFG_CC_OPT_LEVEL sets compiler optimization level passed with -O directive.
+# Optimize for size by default, usually gives good performance too.
+CFG_CC_OPT_LEVEL ?= s
+
+# Enabling CFG_DEBUG_INFO makes debug information embedded in core.
+CFG_DEBUG_INFO ?= y
 
 # If y, enable debug features of the TEE core (assertions and lock checks
 # are enabled, panic and assert messages are more verbose, data and prefetch
@@ -110,19 +122,21 @@ CFG_TEE_IMPL_DESCR ?= OPTEE
 # World?
 CFG_OS_REV_REPORTS_GIT_SHA1 ?= y
 
-# Trusted OS implementation version
-TEE_IMPL_VERSION ?= $(shell git describe --always --dirty=-dev 2>/dev/null || echo Unknown)
-ifeq ($(CFG_OS_REV_REPORTS_GIT_SHA1),y)
-TEE_IMPL_GIT_SHA1 := 0x$(shell git rev-parse --short=8 HEAD 2>/dev/null || echo 0)
-else
-TEE_IMPL_GIT_SHA1 := 0x0
-endif
 # The following values are not extracted from the "git describe" output because
 # we might be outside of a Git environment, or the tree may have been cloned
 # with limited depth not including any tag, so there is really no guarantee
 # that TEE_IMPL_VERSION contains the major and minor revision numbers.
 CFG_OPTEE_REVISION_MAJOR ?= 3
-CFG_OPTEE_REVISION_MINOR ?= 14
+CFG_OPTEE_REVISION_MINOR ?= 16
+
+# Trusted OS implementation version
+TEE_IMPL_VERSION ?= $(shell git describe --always --dirty=-dev 2>/dev/null || \
+		      echo Unknown_$(CFG_OPTEE_REVISION_MAJOR).$(CFG_OPTEE_REVISION_MINOR))
+ifeq ($(CFG_OS_REV_REPORTS_GIT_SHA1),y)
+TEE_IMPL_GIT_SHA1 := 0x$(shell git rev-parse --short=8 HEAD 2>/dev/null || echo 0)
+else
+TEE_IMPL_GIT_SHA1 := 0x0
+endif
 
 # Trusted OS implementation manufacturer name
 CFG_TEE_MANUFACTURER ?= LINARO
@@ -198,6 +212,8 @@ CFG_RPMB_TESTKEY ?= n
 # - Testing
 # - RPMB key provisioning in a controlled environment (factory setup)
 CFG_RPMB_WRITE_KEY ?= n
+
+_CFG_WITH_SECURE_STORAGE := $(call cfg-one-enabled,CFG_REE_FS CFG_RPMB_FS)
 
 # Signing key for OP-TEE TA's
 # When performing external HSM signing for TA's TA_SIGN_KEY can be set to dummy
@@ -325,16 +341,22 @@ CFG_REE_FS_ALLOW_RESET ?= n
 # for instance avb/023f8f1a-292a-432b-8fc4-de8471358067
 ifneq ($(EARLY_TA_PATHS)$(CFG_IN_TREE_EARLY_TAS),)
 $(call force,CFG_EARLY_TA,y)
-$(call force,CFG_EMBEDDED_TS,y)
 else
 CFG_EARLY_TA ?= n
 endif
 
+ifeq ($(CFG_EARLY_TA),y)
+$(call force,CFG_EMBEDDED_TS,y)
+endif
+
 ifneq ($(SP_PATHS),)
-$(call force,CFG_SECURE_PARTITION,y)
 $(call force,CFG_EMBEDDED_TS,y)
 else
 CFG_SECURE_PARTITION ?= n
+endif
+
+ifeq ($(CFG_SECURE_PARTITION),y)
+$(call force,CFG_EMBEDDED_TS,y)
 endif
 
 ifeq ($(CFG_EMBEDDED_TS),y)
@@ -417,14 +439,22 @@ CFG_DT ?= n
 CFG_DTB_MAX_SIZE ?= 0x10000
 
 # Device Tree Overlay support.
-# This define enables support for an OP-TEE provided DTB overlay.
-# One of two modes is supported in this case:
-# 1. Append OP-TEE nodes to an existing DTB overlay located at CFG_DT_ADDR or
-#    passed in arg2
-# 2. Generate a new DTB overlay at CFG_DT_ADDR
-# A subsequent boot stage must then merge the generated overlay DTB into a main
+# CFG_EXTERNAL_DTB_OVERLAY allows to append a DTB overlay into an existing
+# external DTB. The overlay is created when no valid DTB overlay is found.
+# CFG_GENERATE_DTB_OVERLAY allows to create a DTB overlay at external
+# DTB location.
+# External DTB location (physical address) is provided either by boot
+# argument arg2 or from CFG_DT_ADDR if defined.
+# A subsequent boot stage can then merge the generated overlay DTB into a main
 # DTB using the standard fdt_overlay_apply() method.
 CFG_EXTERNAL_DTB_OVERLAY ?= n
+CFG_GENERATE_DTB_OVERLAY ?= n
+
+ifeq (y-y,$(CFG_EXTERNAL_DTB_OVERLAY)-$(CFG_GENERATE_DTB_OVERLAY))
+$(error CFG_EXTERNAL_DTB_OVERLAY and CFG_GENERATE_DTB_OVERLAY are exclusive)
+endif
+_CFG_USE_DTB_OVERLAY := $(call cfg-one-enabled,CFG_EXTERNAL_DTB_OVERLAY \
+			  CFG_GENERATE_DTB_OVERLAY)
 
 # All embedded tests are supposed to be disabled by default, this flag
 # is used to control the default value of all other embedded tests
@@ -512,7 +542,7 @@ endif
 #   in the same way as TAs so that they can be found at runtime.
 CFG_ULIBS_SHARED ?= n
 
-ifeq (yy,$(CFG_TA_GPROF_SUPPORT)$(CFG_ULIBS_SHARED))
+ifeq (y-y,$(CFG_TA_GPROF_SUPPORT)-$(CFG_ULIBS_SHARED))
 $(error CFG_TA_GPROF_SUPPORT and CFG_ULIBS_SHARED are currently incompatible)
 endif
 
@@ -535,8 +565,10 @@ CFG_SECSTOR_TA_MGMT_PTA ?= $(call cfg-all-enabled,CFG_SECSTOR_TA)
 $(eval $(call cfg-depends-all,CFG_SECSTOR_TA_MGMT_PTA,CFG_SECSTOR_TA))
 
 # Enable the pseudo TA for misc. auxilary services, extending existing
-# GlobalPlatform Core API (for example, re-seeding RNG entropy pool etc.)
-CFG_SYSTEM_PTA ?= y
+# GlobalPlatform TEE Internal Core API (for example, re-seeding RNG entropy
+# pool etc...)
+CFG_SYSTEM_PTA ?= $(CFG_WITH_USER_TA)
+$(eval $(call cfg-depends-all,CFG_SYSTEM_PTA,CFG_WITH_USER_TA))
 
 # Enable the pseudo TA for enumeration of TEE based devices for the normal
 # world OS.
@@ -603,12 +635,6 @@ CFG_CRYPTOLIB_DIR ?= core/lib/libtomcrypt
 # that would set = n.
 $(call force,CFG_CORE_MBEDTLS_MPI,y)
 
-# Enable PKCS#11 TA's TEE Identity based authentication support
-CFG_PKCS11_TA_AUTH_TEE_IDENTITY ?= y
-
-# Enable PKCS#11 TA's C_DigestKey support
-CFG_PKCS11_TA_ALLOW_DIGEST_KEY ?= y
-
 # Enable virtualization support. OP-TEE will not work without compatible
 # hypervisor if this option is enabled.
 CFG_VIRTUALIZATION ?= n
@@ -623,6 +649,10 @@ endif
 
 # Enables backwards compatible derivation of RPMB and SSK keys
 CFG_CORE_HUK_SUBKEY_COMPAT ?= y
+
+# Use SoC specific tee_otp_get_die_id() implementation for SSK key generation.
+# This option depends on CFG_CORE_HUK_SUBKEY_COMPAT=y.
+CFG_CORE_HUK_SUBKEY_COMPAT_USE_OTP_DIE_ID ?= n
 
 # Compress and encode conf.mk into the TEE core, and show the encoded string on
 # boot (with severity TRACE_INFO).
@@ -681,3 +711,72 @@ ifeq (,$(CFG_HWRNG_QUALITY))
 $(error CFG_HWRNG_QUALITY not defined)
 endif
 endif
+
+# CFG_PREALLOC_RPC_CACHE, when enabled, makes core to preallocate
+# shared memory for each secure thread. When disabled, RPC shared
+# memory is released once the secure thread has completed is execution.
+ifeq ($(CFG_WITH_PAGER),y)
+CFG_PREALLOC_RPC_CACHE ?= n
+endif
+CFG_PREALLOC_RPC_CACHE ?= y
+
+# When enabled, CFG_DRIVERS_CLK embeds a clock framework in OP-TEE core.
+# This clock framework allows to describe clock tree and provides functions to
+# get and configure the clocks.
+# CFG_DRIVERS_CLK_DT embeds devicetree clock parsing support
+# CFG_DRIVERS_CLK_FIXED add support for "fixed-clock" compatible clocks
+CFG_DRIVERS_CLK ?= n
+CFG_DRIVERS_CLK_DT ?= $(call cfg-all-enabled,CFG_DRIVERS_CLK CFG_DT)
+CFG_DRIVERS_CLK_FIXED ?= $(CFG_DRIVERS_CLK_DT)
+
+$(eval $(call cfg-depends-all,CFG_DRIVERS_CLK_DT,CFG_DRIVERS_CLK CFG_DT))
+$(eval $(call cfg-depends-all,CFG_DRIVERS_CLK_FIXED,CFG_DRIVERS_CLK_DT))
+
+# When enabled, CFG_DRIVERS_RSTCTRL embeds a reset controller framework in
+# OP-TEE core to provide reset controls on subsystems of the devices.
+CFG_DRIVERS_RSTCTRL ?= n
+
+# The purpose of this flag is to show a print when booting up the device that
+# indicates whether the board runs a standard developer configuration or not.
+# A developer configuration doesn't necessarily has to be secure. The intention
+# is that the one making products based on OP-TEE should override this flag in
+# plat-xxx/conf.mk for the platform they're basing their products on after
+# they've finalized implementing stubbed functionality (see OP-TEE
+# documentation/Porting guidelines) as well as vendor specific security
+# configuration.
+CFG_WARN_INSECURE ?= y
+
+# Enables warnings for declarations mixed with statements
+CFG_WARN_DECL_AFTER_STATEMENT ?= y
+
+# Branch Target Identification (part of the ARMv8.5 Extensions) provides a
+# mechanism to limit the set of locations to which computed branch instructions
+# such as BR or BLR can jump. To make use of BTI in TEE core and ldelf on CPU's
+# that support it, enable this option. A GCC toolchain built with
+# --enable-standard-branch-protection is needed to use this option.
+CFG_CORE_BTI ?= n
+
+$(eval $(call cfg-depends-all,CFG_CORE_BTI,CFG_ARM64_core))
+
+# To make use of BTI in user space libraries and TA's on CPU's that support it,
+# enable this option.
+CFG_TA_BTI ?= $(CFG_CORE_BTI)
+
+$(eval $(call cfg-depends-all,CFG_TA_BTI,CFG_ARM64_core))
+
+ifeq (y-y,$(CFG_VIRTUALIZATION)-$(call cfg-one-enabled, CFG_TA_BTI CFG_CORE_BTI))
+$(error CFG_VIRTUALIZATION and BTI are currently incompatible)
+endif
+
+ifeq (y-y,$(CFG_PAGED_USER_TA)-$(CFG_TA_BTI))
+$(error CFG_PAGED_USER_TA and CFG_TA_BTI are currently incompatible)
+endif
+
+# CFG_CORE_ASYNC_NOTIF is defined by the platform to enable enables support
+# for sending asynchronous notifications to normal world. Note that an
+# interrupt ID must be configurged by the platform too. Currently is only
+# CFG_CORE_ASYNC_NOTIF_GIC_INTID defined.
+CFG_CORE_ASYNC_NOTIF ?= n
+
+$(eval $(call cfg-enable-all-depends,CFG_MEMPOOL_REPORT_LAST_OFFSET, \
+	 CFG_WITH_STATS))

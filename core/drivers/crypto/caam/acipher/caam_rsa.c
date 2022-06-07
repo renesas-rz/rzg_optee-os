@@ -712,6 +712,7 @@ static TEE_Result do_oaep_decoding(struct drvcrypt_rsa_ed *rsa_data)
 	struct caambuf EM = { };
 	size_t db_size = 0;
 	size_t b01_idx = 0;
+	size_t db_len = 0;
 	struct drvcrypt_rsa_mgf mgf_data = { };
 	struct drvcrypt_rsa_ed dec_data = { };
 	struct drvcrypt_mod_op mod_op = { };
@@ -916,7 +917,15 @@ static TEE_Result do_oaep_decoding(struct drvcrypt_rsa_ed *rsa_data)
 		goto exit_oaep_decrypt;
 	}
 
-	rsa_data->message.length = DB.length - b01_idx - 1;
+	db_len = DB.length - b01_idx - 1;
+
+	if (rsa_data->message.length < db_len) {
+		rsa_data->message.length = db_len;
+		ret = TEE_ERROR_SHORT_BUFFER;
+		goto exit_oaep_decrypt;
+	}
+
+	rsa_data->message.length = db_len;
 	memcpy(rsa_data->message.data, &DB.data[b01_idx + 1],
 	       rsa_data->message.length);
 
@@ -1546,12 +1555,13 @@ static const struct drvcrypt_rsa driver_rsa = {
 	.optional.ssa_verify = NULL,
 };
 
-enum caam_status caam_rsa_init(vaddr_t ctrl_addr)
+enum caam_status caam_rsa_init(struct caam_jrcfg *caam_jrcfg)
 {
 	enum caam_status retstatus = CAAM_FAILURE;
+	vaddr_t jr_base = caam_jrcfg->base + caam_jrcfg->offset;
 
-	if (caam_hal_ctrl_pknum(ctrl_addr)) {
-		caam_era = caam_hal_ctrl_era(ctrl_addr);
+	if (caam_hal_ctrl_pknum(jr_base)) {
+		caam_era = caam_hal_ctrl_era(jr_base);
 		RSA_TRACE("CAAM Era %d", caam_era);
 
 		if (!drvcrypt_register_rsa(&driver_rsa))

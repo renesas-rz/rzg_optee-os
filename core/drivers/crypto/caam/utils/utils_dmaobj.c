@@ -755,6 +755,9 @@ TEE_Result caam_dmaobj_init_output(struct caamdmaobj *obj, void *data,
 			goto out;
 		}
 
+		/* Add the additional size in the DMA buffer length */
+		add_dma_require(obj->priv, newbuf.length);
+
 		entry->nocopy = true;
 		entry->newbuf = true;
 	}
@@ -855,7 +858,13 @@ size_t caam_dmaobj_copy_to_orig(struct caamdmaobj *obj)
 
 	priv = obj->priv;
 
-	dst_rlen = obj->orig.length;
+	/*
+	 * The maximum data size to copy cannot exceed the output buffer size
+	 * (obj->orig.length) and cannot exceed the data processed by the
+	 * CAAM (obj->sgtbuf.length).
+	 */
+	dst_rlen = MIN(obj->orig.length, obj->sgtbuf.length);
+
 	DMAOBJ_TRACE("Copy (len=%zu)", dst_rlen);
 
 	for (idx = 0; idx < obj->sgtbuf.number; idx++) {

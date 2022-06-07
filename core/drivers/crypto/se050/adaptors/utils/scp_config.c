@@ -34,6 +34,8 @@ static bool scp03_enabled;
 #define SE050C1_ID 0xA200
 #define SE050C2_ID 0xA201
 #define SE050DV_ID 0xA1F4
+#define SE051A2_ID 0xA565
+#define SE051C2_ID 0xA564
 
 #define SE050A1 0
 #define SE050A2 1
@@ -42,6 +44,8 @@ static bool scp03_enabled;
 #define SE050C1 4
 #define SE050C2 5
 #define SE050DV 6
+#define SE051A2 7
+#define SE051C2 8
 
 static const struct se050_scp_key se050_default_keys[] = {
 	[SE050A1] = {
@@ -100,6 +104,22 @@ static const struct se050_scp_key se050_default_keys[] = {
 		.dek = { 0xa1, 0xbc, 0x84, 0x38, 0xbf, 0x77, 0x93, 0x5b,
 			0x36, 0x1a, 0x44, 0x25, 0xfe, 0x79, 0xfa, 0x29 },
 	},
+	[SE051A2] = {
+		.enc = { 0x84, 0x0a, 0x5d, 0x51, 0x79, 0x55, 0x11, 0xc9,
+			0xce, 0xf0, 0xc9, 0x6f, 0xd2, 0xcb, 0xf0, 0x41 },
+		.mac = { 0x64, 0x6b, 0xc2, 0xb8, 0xc3, 0xa4, 0xd9, 0xc1,
+			0xfa, 0x8d, 0x71, 0x16, 0xbe, 0x04, 0xfd, 0xfe },
+		.dek = { 0x03, 0xe6, 0x69, 0x9a, 0xca, 0x94, 0x26, 0xd9,
+			0xc3, 0x89, 0x22, 0xf8, 0x91, 0x4c, 0xe5, 0xf7 },
+	},
+	[SE051C2] = {
+		.enc = { 0x88, 0xdb, 0xcd, 0x65, 0x82, 0x0d, 0x2a, 0xa0,
+			0x6f, 0xfa, 0xb9, 0x2a, 0xa8, 0xe7, 0x93, 0x64 },
+		.mac = { 0xa8, 0x64, 0x4e, 0x2a, 0x04, 0xd9, 0xe9, 0xc8,
+			0xc0, 0xea, 0x60, 0x86, 0x68, 0x29, 0x99, 0xe5 },
+		.dek = { 0x8a, 0x38, 0x72, 0x38, 0x99, 0x88, 0x18, 0x44,
+			0xe2, 0xc1, 0x51, 0x3d, 0xac, 0xd9, 0xf8, 0x0d },
+	},
 };
 
 static sss_status_t get_id_from_ofid(uint32_t ofid, uint32_t *id)
@@ -125,6 +145,12 @@ static sss_status_t get_id_from_ofid(uint32_t ofid, uint32_t *id)
 		break;
 	case SE050DV_ID:
 		*id = SE050DV;
+		break;
+	case SE051A2_ID:
+		*id = SE051A2;
+		break;
+	case SE051C2_ID:
+		*id = SE051C2;
 		break;
 	default:
 		return kStatus_SSS_Fail;
@@ -243,7 +269,7 @@ sss_status_t se050_scp03_prepare_rotate_cmd(struct sss_se05x_ctx *ctx,
 	kcv_len += 1;
 
 	for (i = 0; i < ARRAY_SIZE(key); i++) {
-		status = se050_get_oid(kKeyObject_Mode_Transient, &oid);
+		status = se050_get_oid(&oid);
 		if (status != kStatus_SSS_Success)
 			return kStatus_SSS_Fail;
 
@@ -267,10 +293,12 @@ sss_status_t se050_scp03_prepare_rotate_cmd(struct sss_se05x_ctx *ctx,
 
 static sss_status_t get_ofid_key(struct se050_scp_key *keys)
 {
+	uint32_t oefid = SHIFT_U32(se050_ctx.se_info.oefid[0], 8) |
+			 SHIFT_U32(se050_ctx.se_info.oefid[1], 0);
 	sss_status_t status = kStatus_SSS_Success;
 	uint32_t id = 0;
 
-	status = get_id_from_ofid(CFG_CORE_SE05X_OEFID, &id);
+	status = get_id_from_ofid(oefid, &id);
 	if (status != kStatus_SSS_Success)
 		return status;
 

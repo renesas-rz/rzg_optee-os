@@ -1,4 +1,47 @@
 jobs:
+  - job: code_style
+    displayName: 'Check code style'
+    pool:
+      vmImage: ubuntu-18.04
+    container:
+      image: jforissier/optee_os_ci
+    steps:
+      - script: |
+          set -e
+          pushd .
+          mkdir -p /tmp/linux/scripts
+          cd /tmp/linux/scripts
+          wget --quiet https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/plain/scripts/checkpatch.pl
+          chmod +x checkpatch.pl
+          wget --quiet https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/plain/scripts/spelling.txt
+          echo "invalid.struct.name" >const_structs.checkpatch
+          export PATH=/tmp/linux/scripts:$PATH
+          popd
+          source scripts/checkpatch_inc.sh
+          function _do() { echo '>>' $*; $*; }
+          # Run checkpatch.pl:
+          # - on the tip of the branch only if we're not in a pull request
+          # - otherwise:
+          #   * on each commit in the development branch that is not in the target (merge to) branch
+          #   * on the global diff if the PR contains more than one commit (useful to check if fixup
+          #     commits do solve previous checkpatch errors)
+          if [ "${SYSTEM_PULLREQUEST_PULLREQUESTID}" == "" ]; then \
+            _do checkpatch HEAD || failed=1; \
+          else \
+            for c in $(git rev-list HEAD^1..HEAD^2); do \
+              _do checkpatch $c || failed=1; \
+            done; \
+            if [ "$(git rev-list --count HEAD^1..HEAD^2)" -gt 1 ]; then \
+              _do checkdiff $(git rev-parse HEAD^1) $(git rev-parse HEAD^2) || failed=1; \
+            fi; \
+          fi
+          [ -z "$failed" ]
+        displayName: 'Run checkpatch'
+      - script: |
+          sudo -E bash -c "apt update -qq -y && apt install -qq -y pycodestyle"
+          pycodestyle scripts/*.py core/arch/arm/plat-stm32mp1/scripts/stm32image.py
+        displayName: 'Run pycodestyle'
+        condition: succeededOrFailed()  # Run this 'script' even if previous ones failed
   - job: build_all
     displayName: 'Build all'
     pool:
@@ -29,7 +72,7 @@ jobs:
           function upload_cache() { if [ ! -e .uploaded ]; then echo Uploading cache && tar c -C $HOME .ccache | gzip -1 | ssh $SCP_OPT optee_os_ci@cache.forissier.org "cat >ccache-$PROJ.tar.gz" && touch .uploaded || echo Nevermind; fi; }
           function check_upload_cache() { NOW=$(date +%s); if [ $(expr $NOW - $START) -gt 3000 ]; then upload_cache; fi; }
           function _make() { make -j$(getconf _NPROCESSORS_ONLN) -s O=out $* && check_upload_cache; }
-          function download_plug_and_trust() { mkdir -p $HOME/se050 && curl -L https://github.com/foundriesio/plug-and-trust/releases/download/v0.0.2/se050-0.0.2.tar.bz2 | tar jxf - --strip-components=1 -C $HOME/se050 || (rm -rf $HOME/se050; echo Nervermind); }
+          function download_plug_and_trust() { mkdir -p $HOME/se050 && git clone --single-branch -b v0.1.0 https://github.com/foundriesio/plug-and-trust $HOME/se050/plug-and-trust || (rm -rf $HOME/se050 ; echo Nervermind); }
 
           download_cache
           ccache -s
@@ -37,8 +80,8 @@ jobs:
 
           _make
           _make COMPILER=clang
-          _make CFG_TEE_CORE_LOG_LEVEL=4 CFG_TEE_CORE_DEBUG=y CFG_TEE_TA_LOG_LEVEL=4 CFG_CC_OPT_LEVEL=0 CFG_DEBUG_INFO=y CFG_ENABLE_EMBEDDED_TESTS=y
-          _make CFG_TEE_CORE_LOG_LEVEL=0 CFG_TEE_CORE_DEBUG=n CFG_TEE_TA_LOG_LEVEL=0 CFG_DEBUG_INFO=n
+          _make CFG_TEE_CORE_LOG_LEVEL=4 CFG_TEE_CORE_DEBUG=y CFG_TEE_TA_LOG_LEVEL=4 CFG_CC_OPT_LEVEL=0 CFG_DEBUG_INFO=y
+          _make CFG_TEE_CORE_LOG_LEVEL=0 CFG_TEE_CORE_DEBUG=n CFG_TEE_TA_LOG_LEVEL=0 CFG_DEBUG_INFO=n CFG_ENABLE_EMBEDDED_TESTS=n
           _make CFG_TEE_CORE_MALLOC_DEBUG=y CFG_CORE_DEBUG_CHECK_STACKS=y
           _make CFG_CORE_SANITIZE_UNDEFINED=y
           _make CFG_CORE_SANITIZE_KADDRESS=y
@@ -92,7 +135,7 @@ jobs:
           _make PLATFORM=imx-mx6ulevk CFG_NXP_CAAM=y CFG_CRYPTO_DRIVER=y
           _make PLATFORM=imx-mx6ul9x9evk
           _make PLATFORM=imx-mx6ullevk CFG_WITH_SOFTWARE_PRNG=n CFG_IMX_RNGB=y
-          if [ -d $HOME/se050 ]; then _make PLATFORM=imx-mx6ullevk CFG_NXP_SE05X=y CFG_IMX_I2C=y CFG_STACK_{THREAD,TMP}_EXTRA=8192 CFG_CRYPTO_DRV_{CIPHER,ACIPHER}=y CFG_WITH_SOFTWARE_PRNG=n CFG_NXP_SE05X_{RNG,RSA,ECC,CTR}_DRV=y CFG_NXP_SE05X_PLUG_AND_TRUST_LIB=$HOME/se050/buildarm/libse050.a CFG_NXP_SE05X_PLUG_AND_TRUST=$HOME/se050; fi
+          if [ -d $HOME/se050/plug-and-trust ]; then _make PLATFORM=imx-mx6ullevk CFG_NXP_SE05X=y CFG_IMX_I2C=y CFG_STACK_{THREAD,TMP}_EXTRA=8192 CFG_CRYPTO_DRV_{CIPHER,ACIPHER}=y CFG_WITH_SOFTWARE_PRNG=n CFG_NXP_SE05X_{DIEID,RNG,RSA,ECC,CTR}_DRV=y CFG_NXP_SE05X_PLUG_AND_TRUST=$HOME/se050/plug-and-trust ; fi
           _make PLATFORM=imx-mx6ulzevk
           _make PLATFORM=imx-mx6slevk
           _make PLATFORM=imx-mx6sllevk
@@ -118,12 +161,15 @@ jobs:
           _make PLATFORM=imx-mx7ulpevk
           _make PLATFORM=imx-mx8mmevk
           _make PLATFORM=imx-mx8mmevk CFG_NXP_CAAM=y CFG_CRYPTO_DRIVER=y
-          if [ -d $HOME/se050 ]; then _make PLATFORM=imx-mx8mmevk CFG_NXP_CAAM=y CFG_NXP_CAAM_RNG_DRV=y CFG_NXP_SE05X=y CFG_IMX_I2C=y CFG_STACK_{THREAD,TMP}_EXTRA=8192 CFG_CRYPTO_DRV_{CIPHER,ACIPHER}=y CFG_NXP_SE05X_RNG_DRV=n CFG_WITH_SOFTWARE_PRNG=n CFG_NXP_SE05X_{RSA,ECC,CTR}_DRV=y CFG_NXP_SE05X_PLUG_AND_TRUST_LIB=$HOME/se050/build/libse050.a CFG_NXP_SE05X_PLUG_AND_TRUST=$HOME/se050 ; fi
+          if [ -d $HOME/se050/plug-and-trust ]; then _make PLATFORM=imx-mx8mmevk CFG_NXP_CAAM=y CFG_NXP_CAAM_RNG_DRV=y CFG_NXP_SE05X=y CFG_IMX_I2C=y CFG_STACK_{THREAD,TMP}_EXTRA=8192 CFG_CRYPTO_DRV_{CIPHER,ACIPHER}=y CFG_NXP_SE05X_RNG_DRV=n CFG_WITH_SOFTWARE_PRNG=n CFG_NXP_SE05X_{DIEID,RSA,ECC,CTR}_DRV=y CFG_NXP_SE05X_PLUG_AND_TRUST=$HOME/se050/plug-and-trust ; fi
           _make PLATFORM=imx-mx8mnevk
           _make PLATFORM=imx-mx8mqevk
           _make PLATFORM=imx-mx8mpevk
           _make PLATFORM=imx-mx8qxpmek
           _make PLATFORM=imx-mx8qmmek
+          _make PLATFORM=imx-mx8dxlevk
+          _make PLATFORM=imx-mx8ulpevk
+          _make PLATFORM=imx-mx8ulpevk CFG_NXP_CAAM=y CFG_CRYPTO_DRIVER=y
           _make PLATFORM=k3-j721e
           _make PLATFORM=k3-j721e CFG_ARM64_core=y
           _make PLATFORM=k3-am65x
@@ -188,14 +234,39 @@ jobs:
       - script: |
           set -e -v
           export LC_ALL=C
+          # Azure CI sets ${SYSTEM} to "build" which prevents OpenSSL from building due to:
+          # https://github.com/openssl/openssl/blob/OpenSSL_1_1_1l/config#L56
+          unset SYSTEM
           WD=$(pwd)
+          sudo -E bash -c "cd /root/optee_repo_qemu_v8/.repo/repo && git pull"
           sudo -E bash -c "cd /root/optee_repo_qemu_v8 && repo sync -j 10"
           sudo mv /root/optee_repo_qemu_v8/optee_os /root/optee_repo_qemu_v8/optee_os_old
           sudo ln -s ${WD} /root/optee_repo_qemu_v8/optee_os
 
           sudo -E make -C /root/optee_repo_qemu_v8/build -j$(getconf _NPROCESSORS_ONLN) CFG_TEE_CORE_LOG_LEVEL=0 check
 
-          sudo touch /boot/vmlinuz-$(uname -r)
           sudo -E rm -rf /root/optee_repo_qemu_v8/out-br/build/optee_test*
           sudo -E make -C /root/optee_repo_qemu_v8/build arm-tf-clean
           sudo -E make -C /root/optee_repo_qemu_v8/build -j$(getconf _NPROCESSORS_ONLN) CFG_TEE_CORE_LOG_LEVEL=0 check XEN_BOOT=y
+
+  - job: QEMUv8_build_Rust
+    displayName: 'Run regression tests (Rust) in QEMUv8'
+    pool:
+      vmImage: ubuntu-18.04
+    container:
+      image: jforissier/optee_os_ci:qemuv8_check
+    steps:
+      - script: |
+          set -e -v
+          export HOME=/root
+          export LC_ALL=C
+          # Azure CI sets ${SYSTEM} to "build" which prevents OpenSSL from building due to:
+          # https://github.com/openssl/openssl/blob/OpenSSL_1_1_1l/config#L56
+          unset SYSTEM
+          WD=$(pwd)
+          sudo -E bash -c "cd /root/optee_repo_qemu_v8/.repo/repo && git pull"
+          sudo -E bash -c "cd /root/optee_repo_qemu_v8 && repo sync -j 10"
+          sudo mv /root/optee_repo_qemu_v8/optee_os /root/optee_repo_qemu_v8/optee_os_old
+          sudo ln -s ${WD} /root/optee_repo_qemu_v8/optee_os
+
+          sudo -E bash -c "make -C /root/optee_repo_qemu_v8/build -j$(getconf _NPROCESSORS_ONLN) CFG_TEE_CORE_LOG_LEVEL=0 OPTEE_RUST_ENABLE=y check-rust"

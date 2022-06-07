@@ -28,6 +28,7 @@ bool sanitize_consistent_class_and_type(struct obj_attrs *attrs)
 {
 	switch (get_class(attrs)) {
 	case PKCS11_CKO_DATA:
+	case PKCS11_CKO_CERTIFICATE:
 		return true;
 	case PKCS11_CKO_SECRET_KEY:
 		return key_type_is_symm_key(get_key_type(attrs));
@@ -37,7 +38,6 @@ bool sanitize_consistent_class_and_type(struct obj_attrs *attrs)
 	case PKCS11_CKO_PRIVATE_KEY:
 		return key_type_is_asymm_key(get_key_type(attrs));
 	case PKCS11_CKO_OTP_KEY:
-	case PKCS11_CKO_CERTIFICATE:
 	case PKCS11_CKO_DOMAIN_PARAMETERS:
 	case PKCS11_CKO_HW_FEATURE:
 	default:
@@ -231,10 +231,6 @@ static uint32_t sanitize_indirect_attr(struct obj_attrs **dst,
 	enum pkcs11_rc rc = PKCS11_CKR_OK;
 
 	assert(pkcs11_attr_has_indirect_attributes(cli_ref->id));
-
-	rc = init_attributes_head(&obj2);
-	if (rc)
-		return rc;
 
 	/* Build a new serial object while sanitizing the attributes list */
 	rc = sanitize_client_object(&obj2, data, cli_ref->size,

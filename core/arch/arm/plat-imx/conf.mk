@@ -70,13 +70,20 @@ mx8mn-flavorlist = \
 	mx8mnevk
 
 mx8mp-flavorlist = \
-	mx8mpevk
+	mx8mpevk \
+	mx8mp_rsb3720_6g
 
 mx8qm-flavorlist = \
 	mx8qmmek \
 
 mx8qx-flavorlist = \
 	mx8qxpmek \
+
+mx8dxl-flavorlist = \
+	mx8dxlevk \
+
+mx8ulp-flavorlist = \
+	mx8ulpevk \
 
 ifneq (,$(filter $(PLATFORM_FLAVOR),$(mx6ul-flavorlist)))
 $(call force,CFG_MX6,y)
@@ -88,6 +95,7 @@ else ifneq (,$(filter $(PLATFORM_FLAVOR),$(mx6ull-flavorlist)))
 $(call force,CFG_MX6,y)
 $(call force,CFG_MX6ULL,y)
 $(call force,CFG_TEE_CORE_NB_CORE,1)
+$(call force,CFG_TZC380,y)
 $(call force,CFG_IMX_CAAM,n)
 $(call force,CFG_NXP_CAAM,n)
 $(call force,CFG_IMX_DCP,y)
@@ -129,6 +137,7 @@ $(call force,CFG_TEE_CORE_NB_CORE,1)
 $(call force,CFG_IMX_CAAM,n)
 $(call force,CFG_NXP_CAAM,n)
 $(call force,CFG_IMX_DCP,y)
+$(call force,CFG_NO_SMP,y)
 else ifneq (,$(filter $(PLATFORM_FLAVOR),$(mx6sx-flavorlist)))
 $(call force,CFG_MX6,y)
 $(call force,CFG_MX6SX,y)
@@ -150,24 +159,28 @@ $(call force,CFG_NXP_CAAM,n)
 include core/arch/arm/cpu/cortex-a7.mk
 else ifneq (,$(filter $(PLATFORM_FLAVOR),$(mx8mq-flavorlist)))
 $(call force,CFG_MX8MQ,y)
+$(call force,CFG_MX8M,y)
 $(call force,CFG_ARM64_core,y)
 CFG_IMX_UART ?= y
 CFG_DRAM_BASE ?= 0x40000000
 CFG_TEE_CORE_NB_CORE ?= 4
 else ifneq (,$(filter $(PLATFORM_FLAVOR),$(mx8mm-flavorlist)))
 $(call force,CFG_MX8MM,y)
+$(call force,CFG_MX8M,y)
 $(call force,CFG_ARM64_core,y)
 CFG_IMX_UART ?= y
 CFG_DRAM_BASE ?= 0x40000000
 CFG_TEE_CORE_NB_CORE ?= 4
 else ifneq (,$(filter $(PLATFORM_FLAVOR),$(mx8mn-flavorlist)))
 $(call force,CFG_MX8MN,y)
+$(call force,CFG_MX8M,y)
 $(call force,CFG_ARM64_core,y)
 CFG_IMX_UART ?= y
 CFG_DRAM_BASE ?= 0x40000000
 CFG_TEE_CORE_NB_CORE ?= 4
 else ifneq (,$(filter $(PLATFORM_FLAVOR),$(mx8mp-flavorlist)))
 $(call force,CFG_MX8MP,y)
+$(call force,CFG_MX8M,y)
 $(call force,CFG_ARM64_core,y)
 CFG_IMX_UART ?= y
 CFG_DRAM_BASE ?= 0x40000000
@@ -179,14 +192,32 @@ $(call force,CFG_IMX_SNVS,n)
 CFG_IMX_LPUART ?= y
 CFG_DRAM_BASE ?= 0x80000000
 CFG_TEE_CORE_NB_CORE ?= 6
-$(call force,CFG_NXP_CAAM,n)
+$(call force,CFG_IMX_OCOTP,n)
 else ifneq (,$(filter $(PLATFORM_FLAVOR),$(mx8qx-flavorlist)))
 $(call force,CFG_MX8QX,y)
 $(call force,CFG_ARM64_core,y)
+$(call force,CFG_IMX_SNVS,n)
 CFG_IMX_LPUART ?= y
 CFG_DRAM_BASE ?= 0x80000000
 CFG_TEE_CORE_NB_CORE ?= 4
+$(call force,CFG_IMX_OCOTP,n)
+else ifneq (,$(filter $(PLATFORM_FLAVOR),$(mx8dxl-flavorlist)))
+$(call force,CFG_MX8DXL,y)
+$(call force,CFG_ARM64_core,y)
+$(call force,CFG_IMX_SNVS,n)
+CFG_IMX_LPUART ?= y
+CFG_DRAM_BASE ?= 0x80000000
+$(call force,CFG_TEE_CORE_NB_CORE,2)
+$(call force,CFG_IMX_OCOTP,n)
 $(call force,CFG_NXP_CAAM,n)
+else ifneq (,$(filter $(PLATFORM_FLAVOR),$(mx8ulp-flavorlist)))
+$(call force,CFG_MX8ULP,y)
+$(call force,CFG_ARM64_core,y)
+CFG_IMX_LPUART ?= y
+CFG_DRAM_BASE ?= 0x80000000
+CFG_TEE_CORE_NB_CORE ?= 2
+$(call force,CFG_NXP_SNVS,n)
+$(call force,CFG_IMX_OCOTP,n)
 else
 $(error Unsupported PLATFORM_FLAVOR "$(PLATFORM_FLAVOR)")
 endif
@@ -194,11 +225,13 @@ endif
 ifneq (,$(filter $(PLATFORM_FLAVOR),mx7dsabresd))
 CFG_DDR_SIZE ?= 0x40000000
 CFG_NS_ENTRY_ADDR ?= 0x80800000
+CFG_IMX_WDOG_EXT_RESET ?= y
 endif
 
 ifneq (,$(filter $(PLATFORM_FLAVOR),mx7dclsom))
 CFG_DDR_SIZE ?= 0x40000000
 CFG_UART_BASE ?= UART1_BASE
+CFG_IMX_WDOG_EXT_RESET ?= y
 endif
 
 ifneq (,$(filter $(PLATFORM_FLAVOR),mx7dpico_mbl))
@@ -337,12 +370,30 @@ $(call force,CFG_CORE_LARGE_PHYS_ADDR,y)
 $(call force,CFG_CORE_ARM64_PA_BITS,36)
 endif
 
+ifneq (,$(filter $(PLATFORM_FLAVOR),mx8mp_rsb3720_6g))
+CFG_DDR_SIZE ?= UL(0x180000000)
+CFG_UART_BASE ?= UART3_BASE
+CFG_TZDRAM_START ?= 0x56000000
+$(call force,CFG_CORE_LARGE_PHYS_ADDR,y)
+$(call force,CFG_CORE_ARM64_PA_BITS,36)
+endif
+
 ifneq (,$(filter $(PLATFORM_FLAVOR),mx8qxpmek mx8qmmek))
 CFG_DDR_SIZE ?= 0x80000000
 CFG_UART_BASE ?= UART0_BASE
 CFG_NSEC_DDR_1_BASE ?= 0x880000000UL
 CFG_NSEC_DDR_1_SIZE  ?= 0x380000000UL
 CFG_CORE_ARM64_PA_BITS ?= 40
+endif
+
+ifneq (,$(filter $(PLATFORM_FLAVOR),mx8dxlevk))
+CFG_DDR_SIZE ?= 0x40000000
+CFG_UART_BASE ?= UART0_BASE
+endif
+
+ifneq (,$(filter $(PLATFORM_FLAVOR),mx8ulpevk))
+CFG_DDR_SIZE ?= 0x80000000
+CFG_UART_BASE ?= UART5_BASE
 endif
 
 # i.MX6 Solo/SL/SoloX/DualLite/Dual/Quad specific config
@@ -431,11 +482,21 @@ CFG_NSEC_DDR_0_SIZE ?= ($(CFG_DDR_SIZE) - 0x02000000)
 CFG_CRYPTO_SIZE_OPTIMIZATION ?= n
 CFG_MMAP_REGIONS ?= 24
 
+# SE05X and OCOTP both implement tee_otp_get_die_id()
+ifeq ($(CFG_NXP_SE05X),y)
+$(call force,CFG_IMX_OCOTP,n)
+endif
+CFG_IMX_OCOTP ?= y
+
 # Almost all platforms include CAAM HW Modules, except the
 # ones forced to be disabled
 CFG_NXP_CAAM ?= n
 
 ifeq ($(CFG_NXP_CAAM),y)
+ifeq ($(filter y, $(CFG_MX8QM) $(CFG_MX8QX) $(CFG_MX8DXL)), y)
+CFG_IMX_SC ?= y
+endif
+
 # As NXP CAAM Driver is enabled, disable the small local CAAM driver
 # used just to release Job Rings to Non-Secure world
 $(call force,CFG_IMX_CAAM,n)

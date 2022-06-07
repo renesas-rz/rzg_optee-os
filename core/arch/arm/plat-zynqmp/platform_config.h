@@ -32,10 +32,19 @@
 #include <mm/generic_ram_layout.h>
 
 /* Make stacks aligned to data cache line length */
-#define STACK_ALIGNMENT		64
+#define CACHELINE_LEN		64
+#define STACK_ALIGNMENT		CACHELINE_LEN
 
 #ifdef CFG_WITH_PAGER
 #error "Pager not supported for zynqmp"
+#endif
+
+/* DDR Low area base */
+#define DRAM0_BASE		0
+
+#ifdef ARM64
+/* DDR High area base is only available when compiling for 64 bits */
+#define DRAM1_BASE		0x800000000
 #endif
 
 #if defined(PLATFORM_FLAVOR_zc1751_dc1) || \
@@ -55,9 +64,6 @@
 #define IT_CONSOLE_UART		IT_UART0
 #define CONSOLE_UART_CLK_IN_HZ	UART0_CLK_IN_HZ
 
-#define DRAM0_BASE		0
-#define DRAM0_SIZE		0x80000000
-
 #define GICD_OFFSET		0
 #define GICC_OFFSET		0x20000
 
@@ -76,15 +82,17 @@
 #define IT_CONSOLE_UART		IT_UART1
 #define CONSOLE_UART_CLK_IN_HZ	UART1_CLK_IN_HZ
 
-#define DRAM0_BASE		0
-#define DRAM0_SIZE		0x80000000
-
 #define GICD_OFFSET		0
 #define GICC_OFFSET		0x20000
 
 #else
 #error "Unknown platform flavor"
 #endif
+
+#define CSUDMA_BASE		0xFFC80000
+#define CSUDMA_SIZE		0x1000
+#define CSU_BASE		0xFFCA0000
+#define CSU_SIZE		0x5038
 
 #ifdef CFG_TEE_LOAD_ADDR
 #define TEE_LOAD_ADDR			CFG_TEE_LOAD_ADDR

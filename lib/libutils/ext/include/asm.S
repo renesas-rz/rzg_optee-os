@@ -4,13 +4,24 @@
  * Copyright (c) 2020, Linaro Limited
  */
 
+#if defined(__aarch64__)
+#include <arm64_bti.S>
+#endif
+
+#if defined(__aarch64__) && ((defined(__KERNEL__) && defined(CFG_CORE_BTI)) || \
+			     (!defined(__KERNEL__) && defined(CFG_TA_BTI)))
+#define BTI(...) __VA_ARGS__
+#else
+#define BTI(...)
+#endif
+
 #if defined(CFG_UNWIND) && defined(__arm__)
 #define UNWIND(...) __VA_ARGS__
 #else
 #define UNWIND(...)
 #endif
 
-	.macro FUNC name colon section=default align=4
+	.macro FUNC name colon section=default align=4 _bti=default
 	.ifc	\section\(),default
 	.section .text.\name
 	.else
@@ -21,9 +32,12 @@
 	.balign \align
 	\name \colon
 UNWIND(	.fnstart)
+	.ifc	\_bti\(),default
+BTI(	bti	c)
+	.endif
 	.endm
 
-	.macro LOCAL_FUNC name colon section=default align=4
+	.macro LOCAL_FUNC name colon section=default align=4 _bti=default
 	.ifc	\section\(),default
 	.section .text.\name
 	.else
@@ -33,9 +47,12 @@ UNWIND(	.fnstart)
 	.balign \align
 	\name \colon
 UNWIND(	.fnstart)
+	.ifc	\_bti\(),default
+BTI(	bti	c)
+	.endif
 	.endm
 
-	.macro WEAK_FUNC name colon section=default align=4
+	.macro WEAK_FUNC name colon section=default align=4 _bti=default
 	.ifc	\section\(),default
 	.section .text.\name
 	.else
@@ -46,6 +63,9 @@ UNWIND(	.fnstart)
 	.balign \align
 	\name \colon
 UNWIND(	.fnstart)
+	.ifc	\_bti\(),default
+BTI(	bti	c)
+	.endif
 	.endm
 
 	.macro END_FUNC name

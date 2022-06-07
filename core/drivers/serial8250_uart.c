@@ -34,7 +34,7 @@ static vaddr_t chip_to_base(struct serial_chip *chip)
 	struct serial8250_uart_data *pd =
 		container_of(chip, struct serial8250_uart_data, chip);
 
-	return io_pa_or_va(&pd->base);
+	return io_pa_or_va(&pd->base, SERIAL8250_UART_REG_SIZE);
 }
 
 static void serial8250_uart_flush(struct serial_chip *chip)
@@ -158,8 +158,9 @@ static const struct dt_device_match serial8250_match_table[] = {
 	{ 0 }
 };
 
-const struct dt_driver serial8250_dt_driver __dt_driver = {
+DEFINE_DT_DRIVER(serial8250_dt_driver) = {
 	.name = "serial8250_uart",
+	.type = DT_DRIVER_UART,
 	.match_table = serial8250_match_table,
 	.driver = &serial8250_driver,
 };

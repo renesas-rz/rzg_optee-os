@@ -27,6 +27,8 @@
    SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <asm.S>
+
 #define GPR_LAYOUT			\
 	REG_PAIR (x19, x20,  0);	\
 	REG_PAIR (x21, x22, 16);	\
@@ -46,6 +48,7 @@
 	.global	setjmp
 	.type	setjmp, %function
 setjmp:
+BTI(	bti	c)
 	mov	x16, sp
 #define REG_PAIR(REG1, REG2, OFFS)	stp REG1, REG2, [x0, OFFS]
 #define REG_ONE(REG1, OFFS)		str REG1, [x0, OFFS]
@@ -68,6 +71,7 @@ setjmp:
 	.global	longjmp
 	.type	longjmp, %function
 longjmp:
+BTI(	bti	c)
 #define REG_PAIR(REG1, REG2, OFFS)	ldp REG1, REG2, [x0, OFFS]
 #define REG_ONE(REG1, OFFS)		ldr REG1, [x0, OFFS]
 #ifdef CFG_FTRACE_SUPPORT
@@ -86,6 +90,17 @@ longjmp:
 	mov	sp, x16
 	cmp	w1, #0
 	cinc	w0, w1, eq
+/*
+ * clang has a bug and doesn't insert bti after setjmp
+ * causing BTI ecxception. Remove this when the bug is fixed.
+ * https://bugs.llvm.org/show_bug.cgi?id=49544
+ */
+#if defined(__clang__) && defined(CFG_TA_BTI)
+	ret
+#else
 	// use br not ret, as ret is guaranteed to mispredict
 	br	x30
+#endif
 	.size	longjmp, .-longjmp
+
+BTI(emit_aarch64_feature_1_and     GNU_PROPERTY_AARCH64_FEATURE_1_BTI)

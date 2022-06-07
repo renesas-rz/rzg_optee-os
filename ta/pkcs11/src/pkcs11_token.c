@@ -24,12 +24,8 @@
 #include "serializer.h"
 #include "token_capabilities.h"
 
-/* Provide 3 slots/tokens, ID is token index */
-#ifndef CFG_PKCS11_TA_TOKEN_COUNT
-#define TOKEN_COUNT		3
-#else
+/* Number of tokens implemented by the TA. Token ID is the token index */
 #define TOKEN_COUNT		CFG_PKCS11_TA_TOKEN_COUNT
-#endif
 
 /* RNG chunk size used to split RNG generation to smaller sizes */
 #define RNG_CHUNK_SIZE		512U
@@ -219,6 +215,7 @@ enum pkcs11_rc set_processing_state(struct pkcs11_session *session,
 
 	/* Boolean are default to false and pointers to NULL */
 	proc->state = state;
+	proc->step = PKCS11_FUNC_STEP_INIT;
 	proc->tee_op_handle = TEE_HANDLE_NULL;
 	proc->tee_hash_algo = 0;
 	proc->tee_hash_op_handle = TEE_HANDLE_NULL;

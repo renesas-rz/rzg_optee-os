@@ -36,15 +36,28 @@ CFG_CAAM_SGT_ALIGN ?= 1
 # Version of the SGT implementation to use
 CFG_NXP_CAAM_SGT_V1 ?= y
 
-#
-# CAAM Job Ring configuration
-#  - Normal boot settings
-#  - HAB support boot settings
-#
+ifeq ($(filter y, $(CFG_MX8QM) $(CFG_MX8QX)),y)
+$(call force, CFG_CAAM_SIZE_ALIGN,4)
+$(call force, CFG_JR_BLOCK_SIZE,0x10000)
+$(call force,CFG_JR_INDEX,3)
+$(call force,CFG_JR_INT,486)
+else ifneq (,$(filter y, $(CFG_MX8MM) $(CFG_MX8MN) $(CFG_MX8MP) $(CFG_MX8MQ)))
+$(call force,CFG_CAAM_SIZE_ALIGN,1)
+$(call force,CFG_JR_BLOCK_SIZE,0x1000)
+$(call force,CFG_JR_INDEX,2)
+$(call force,CFG_JR_INT,146)
+else ifneq (,$(filter y, $(CFG_MX8ULP)))
+$(call force,CFG_CAAM_SIZE_ALIGN,1)
+$(call force,CFG_JR_BLOCK_SIZE,0x1000)
+$(call force,CFG_JR_INDEX,2)
+$(call force,CFG_JR_INT,114)
+$(call force,CFG_CAAM_NO_ITR,y)
+else
+$(call force, CFG_CAAM_SIZE_ALIGN,1)
 $(call force, CFG_JR_BLOCK_SIZE,0x1000)
-
-$(call force, CFG_JR_INDEX,0)  # Default JR index used
-$(call force, CFG_JR_INT,137)  # Default JR IT Number (105 + 32) = 137
+$(call force, CFG_JR_INDEX,0)
+$(call force, CFG_JR_INT,137)
+endif
 
 #
 # Configuration of the Crypto Driver
@@ -88,7 +101,7 @@ $(eval $(call cryphw-enable-drv-hw, HMAC))
 $(eval $(call cryphw-enable-drv-hw, CMAC))
 
 ifneq ($(filter y, $(CFG_MX6QP) $(CFG_MX6Q) $(CFG_MX6D) $(CFG_MX6DL) \
-	$(CFG_MX6S) $(CFG_MX6SL) $(CFG_MX6SLL) $(CFG_MX6SX)), y)
+	$(CFG_MX6S) $(CFG_MX6SL) $(CFG_MX6SLL) $(CFG_MX6SX) $(CFG_MX7ULP) $(CFG_MX8ULP)), y)
 $(eval $(call cryphw-enable-drv-hw, RSA))
 $(eval $(call cryphw-enable-drv-hw, ECC))
 $(eval $(call cryphw-enable-drv-hw, DH))

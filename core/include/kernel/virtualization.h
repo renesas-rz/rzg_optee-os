@@ -4,12 +4,14 @@
 #ifndef KERNEL_VIRTUALIZATION_H
 #define KERNEL_VIRTUALIZATION_H
 
+#include <mm/core_mmu.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <mm/core_mmu.h>
+#include <tee_api_types.h>
 
 #define HYP_CLNT_ID 0
 
+#if defined(CFG_VIRTUALIZATION)
 /**
  * virt_guest_created() - create new VM partition
  * @guest_id: VM id provided by hypervisor
@@ -17,10 +19,8 @@
  * This function is called by hypervisor (via fast SMC)
  * when hypervisor creates new guest VM, so OP-TEE
  * can prepare partition for that VM
- *
- * Return: OPTEE_SMC_RETURN_* code
  */
-uint32_t virt_guest_created(uint16_t guest_id);
+TEE_Result virt_guest_created(uint16_t guest_id);
 
 /**
  * virt_guest_destroyed() - destroy existing VM partition
@@ -30,10 +30,8 @@ uint32_t virt_guest_created(uint16_t guest_id);
  * when hypervisor is ready to destroy guest VM. Hypervisor
  * must ensure that there are no ongoing calls from this
  * VM right now.
- *
- * Return: OPTEE_SMC_RETURN_OK
  */
-uint32_t virt_guest_destroyed(uint16_t guest_id);
+TEE_Result virt_guest_destroyed(uint16_t guest_id);
 
 /**
  * virt_set_guest() - set guest VM context for current core
@@ -42,10 +40,8 @@ uint32_t virt_guest_destroyed(uint16_t guest_id);
  * This function switches memory partitions, so TEE part of
  * OP-TEE will see memory associated with current guest.
  * It should be called on entry to OP-TEE
- *
- * Return: True if VM partition was found and set
  */
-bool virt_set_guest(uint16_t guest_id);
+TEE_Result virt_set_guest(uint16_t guest_id);
 
 /**
  * virt_unset_guest() - set default memory partition
@@ -88,5 +84,24 @@ struct tee_mmap_region *virt_get_memory_map(void);
  * @end: end of TA RAM returned here
  */
 void virt_get_ta_ram(vaddr_t *start, vaddr_t *end);
+
+#else
+static inline TEE_Result virt_guest_created(uint16_t guest_id __unused)
+{ return TEE_ERROR_NOT_SUPPORTED; }
+
+static inline TEE_Result virt_guest_destroyed(uint16_t guest_id __unused)
+{ return TEE_ERROR_NOT_SUPPORTED; }
+
+static inline TEE_Result virt_set_guest(uint16_t guest_id __unused)
+{ return TEE_ERROR_NOT_SUPPORTED; }
+
+static inline void virt_unset_guest(void) { }
+static inline void virt_on_stdcall(void) { }
+static inline struct tee_mmap_region *virt_get_memory_map(void) { return NULL; }
+static inline void
+virt_get_ta_ram(vaddr_t *start __unused, vaddr_t *end __unused) { }
+static inline void
+virt_init_memory(struct tee_mmap_region *memory_map __unused) { }
+#endif /*CFG_VIRTUALIZATION*/
 
 #endif	/* KERNEL_VIRTUALIZATION_H */

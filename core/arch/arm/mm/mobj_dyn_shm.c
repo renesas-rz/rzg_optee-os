@@ -101,11 +101,11 @@ static size_t mobj_reg_shm_get_phys_offs(struct mobj *mobj,
 	return to_mobj_reg_shm(mobj)->page_offset;
 }
 
-static void *mobj_reg_shm_get_va(struct mobj *mobj, size_t offst)
+static void *mobj_reg_shm_get_va(struct mobj *mobj, size_t offst, size_t len)
 {
 	struct mobj_reg_shm *mrs = to_mobj_reg_shm(mobj);
 
-	if (!mrs->mm || offst >= mobj->size)
+	if (!mrs->mm || !mobj_check_offset_and_len(mobj, offst, len))
 		return NULL;
 
 	return (void *)(vaddr_t)(tee_mm_get_smem(mrs->mm) + offst +
@@ -114,6 +114,7 @@ static void *mobj_reg_shm_get_va(struct mobj *mobj, size_t offst)
 
 static void reg_shm_unmap_helper(struct mobj_reg_shm *r)
 {
+	assert(r->mm);
 	assert(r->mm->pool->shift == SMALL_PAGE_SHIFT);
 	core_mmu_unmap_pages(tee_mm_get_smem(r->mm), r->mm->size);
 	tee_mm_free(r->mm);
@@ -180,30 +181,44 @@ static TEE_Result mobj_reg_shm_inc_map(struct mobj *mobj)
 {
 	TEE_Result res = TEE_SUCCESS;
 	struct mobj_reg_shm *r = to_mobj_reg_shm(mobj);
+	uint32_t exceptions = 0;
 	size_t sz = 0;
 
-	if (refcount_inc(&r->mapcount))
-		return TEE_SUCCESS;
+	while (true) {
+		if (refcount_inc(&r->mapcount))
+			return TEE_SUCCESS;
 
-	uint32_t exceptions = cpu_spin_lock_xsave(&reg_shm_map_lock);
+		exceptions = cpu_spin_lock_xsave(&reg_shm_map_lock);
 
-	if (refcount_val(&r->mapcount))
-		goto out;
-
-	assert(!r->mm);
-	sz = ROUNDUP(mobj->size + r->page_offset, SMALL_PAGE_SIZE);
-	r->mm = tee_mm_alloc(&tee_mm_shm, sz);
-	if (!r->mm) {
-		res = TEE_ERROR_OUT_OF_MEMORY;
-		goto out;
+		if (!refcount_val(&r->mapcount))
+			break; /* continue to reinitialize */
+		/*
+		 * If another thread beat us to initialize mapcount,
+		 * restart to make sure we still increase it.
+		 */
+		cpu_spin_unlock_xrestore(&reg_shm_map_lock, exceptions);
 	}
 
-	res = core_mmu_map_pages(tee_mm_get_smem(r->mm), r->pages,
-				 sz / SMALL_PAGE_SIZE, MEM_AREA_NSEC_SHM);
-	if (res) {
-		tee_mm_free(r->mm);
-		r->mm = NULL;
-		goto out;
+	/*
+	 * If we have beated another thread calling mobj_reg_shm_dec_map()
+	 * to get the lock we need only to reinitialize mapcount to 1.
+	 */
+	if (!r->mm) {
+		sz = ROUNDUP(mobj->size + r->page_offset, SMALL_PAGE_SIZE);
+		r->mm = tee_mm_alloc(&tee_mm_shm, sz);
+		if (!r->mm) {
+			res = TEE_ERROR_OUT_OF_MEMORY;
+			goto out;
+		}
+
+		res = core_mmu_map_pages(tee_mm_get_smem(r->mm), r->pages,
+					 sz / SMALL_PAGE_SIZE,
+					 MEM_AREA_NSEC_SHM);
+		if (res) {
+			tee_mm_free(r->mm);
+			r->mm = NULL;
+			goto out;
+		}
 	}
 
 	refcount_set(&r->mapcount, 1);
@@ -239,8 +254,10 @@ static uint64_t mobj_reg_shm_get_cookie(struct mobj *mobj)
 }
 
 /*
- * Note: this variable is weak just to ease breaking its dependency chain
- * when added to the unpaged area.
+ * When CFG_PREALLOC_RPC_CACHE is disabled, this variable is weak just
+ * to ease breaking its dependency chain when added to the unpaged area.
+ * When CFG_PREALLOC_RPC_CACHE is enabled, releasing RPC preallocated
+ * shm mandates these resources to be unpaged.
  */
 const struct mobj_ops mobj_reg_shm_ops
 __weak __rodata_unpaged("mobj_reg_shm_ops") = {
@@ -254,6 +271,13 @@ __weak __rodata_unpaged("mobj_reg_shm_ops") = {
 	.inc_map = mobj_reg_shm_inc_map,
 	.dec_map = mobj_reg_shm_dec_map,
 };
+
+#ifdef CFG_PREALLOC_RPC_CACHE
+/* Releasing RPC preallocated shm mandates few resources to be unpaged */
+DECLARE_KEEP_PAGER(mobj_reg_shm_get_cookie);
+DECLARE_KEEP_PAGER(mobj_reg_shm_matches);
+DECLARE_KEEP_PAGER(mobj_reg_shm_free);
+#endif
 
 static bool mobj_reg_shm_matches(struct mobj *mobj __maybe_unused,
 				   enum buf_is_attr attr)
@@ -432,8 +456,8 @@ static TEE_Result mobj_mapped_shm_init(void)
 	if (!pool_start || !pool_end)
 		panic("Can't find region for shmem pool");
 
-	if (!tee_mm_init(&tee_mm_shm, pool_start, pool_end, SMALL_PAGE_SHIFT,
-		    TEE_MM_POOL_NO_FLAGS))
+	if (!tee_mm_init(&tee_mm_shm, pool_start, pool_end - pool_start,
+			 SMALL_PAGE_SHIFT, TEE_MM_POOL_NO_FLAGS))
 		panic("Could not create shmem pool");
 
 	DMSG("Shared memory address range: %" PRIxVA ", %" PRIxVA,
@@ -441,4 +465,4 @@ static TEE_Result mobj_mapped_shm_init(void)
 	return TEE_SUCCESS;
 }
 
-service_init(mobj_mapped_shm_init);
+preinit(mobj_mapped_shm_init);

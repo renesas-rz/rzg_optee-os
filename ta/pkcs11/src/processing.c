@@ -140,6 +140,11 @@ size_t get_object_key_bit_size(struct pkcs11_object *obj)
 			return 0;
 
 		return a_size * 8;
+	case PKCS11_CKK_RSA:
+		if (get_attribute_ptr(attrs, PKCS11_CKA_MODULUS, NULL, &a_size))
+			return 0;
+
+		return a_size * 8;
 	case PKCS11_CKK_EC:
 		if (get_attribute_ptr(attrs, PKCS11_CKA_EC_PARAMS,
 				      &a_ptr, &a_size) || !a_ptr)
@@ -501,6 +506,9 @@ enum pkcs11_rc entry_generate_key_pair(struct pkcs11_client *client,
 	case PKCS11_CKM_EC_KEY_PAIR_GEN:
 		rc = generate_ec_keys(proc_params, &pub_head, &priv_head);
 		break;
+	case PKCS11_CKM_RSA_PKCS_KEY_PAIR_GEN:
+		rc = generate_rsa_keys(proc_params, &pub_head, &priv_head);
+		break;
 	default:
 		rc = PKCS11_CKR_MECHANISM_INVALID;
 		break;
@@ -605,18 +613,18 @@ enum pkcs11_rc entry_processing_init(struct pkcs11_client *client,
 
 	if (serialargs_remaining_bytes(&ctrlargs)) {
 		rc = PKCS11_CKR_ARGUMENTS_BAD;
-		goto out;
+		goto out_free;
 	}
 
 	rc = get_ready_session(session);
 	if (rc)
-		goto out;
+		goto out_free;
 
 	if (function != PKCS11_FUNCTION_DIGEST) {
 		obj = pkcs11_handle2object(key_handle, session);
 		if (!obj) {
 			rc = PKCS11_CKR_KEY_HANDLE_INVALID;
-			goto out;
+			goto out_free;
 		}
 	}
 
@@ -660,9 +668,9 @@ enum pkcs11_rc entry_processing_init(struct pkcs11_client *client,
 	}
 
 out:
-	if (rc && session)
+	if (rc)
 		release_active_processing(session);
-
+out_free:
 	TEE_Free(proc_params);
 
 	return rc;
@@ -751,11 +759,18 @@ enum pkcs11_rc entry_processing_step(struct pkcs11_client *client,
 
 	if (rc == PKCS11_CKR_OK && (step == PKCS11_FUNC_STEP_UPDATE ||
 				    step == PKCS11_FUNC_STEP_UPDATE_KEY)) {
-		session->processing->updated = true;
+		session->processing->step = PKCS11_FUNC_STEP_UPDATE;
 		DMSG("PKCS11 session%"PRIu32": processing %s %s",
 		     session->handle, id2str_proc(mecha_type),
 		     id2str_function(function));
 	}
+
+	if (rc == PKCS11_CKR_BUFFER_TOO_SMALL &&
+	    step == PKCS11_FUNC_STEP_ONESHOT)
+		session->processing->step = PKCS11_FUNC_STEP_ONESHOT;
+
+	if (rc == PKCS11_CKR_BUFFER_TOO_SMALL && step == PKCS11_FUNC_STEP_FINAL)
+		session->processing->step = PKCS11_FUNC_STEP_FINAL;
 
 out:
 	switch (step) {

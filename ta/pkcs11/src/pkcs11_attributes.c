@@ -87,8 +87,9 @@ check_mechanism_against_processing(struct pkcs11_session *session,
 		    !session->processing->relogged)
 			return PKCS11_CKR_USER_NOT_LOGGED_IN;
 
-		if (session->processing->updated) {
-			EMSG("Cannot perform one-shot on updated processing");
+		if (session->processing->step == PKCS11_FUNC_STEP_UPDATE ||
+		    session->processing->step == PKCS11_FUNC_STEP_FINAL) {
+			EMSG("Cannot perform one-shot on active processing");
 			return PKCS11_CKR_OPERATION_ACTIVE;
 		}
 
@@ -99,6 +100,12 @@ check_mechanism_against_processing(struct pkcs11_session *session,
 		if (session->processing->always_authen &&
 		    !session->processing->relogged)
 			return PKCS11_CKR_USER_NOT_LOGGED_IN;
+
+		if (session->processing->step == PKCS11_FUNC_STEP_ONESHOT ||
+		    session->processing->step == PKCS11_FUNC_STEP_FINAL) {
+			EMSG("Cannot perform update on finalized processing");
+			return PKCS11_CKR_OPERATION_ACTIVE;
+		}
 
 		allowed = !mechanism_is_one_shot_only(mechanism_type);
 		break;
@@ -118,6 +125,10 @@ check_mechanism_against_processing(struct pkcs11_session *session,
 		    !session->processing->relogged)
 			return PKCS11_CKR_USER_NOT_LOGGED_IN;
 
+		if (session->processing->step == PKCS11_FUNC_STEP_ONESHOT) {
+			EMSG("Cannot perform final on oneshot processing");
+			return PKCS11_CKR_OPERATION_ACTIVE;
+		}
 		return PKCS11_CKR_OK;
 
 	default:
@@ -330,6 +341,35 @@ const uint32_t raw_data_opt_or_null[] = {
 	PKCS11_CKA_OBJECT_ID, PKCS11_CKA_APPLICATION, PKCS11_CKA_VALUE,
 };
 
+/* PKCS#11 specification for certificate object (+pkcs11_any_object_xxx) */
+static const uint32_t pkcs11_certificate_mandated[] = {
+	PKCS11_CKA_CERTIFICATE_TYPE,
+};
+
+static const uint32_t pkcs11_certificate_boolprops[] = {
+	PKCS11_CKA_TRUSTED,
+};
+
+static const uint32_t pkcs11_certificate_optional[] = {
+	PKCS11_CKA_CERTIFICATE_CATEGORY, PKCS11_CKA_CHECK_VALUE,
+	PKCS11_CKA_START_DATE, PKCS11_CKA_END_DATE, PKCS11_CKA_PUBLIC_KEY_INFO,
+};
+
+/*
+ * PKCS#11 specification for X.509 certificate object (+pkcs11_certificate_xxx)
+ */
+static const uint32_t pkcs11_x509_certificate_mandated[] = {
+	PKCS11_CKA_SUBJECT,
+};
+
+static const uint32_t pkcs11_x509_certificate_optional[] = {
+	PKCS11_CKA_ID, PKCS11_CKA_ISSUER, PKCS11_CKA_SERIAL_NUMBER,
+	PKCS11_CKA_VALUE, PKCS11_CKA_URL,
+	PKCS11_CKA_HASH_OF_SUBJECT_PUBLIC_KEY,
+	PKCS11_CKA_HASH_OF_ISSUER_PUBLIC_KEY,
+	PKCS11_CKA_JAVA_MIDP_SECURITY_DOMAIN, PKCS11_CKA_NAME_HASH_ALGORITHM,
+};
+
 /* PKCS#11 specification for any key object (+any_object_xxx) */
 static const uint32_t any_key_boolprops[] = {
 	PKCS11_CKA_DERIVE,
@@ -394,15 +434,19 @@ static const uint32_t private_key_opt_or_null[] = {
 };
 
 /* PKCS#11 specification for any RSA key (+public/private_key_xxx) */
-static const uint32_t rsa_public_key_mandated[] = {
+static const uint32_t rsa_pub_key_gen_mand[] = {
 	PKCS11_CKA_MODULUS_BITS,
 };
 
-static const uint32_t rsa_public_key_opt_or_null[] = {
+static const uint32_t rsa_pub_key_create_mand[] = {
 	PKCS11_CKA_MODULUS, PKCS11_CKA_PUBLIC_EXPONENT,
 };
 
-static const uint32_t rsa_private_key_opt_or_null[] = {
+static const uint32_t rsa_pub_key_gen_opt_or_null[] = {
+	PKCS11_CKA_PUBLIC_EXPONENT,
+};
+
+static const uint32_t rsa_priv_key_opt_or_null[] = {
 	PKCS11_CKA_MODULUS, PKCS11_CKA_PUBLIC_EXPONENT,
 	PKCS11_CKA_PRIVATE_EXPONENT,
 	PKCS11_CKA_PRIME_1, PKCS11_CKA_PRIME_2,
@@ -552,13 +596,130 @@ static enum pkcs11_rc create_data_attributes(struct obj_attrs **out,
 					  ARRAY_SIZE(raw_data_opt_or_null));
 }
 
-static enum pkcs11_rc create_pub_key_attributes(struct obj_attrs **out,
-						struct obj_attrs *temp)
+static enum pkcs11_rc create_certificate_attributes(struct obj_attrs **out,
+						    struct obj_attrs *temp)
 {
 	uint32_t const *mandated = NULL;
-	uint32_t const *opt_or_null = NULL;
+	uint32_t const *optional = NULL;
 	size_t mandated_count = 0;
-	size_t opt_or_null_count = 0;
+	size_t optional_count = 0;
+	void *attr_value = NULL;
+	uint32_t attr_size = 0;
+	uint32_t default_cert_category =
+		PKCS11_CK_CERTIFICATE_CATEGORY_UNSPECIFIED;
+	uint32_t default_name_hash_alg = PKCS11_CKM_SHA_1;
+	uint32_t cert_category = 0;
+	enum pkcs11_rc rc = PKCS11_CKR_OK;
+
+	assert(get_class(temp) == PKCS11_CKO_CERTIFICATE);
+
+	rc = create_storage_attributes(out, temp);
+	if (rc)
+		return rc;
+
+	assert(get_class(*out) == PKCS11_CKO_CERTIFICATE);
+
+	rc = set_mandatory_boolprops(out, temp, pkcs11_certificate_boolprops,
+				     ARRAY_SIZE(pkcs11_certificate_boolprops));
+	if (rc)
+		return rc;
+
+	rc = set_mandatory_attributes(out, temp, pkcs11_certificate_mandated,
+				      ARRAY_SIZE(pkcs11_certificate_mandated));
+	if (rc)
+		return rc;
+
+	rc = set_optional_attributes(out, temp, pkcs11_certificate_optional,
+				     ARRAY_SIZE(pkcs11_certificate_optional));
+	if (rc)
+		return rc;
+
+	switch (get_certificate_type(*out)) {
+	case PKCS11_CKC_X_509:
+		mandated = pkcs11_x509_certificate_mandated;
+		optional = pkcs11_x509_certificate_optional;
+		mandated_count = ARRAY_SIZE(pkcs11_x509_certificate_mandated);
+		optional_count = ARRAY_SIZE(pkcs11_x509_certificate_optional);
+		break;
+	default:
+		EMSG("Invalid certificate type %#"PRIx32"/%s",
+		     get_certificate_type(*out),
+		     id2str_certificate_type(get_certificate_type(*out)));
+
+		return PKCS11_CKR_TEMPLATE_INCONSISTENT;
+	}
+
+	rc = set_mandatory_attributes(out, temp, mandated, mandated_count);
+	if (rc)
+		return rc;
+
+	rc = set_optional_attributes(out, temp, optional, optional_count);
+	if (rc)
+		return rc;
+
+	attr_size = 0;
+	rc = get_attribute_ptr(*out, PKCS11_CKA_CERTIFICATE_CATEGORY,
+			       &attr_value, &attr_size);
+	if (rc == PKCS11_CKR_OK && attr_size == sizeof(cert_category)) {
+		/* Sanitize certificate category */
+		TEE_MemMove(&cert_category, attr_value, sizeof(cert_category));
+
+		switch (cert_category) {
+		case PKCS11_CK_CERTIFICATE_CATEGORY_UNSPECIFIED:
+		case PKCS11_CK_CERTIFICATE_CATEGORY_TOKEN_USER:
+		case PKCS11_CK_CERTIFICATE_CATEGORY_AUTHORITY:
+		case PKCS11_CK_CERTIFICATE_CATEGORY_OTHER_ENTITY:
+			break;
+		default:
+			EMSG("Invalid certificate category %#"PRIx32,
+			     cert_category);
+
+			return PKCS11_CKR_ATTRIBUTE_VALUE_INVALID;
+		}
+	} else if (rc == PKCS11_RV_NOT_FOUND) {
+		/* Set default category when missing */
+		rc = set_attribute(out, PKCS11_CKA_CERTIFICATE_CATEGORY,
+				   &default_cert_category,
+				   sizeof(default_cert_category));
+		if (rc)
+			return rc;
+	} else {
+		/* All other cases are errors */
+		EMSG("Invalid certificate category");
+
+		return PKCS11_CKR_TEMPLATE_INCONSISTENT;
+	}
+
+	attr_size = 0;
+	rc = get_attribute_ptr(*out, PKCS11_CKA_NAME_HASH_ALGORITHM, NULL,
+			       &attr_size);
+	if (rc == PKCS11_CKR_OK && attr_size == sizeof(uint32_t)) {
+		/* We accept any algorithm what caller wanted to specify */
+	} else if (rc == PKCS11_RV_NOT_FOUND) {
+		/* Set default hash algorithm when missing */
+		rc = set_attribute(out, PKCS11_CKA_NAME_HASH_ALGORITHM,
+				   &default_name_hash_alg,
+				   sizeof(default_name_hash_alg));
+		if (rc)
+			return rc;
+	} else {
+		/* All other cases are errors */
+		EMSG("Invalid name hash algorithm");
+
+		return PKCS11_CKR_TEMPLATE_INCONSISTENT;
+	}
+
+	return rc;
+}
+
+static enum pkcs11_rc create_pub_key_attributes(struct obj_attrs **out,
+						struct obj_attrs *temp,
+						enum processing_func function)
+{
+	uint32_t const *mandated = NULL;
+	uint32_t const *oon = NULL;
+	size_t mandated_count = 0;
+	size_t oon_count = 0;
 	enum pkcs11_rc rc = PKCS11_CKR_OK;
 
 	assert(get_class(temp) == PKCS11_CKO_PUBLIC_KEY);
@@ -587,16 +748,29 @@ static enum pkcs11_rc create_pub_key_attributes(struct obj_attrs **out,
 
 	switch (get_key_type(*out)) {
 	case PKCS11_CKK_RSA:
-		mandated = rsa_public_key_mandated;
-		opt_or_null = rsa_public_key_opt_or_null;
-		mandated_count = ARRAY_SIZE(rsa_public_key_mandated);
-		opt_or_null_count = ARRAY_SIZE(rsa_public_key_opt_or_null);
+		switch (function) {
+		case PKCS11_FUNCTION_GENERATE_PAIR:
+			mandated = rsa_pub_key_gen_mand;
+			oon = rsa_pub_key_gen_opt_or_null;
+			mandated_count = ARRAY_SIZE(rsa_pub_key_gen_mand);
+			oon_count = ARRAY_SIZE(rsa_pub_key_gen_opt_or_null);
+			break;
+		case PKCS11_FUNCTION_IMPORT:
+			mandated = rsa_pub_key_create_mand;
+			mandated_count = ARRAY_SIZE(rsa_pub_key_create_mand);
+			break;
+		default:
+			EMSG("Unsupported function %#"PRIx32"/%s", function,
+			     id2str_function(function));
+
+			return PKCS11_CKR_TEMPLATE_INCONSISTENT;
+		}
 		break;
 	case PKCS11_CKK_EC:
 		mandated = ec_public_key_mandated;
-		opt_or_null = ec_public_key_opt_or_null;
+		oon = ec_public_key_opt_or_null;
 		mandated_count = ARRAY_SIZE(ec_public_key_mandated);
-		opt_or_null_count = ARRAY_SIZE(ec_public_key_opt_or_null);
+		oon_count = ARRAY_SIZE(ec_public_key_opt_or_null);
 		break;
 	default:
 		EMSG("Invalid key type %#"PRIx32"/%s",
@@ -609,17 +783,16 @@ static enum pkcs11_rc create_pub_key_attributes(struct obj_attrs **out,
 	if (rc)
 		return rc;
 
-	return set_attributes_opt_or_null(out, temp, opt_or_null,
-					  opt_or_null_count);
+	return set_attributes_opt_or_null(out, temp, oon, oon_count);
 }
 
 static enum pkcs11_rc create_priv_key_attributes(struct obj_attrs **out,
 						 struct obj_attrs *temp)
 {
 	uint32_t const *mandated = NULL;
-	uint32_t const *opt_or_null = NULL;
+	uint32_t const *oon = NULL;
 	size_t mandated_count = 0;
-	size_t opt_or_null_count = 0;
+	size_t oon_count = 0;
 	enum pkcs11_rc rc = PKCS11_CKR_OK;
 
 	assert(get_class(temp) == PKCS11_CKO_PRIVATE_KEY);
@@ -647,14 +820,14 @@ static enum pkcs11_rc create_priv_key_attributes(struct obj_attrs **out,
 
 	switch (get_key_type(*out)) {
 	case PKCS11_CKK_RSA:
-		opt_or_null = rsa_private_key_opt_or_null;
-		opt_or_null_count = ARRAY_SIZE(rsa_private_key_opt_or_null);
+		oon = rsa_priv_key_opt_or_null;
+		oon_count = ARRAY_SIZE(rsa_priv_key_opt_or_null);
 		break;
 	case PKCS11_CKK_EC:
 		mandated = ec_private_key_mandated;
-		opt_or_null = ec_private_key_opt_or_null;
+		oon = ec_private_key_opt_or_null;
 		mandated_count = ARRAY_SIZE(ec_private_key_mandated);
-		opt_or_null_count = ARRAY_SIZE(ec_private_key_opt_or_null);
+		oon_count = ARRAY_SIZE(ec_private_key_opt_or_null);
 		break;
 	default:
 		EMSG("Invalid key type %#"PRIx32"/%s",
@@ -667,8 +840,7 @@ static enum pkcs11_rc create_priv_key_attributes(struct obj_attrs **out,
 	if (rc)
 		return rc;
 
-	return set_attributes_opt_or_null(out, temp, opt_or_null,
-					  opt_or_null_count);
+	return set_attributes_opt_or_null(out, temp, oon, oon_count);
 }
 
 static enum pkcs11_rc
@@ -810,6 +982,10 @@ create_attributes_from_template(struct obj_attrs **out, void *template,
 			class = template_class;
 			type = PKCS11_CKK_EC;
 			break;
+		case PKCS11_CKM_RSA_PKCS_KEY_PAIR_GEN:
+			class = template_class;
+			type = PKCS11_CKK_RSA;
+			break;
 		default:
 			TEE_Panic(TEE_ERROR_NOT_SUPPORTED);
 		}
@@ -879,6 +1055,14 @@ create_attributes_from_template(struct obj_attrs **out, void *template,
 			goto out;
 		}
 		break;
+	case PKCS11_CKM_RSA_PKCS_KEY_PAIR_GEN:
+		if ((get_class(temp) != PKCS11_CKO_PUBLIC_KEY &&
+		     get_class(temp) != PKCS11_CKO_PRIVATE_KEY) ||
+		    get_key_type(temp) != PKCS11_CKK_RSA) {
+			rc = PKCS11_CKR_TEMPLATE_INCONSISTENT;
+			goto out;
+		}
+		break;
 	default:
 		break;
 	}
@@ -901,6 +1085,9 @@ create_attributes_from_template(struct obj_attrs **out, void *template,
 	case PKCS11_CKO_DATA:
 		rc = create_data_attributes(&attrs, temp);
 		break;
+	case PKCS11_CKO_CERTIFICATE:
+		rc = create_certificate_attributes(&attrs, temp);
+		break;
 	case PKCS11_CKO_SECRET_KEY:
 		rc = sanitize_symm_key_attributes(&temp, function);
 		if (rc)
@@ -908,7 +1095,7 @@ create_attributes_from_template(struct obj_attrs **out, void *template,
 		rc = create_symm_key_attributes(&attrs, temp);
 		break;
 	case PKCS11_CKO_PUBLIC_KEY:
-		rc = create_pub_key_attributes(&attrs, temp);
+		rc = create_pub_key_attributes(&attrs, temp, function);
 		break;
 	case PKCS11_CKO_PRIVATE_KEY:
 		rc = create_priv_key_attributes(&attrs, temp);
@@ -1095,6 +1282,7 @@ enum pkcs11_rc check_access_attrs_against_token(struct pkcs11_session *session,
 	case PKCS11_CKO_PRIVATE_KEY:
 	case PKCS11_CKO_PUBLIC_KEY:
 	case PKCS11_CKO_DATA:
+	case PKCS11_CKO_CERTIFICATE:
 		private = object_is_private(head);
 		break;
 	default:
@@ -1194,6 +1382,7 @@ enum pkcs11_rc check_created_attrs_against_processing(uint32_t proc_id,
 	case PKCS11_CKM_GENERIC_SECRET_KEY_GEN:
 	case PKCS11_CKM_AES_KEY_GEN:
 	case PKCS11_CKM_EC_KEY_PAIR_GEN:
+	case PKCS11_CKM_RSA_PKCS_KEY_PAIR_GEN:
 		assert(check_attr_bval(proc_id, head, PKCS11_CKA_LOCAL, true));
 		break;
 	default:
@@ -1210,6 +1399,9 @@ enum pkcs11_rc check_created_attrs_against_processing(uint32_t proc_id,
 		break;
 	case PKCS11_CKM_EC_KEY_PAIR_GEN:
 		assert(get_key_type(head) == PKCS11_CKK_EC);
+		break;
+	case PKCS11_CKM_RSA_PKCS_KEY_PAIR_GEN:
+		assert(get_key_type(head) == PKCS11_CKK_RSA);
 		break;
 	case PKCS11_PROCESSING_IMPORT:
 	default:
@@ -1250,6 +1442,12 @@ static void get_key_min_max_sizes(enum pkcs11_key_type key_type,
 		break;
 	case PKCS11_CKK_SHA512_HMAC:
 		mechanism = PKCS11_CKM_SHA512_HMAC;
+		break;
+	case PKCS11_CKK_EC:
+		mechanism = PKCS11_CKM_EC_KEY_PAIR_GEN;
+		break;
+	case PKCS11_CKK_RSA:
+		mechanism = PKCS11_CKM_RSA_PKCS_KEY_PAIR_GEN;
 		break;
 	default:
 		TEE_Panic(key_type);
@@ -1330,6 +1528,14 @@ enum pkcs11_rc check_created_attrs(struct obj_attrs *key1,
 	}
 	if (public) {
 		switch (get_key_type(public)) {
+		case PKCS11_CKK_RSA:
+			/* Get key size */
+			rc = get_u32_attribute(public, PKCS11_CKA_MODULUS_BITS,
+					       &key_length);
+			if (rc)
+				return PKCS11_CKR_TEMPLATE_INCONSISTENT;
+			key_length = ROUNDUP(key_length, 8) / 8;
+			break;
 		case PKCS11_CKK_EC:
 			break;
 		default:
@@ -1338,6 +1544,7 @@ enum pkcs11_rc check_created_attrs(struct obj_attrs *key1,
 	}
 	if (private) {
 		switch (get_key_type(private)) {
+		case PKCS11_CKK_RSA:
 		case PKCS11_CKK_EC:
 			break;
 		default:
@@ -1446,6 +1653,8 @@ check_parent_attrs_against_processing(enum pkcs11_mechanism_id proc_id,
 	case PKCS11_CKM_AES_CBC_PAD:
 	case PKCS11_CKM_AES_CTS:
 	case PKCS11_CKM_AES_CTR:
+	case PKCS11_CKM_AES_CMAC:
+	case PKCS11_CKM_AES_CMAC_GENERAL:
 		if (key_class == PKCS11_CKO_SECRET_KEY &&
 		    key_type == PKCS11_CKK_AES)
 			break;
@@ -1484,6 +1693,12 @@ check_parent_attrs_against_processing(enum pkcs11_mechanism_id proc_id,
 	case PKCS11_CKM_SHA256_HMAC:
 	case PKCS11_CKM_SHA384_HMAC:
 	case PKCS11_CKM_SHA512_HMAC:
+	case PKCS11_CKM_MD5_HMAC_GENERAL:
+	case PKCS11_CKM_SHA_1_HMAC_GENERAL:
+	case PKCS11_CKM_SHA224_HMAC_GENERAL:
+	case PKCS11_CKM_SHA256_HMAC_GENERAL:
+	case PKCS11_CKM_SHA384_HMAC_GENERAL:
+	case PKCS11_CKM_SHA512_HMAC_GENERAL:
 		if (key_class != PKCS11_CKO_SECRET_KEY)
 			return PKCS11_CKR_KEY_FUNCTION_NOT_PERMITTED;
 
@@ -1492,26 +1707,32 @@ check_parent_attrs_against_processing(enum pkcs11_mechanism_id proc_id,
 
 		switch (proc_id) {
 		case PKCS11_CKM_MD5_HMAC:
+		case PKCS11_CKM_MD5_HMAC_GENERAL:
 			if (key_type == PKCS11_CKK_MD5_HMAC)
 				break;
 			return PKCS11_CKR_KEY_FUNCTION_NOT_PERMITTED;
 		case PKCS11_CKM_SHA_1_HMAC:
+		case PKCS11_CKM_SHA_1_HMAC_GENERAL:
 			if (key_type == PKCS11_CKK_SHA_1_HMAC)
 				break;
 			return PKCS11_CKR_KEY_FUNCTION_NOT_PERMITTED;
 		case PKCS11_CKM_SHA224_HMAC:
+		case PKCS11_CKM_SHA224_HMAC_GENERAL:
 			if (key_type == PKCS11_CKK_SHA224_HMAC)
 				break;
 			return PKCS11_CKR_KEY_FUNCTION_NOT_PERMITTED;
 		case PKCS11_CKM_SHA256_HMAC:
+		case PKCS11_CKM_SHA256_HMAC_GENERAL:
 			if (key_type == PKCS11_CKK_SHA256_HMAC)
 				break;
 			return PKCS11_CKR_KEY_FUNCTION_NOT_PERMITTED;
 		case PKCS11_CKM_SHA384_HMAC:
+		case PKCS11_CKM_SHA384_HMAC_GENERAL:
 			if (key_type == PKCS11_CKK_SHA384_HMAC)
 				break;
 			return PKCS11_CKR_KEY_FUNCTION_NOT_PERMITTED;
 		case PKCS11_CKM_SHA512_HMAC:
+		case PKCS11_CKM_SHA512_HMAC_GENERAL:
 			if (key_type == PKCS11_CKK_SHA512_HMAC)
 				break;
 			return PKCS11_CKR_KEY_FUNCTION_NOT_PERMITTED;
@@ -1527,6 +1748,35 @@ check_parent_attrs_against_processing(enum pkcs11_mechanism_id proc_id,
 	case PKCS11_CKM_ECDSA_SHA384:
 	case PKCS11_CKM_ECDSA_SHA512:
 		if (key_type != PKCS11_CKK_EC) {
+			EMSG("Invalid key %s for mechanism %s",
+			     id2str_type(key_type, key_class),
+			     id2str_proc(proc_id));
+
+			return PKCS11_CKR_KEY_TYPE_INCONSISTENT;
+		}
+		if (key_class != PKCS11_CKO_PUBLIC_KEY &&
+		    key_class != PKCS11_CKO_PRIVATE_KEY) {
+			EMSG("Invalid key class for mechanism %s",
+			     id2str_proc(proc_id));
+
+			return PKCS11_CKR_KEY_FUNCTION_NOT_PERMITTED;
+		}
+		break;
+	case PKCS11_CKM_RSA_PKCS:
+	case PKCS11_CKM_MD5_RSA_PKCS:
+	case PKCS11_CKM_SHA1_RSA_PKCS:
+	case PKCS11_CKM_SHA224_RSA_PKCS:
+	case PKCS11_CKM_SHA256_RSA_PKCS:
+	case PKCS11_CKM_SHA384_RSA_PKCS:
+	case PKCS11_CKM_SHA512_RSA_PKCS:
+	case PKCS11_CKM_RSA_PKCS_OAEP:
+	case PKCS11_CKM_RSA_PKCS_PSS:
+	case PKCS11_CKM_SHA1_RSA_PKCS_PSS:
+	case PKCS11_CKM_SHA224_RSA_PKCS_PSS:
+	case PKCS11_CKM_SHA256_RSA_PKCS_PSS:
+	case PKCS11_CKM_SHA384_RSA_PKCS_PSS:
+	case PKCS11_CKM_SHA512_RSA_PKCS_PSS:
+		if (key_type != PKCS11_CKK_RSA) {
 			EMSG("Invalid key %s for mechanism %s",
 			     id2str_type(key_type, key_class),
 			     id2str_proc(proc_id));
@@ -1693,6 +1943,60 @@ static bool attr_is_modifiable_private_key(struct pkcs11_attribute_head *attr,
 	}
 }
 
+static bool attr_is_modifiable_certificate(struct pkcs11_attribute_head *attr,
+					   struct pkcs11_session *session,
+					   struct pkcs11_object *obj)
+{
+	uint8_t boolval = 0;
+	uint32_t boolsize = 0;
+	enum pkcs11_rc rc = PKCS11_CKR_GENERAL_ERROR;
+
+	/* Trusted certificates cannot be modified. */
+	rc = get_attribute(obj->attributes, PKCS11_CKA_TRUSTED,
+			   &boolval, &boolsize);
+	if (rc || boolval == PKCS11_TRUE)
+		return false;
+
+	/* Common certificate attributes */
+	switch (attr->id) {
+	case PKCS11_CKA_TRUSTED:
+		/*
+		 * The CKA_TRUSTED attribute cannot be set to CK_TRUE by an
+		 * application. It MUST be set by a token initialization
+		 * application or by the token’s SO.
+		 */
+		return pkcs11_session_is_so(session);
+	case PKCS11_CKA_CERTIFICATE_TYPE:
+	case PKCS11_CKA_CERTIFICATE_CATEGORY:
+		return false;
+	default:
+		break;
+	}
+
+	/* Certificate type specific attributes */
+	switch (get_certificate_type(obj->attributes)) {
+	case PKCS11_CKC_X_509:
+		/*
+		 * Only the CKA_ID, CKA_ISSUER, and CKA_SERIAL_NUMBER
+		 * attributes may be modified after the object is created.
+		 */
+		switch (attr->id) {
+		case PKCS11_CKA_ID:
+		case PKCS11_CKA_ISSUER:
+		case PKCS11_CKA_SERIAL_NUMBER:
+			return true;
+		default:
+			break;
+		}
+		break;
+	default:
+		/* Unsupported certificate type */
+		break;
+	}
+
+	return false;
+}
+
 static bool attribute_is_modifiable(struct pkcs11_session *session,
 				    struct pkcs11_attribute_head *req_attr,
 				    struct pkcs11_object *obj,
@@ -1741,6 +2045,8 @@ static bool attribute_is_modifiable(struct pkcs11_session *session,
 	case PKCS11_CKO_DATA:
 		/* None of the data object attributes are modifiable */
 		return false;
+	case PKCS11_CKO_CERTIFICATE:
+		return attr_is_modifiable_certificate(req_attr, session, obj);
 	default:
 		break;
 	}

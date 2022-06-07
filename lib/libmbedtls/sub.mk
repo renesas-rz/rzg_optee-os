@@ -73,6 +73,7 @@ SRCS_CRYPTO += bignum.c
 SRCS_CRYPTO += cipher.c
 SRCS_CRYPTO += cipher_wrap.c
 SRCS_CRYPTO += cmac.c
+SRCS_CRYPTO += ctr_drbg.c
 SRCS_CRYPTO += des.c
 SRCS_CRYPTO += dhm.c
 SRCS_CRYPTO += ecdh.c
@@ -123,6 +124,7 @@ srcs-$(sm-$(ta-target)) += $(addprefix mbedtls/library/, $(SRCS_TLS))
 
 cflags-lib-y += -Wno-redundant-decls
 cflags-lib-y += -Wno-switch-default
+cflags-lib-y += -Wno-declaration-after-statement
 
 ifeq ($(CFG_CRYPTOLIB_NAME_mbedtls),y)
 subdirs-$(sm-core) += core

@@ -130,11 +130,6 @@ SECTIONS
 		*(.rodata .rodata.__unpaged .rodata.__unpaged.*)
 #include <rodata_unpaged.ld.S>
 #else
-#ifdef CFG_DT
-		__rodata_dtdrv_start = .;
-		KEEP(*(.rodata.dtdrv))
-		__rodata_dtdrv_end = .;
-#endif
 		*(.rodata .rodata.*)
 		. = ALIGN(8);
 		KEEP(*(SORT(.scattered_array*)));
@@ -144,6 +139,7 @@ SECTIONS
 	}
 
 	.got : { *(.got.plt) *(.got) }
+	.note.gnu.property : { *(.note.gnu.property) }
 	.plt : { *(.plt) }
 
 	.ctors : ALIGN(8) {
@@ -211,7 +207,7 @@ SECTIONS
 	}
 	.nex_nozi (NOLOAD) : {
 		ASSERT(!(ABSOLUTE(.) & (16 * 1024 - 1)), "align nozi to 16kB");
-		KEEP(*(.nozi.mmu.l1 .nozi.mmu.l2))
+		KEEP(*(.nozi.mmu.base_table .nozi.mmu.l2))
 	}
 
 	. = ALIGN(SMALL_PAGE_SIZE);
@@ -340,11 +336,6 @@ SECTIONS
 	__flatmap_init_ro_size = __init_end - __flatmap_init_ro_start;
 
 	.rodata_pageable : ALIGN(8) {
-#ifdef CFG_DT
-		__rodata_dtdrv_start = .;
-		KEEP(*(.rodata.dtdrv))
-		__rodata_dtdrv_end = .;
-#endif
 		*(.rodata*)
 	}
 

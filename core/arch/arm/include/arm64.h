@@ -196,6 +196,9 @@
 #define TLBI_ASID_SHIFT		U(48)
 #define TLBI_ASID_MASK		U(0xff)
 
+#define ID_AA64PFR1_EL1_BT_MASK	ULL(0xf)
+#define FEAT_BTI_IMPLEMENTED	ULL(0x1)
+
 #ifndef __ASSEMBLER__
 static inline __noprof void isb(void)
 {
@@ -225,6 +228,11 @@ static inline __noprof void sev(void)
 static inline __noprof void wfe(void)
 {
 	asm volatile ("wfe");
+}
+
+static inline __noprof void wfi(void)
+{
+	asm volatile ("wfi");
 }
 
 static inline __noprof void write_at_s1e1r(uint64_t va)
@@ -349,6 +357,8 @@ DEFINE_U64_REG_READ_FUNC(midr_el1)
 DEFINE_U64_REG_READ_FUNC(par_el1)
 
 DEFINE_U64_REG_WRITE_FUNC(mair_el1)
+
+DEFINE_U64_REG_READ_FUNC(id_aa64pfr1_el1)
 
 /* Register read/write functions for GICC registers by using system interface */
 DEFINE_REG_READ_FUNC_(icc_ctlr, uint32_t, S3_0_C12_C12_4)

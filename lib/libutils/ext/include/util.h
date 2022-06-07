@@ -75,6 +75,12 @@
 /* Round down the even multiple of size, size has to be a multiple of 2 */
 #define ROUNDDOWN(v, size) ((v) & ~((__typeof__(v))(size) - 1))
 
+/*
+ * Round up the result of x / y to the nearest upper integer if result is not 
+ * already an integer.
+ */
+#define DIV_ROUND_UP(x, y) (((x) + (y) - 1) / (y))
+
 /* Unsigned integer division with nearest rounding variant */
 #define UDIV_ROUND_NEAREST(x, y) \
 	(__extension__ ({ __typeof__(x) _x = (x); \
@@ -89,8 +95,12 @@
 /* x has to be of an unsigned type */
 #define IS_POWER_OF_TWO(x) (((x) != 0) && (((x) & (~(x) + 1)) == (x)))
 
-#define ALIGNMENT_IS_OK(p, type) \
-	(((uintptr_t)(p) & (__alignof__(type) - 1)) == 0)
+#define IS_ALIGNED(x, a)		(((x) & ((a) - 1)) == 0)
+#define IS_ALIGNED_WITH_TYPE(x, type) \
+        (__extension__({ \
+                type __is_aligned_y; \
+                IS_ALIGNED((uintptr_t)(x), __alignof__(__is_aligned_y)); \
+        }))
 
 #define TO_STR(x) _TO_STR(x)
 #define _TO_STR(x) #x

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /*
- * Copyright (c) 2017-2020, STMicroelectronics
+ * Copyright (c) 2017-2021, STMicroelectronics
  */
 
 #include <drivers/stm32_i2c.h>
@@ -492,8 +492,11 @@ static int dt_pmic_i2c_config(struct dt_node_info *i2c_info,
 	if (!i2c_info->reg)
 		return -FDT_ERR_NOTFOUND;
 
-	return stm32_i2c_get_setup_from_fdt(fdt, i2c_node, init,
-					    pinctrl, pinctrl_count);
+	if (stm32_i2c_get_setup_from_fdt(fdt, i2c_node, init,
+					 pinctrl, pinctrl_count))
+		panic();
+
+	return 0;
 }
 
 /*
@@ -520,10 +523,10 @@ static bool initialize_pmic_i2c(void)
 
 	/* Initialize PMIC I2C */
 	i2c->base.pa = i2c_info.reg;
-	i2c->base.va = (vaddr_t)phys_to_virt(i2c->base.pa, MEM_AREA_IO_SEC);
+	i2c->base.va = (vaddr_t)phys_to_virt(i2c->base.pa, MEM_AREA_IO_SEC, 1);
 	assert(i2c->base.va);
 	i2c->dt_status = i2c_info.status;
-	i2c->clock = i2c_info.clock;
+	i2c->clock = i2c_init.clock;
 	i2c->i2c_state = I2C_STATE_RESET;
 	i2c_init.own_address1 = pmic_i2c_addr;
 	i2c_init.analog_filter = true;
@@ -593,13 +596,6 @@ static void register_non_secure_pmic(void)
 						 i2c_handle.pinctrl[n].pin);
 
 	stm32mp_register_non_secure_periph_iomem(i2c_handle.base.pa);
-
-	/*
-	 * Non secure PMIC can be used by secure world during power state
-	 * transition when non-secure world is suspended. Therefore secure
-	 * the I2C clock parents, if not specifically the I2C clock itself.
-	 */
-	stm32mp_register_clock_parents_secure(i2c_handle.clock);
 }
 
 static void register_secure_pmic(void)
@@ -611,7 +607,7 @@ static void register_secure_pmic(void)
 					     i2c_handle.pinctrl[n].pin);
 
 	stm32mp_register_secure_periph_iomem(i2c_handle.base.pa);
-	register_pm_driver_cb(pmic_pm, NULL);
+	register_pm_driver_cb(pmic_pm, NULL, "stm32mp1-pmic");
 }
 
 static TEE_Result initialize_pmic(void)

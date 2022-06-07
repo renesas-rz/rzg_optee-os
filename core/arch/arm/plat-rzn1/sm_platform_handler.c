@@ -42,7 +42,7 @@ static uint32_t oem_sysreg(uint32_t addr, uint32_t mask, uint32_t *pvalue)
 	if (!auth)
 		auth = &regauth_pass;
 
-	reg = core_mmu_get_va(addr, MEM_AREA_IO_SEC);
+	reg = core_mmu_get_va(addr, MEM_AREA_IO_SEC, sizeof(uint32_t));
 
 	if (mask) {
 		/* Write operation */
@@ -50,6 +50,8 @@ static uint32_t oem_sysreg(uint32_t addr, uint32_t mask, uint32_t *pvalue)
 		if (!reg || !mask)
 			DMSG("Blocking write of 0x%"PRIx32" to register 0x%"
 			     PRIx32" (0x%"PRIxVA")", *pvalue, addr, reg);
+		else if (mask == ~0UL)
+			io_write32(reg, *pvalue);
 		else
 			io_mask32(reg, *pvalue, mask);
 	} else {

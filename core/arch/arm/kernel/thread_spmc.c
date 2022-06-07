@@ -24,6 +24,7 @@
 #include <string.h>
 #include <sys/queue.h>
 #include <tee/entry_std.h>
+#include <tee/uuid.h>
 #include <util.h>
 
 #include "thread_private.h"
@@ -326,46 +327,116 @@ static bool is_my_uuid(uint32_t w0, uint32_t w1, uint32_t w2, uint32_t w3)
 	       w2 == 0x02005ebc && w3 == 0x1bc5d5a5;
 }
 
-static void handle_partition_info_get(struct thread_smc_args *args,
-				      struct ffa_rxtx *rxtx)
+void spmc_fill_partition_entry(struct ffa_partition_info *fpi,
+			       uint16_t endpoint_id, uint16_t execution_context)
 {
-	uint32_t ret_fid = 0;
-	int rc = 0;
+	fpi->id = endpoint_id;
+	/* Number of execution contexts implemented by this partition */
+	fpi->execution_context = execution_context;
 
-	if (!is_nil_uuid(args->a1, args->a2, args->a3, args->a4) &&
-	    !is_my_uuid(args->a1, args->a2, args->a3, args->a4)) {
+	fpi->partition_properties = FFA_PARTITION_DIRECT_REQ_RECV_SUPPORT |
+				    FFA_PARTITION_DIRECT_REQ_SEND_SUPPORT;
+}
+
+static uint32_t handle_partition_info_get_all(size_t *elem_count,
+					      struct ffa_rxtx *rxtx)
+{
+	struct ffa_partition_info *fpi = rxtx->tx;
+
+	/* Add OP-TEE SP */
+	spmc_fill_partition_entry(fpi, my_endpoint_id, CFG_TEE_CORE_NB_CORE);
+	rxtx->tx_is_mine = false;
+	*elem_count = 1;
+	fpi++;
+
+	if (IS_ENABLED(CFG_SECURE_PARTITION)) {
+		size_t count = (rxtx->size / sizeof(*fpi)) - 1;
+
+		if (sp_partition_info_get_all(fpi, &count))
+			return FFA_NO_MEMORY;
+		*elem_count += count;
+	}
+
+	return FFA_OK;
+}
+
+void spmc_handle_partition_info_get(struct thread_smc_args *args,
+				    struct ffa_rxtx *rxtx)
+{
+	uint32_t ret_fid = FFA_ERROR;
+	uint32_t rc = 0;
+	uint32_t endpoint_id = my_endpoint_id;
+	struct ffa_partition_info *fpi = NULL;
+
+	cpu_spin_lock(&rxtx->spinlock);
+
+	if (!rxtx->size || !rxtx->tx_is_mine) {
+		if (rxtx->size)
+			rc = FFA_BUSY;
+		else
+			rc = FFA_DENIED; /* TX buffer not setup yet */
+		goto out;
+	}
+
+	fpi = rxtx->tx;
+
+	if (rxtx->size < sizeof(*fpi)) {
+		ret_fid = FFA_ERROR;
+		rc = FFA_NO_MEMORY;
+		goto out;
+	}
+
+	if (is_nil_uuid(args->a1, args->a2, args->a3, args->a4)) {
+		size_t elem_count = 0;
+
+		ret_fid = handle_partition_info_get_all(&elem_count, rxtx);
+
+		if (ret_fid) {
+			rc = ret_fid;
+			ret_fid = FFA_ERROR;
+		} else {
+			ret_fid = FFA_SUCCESS_32;
+			rc = elem_count;
+		}
+
+		goto out;
+	}
+
+	if (is_my_uuid(args->a1, args->a2, args->a3, args->a4)) {
+		spmc_fill_partition_entry(fpi, endpoint_id,
+					  CFG_TEE_CORE_NB_CORE);
+	} else if (IS_ENABLED(CFG_SECURE_PARTITION)) {
+		uint32_t uuid_array[4] = { 0 };
+		TEE_UUID uuid = { };
+		TEE_Result res = TEE_SUCCESS;
+
+		uuid_array[0] = args->a1;
+		uuid_array[1] = args->a2;
+		uuid_array[2] = args->a3;
+		uuid_array[3] = args->a4;
+		tee_uuid_from_octets(&uuid, (uint8_t *)uuid_array);
+
+		res = sp_find_session_id(&uuid, &endpoint_id);
+		if (res != TEE_SUCCESS) {
+			ret_fid = FFA_ERROR;
+			rc = FFA_INVALID_PARAMETERS;
+			goto out;
+		}
+		spmc_fill_partition_entry(fpi, endpoint_id, 1);
+	} else {
 		ret_fid = FFA_ERROR;
 		rc = FFA_INVALID_PARAMETERS;
 		goto out;
 	}
 
-	cpu_spin_lock(&rxtx->spinlock);
-	if (rxtx->size && rxtx->tx_is_mine) {
-		struct ffa_partition_info *fpi = rxtx->tx;
-
-		fpi->id = my_endpoint_id;
-		fpi->execution_context = CFG_TEE_CORE_NB_CORE;
-		/*
-		 * Supports receipt of direct requests.
-		 * Can send direct requests.
-		 */
-		fpi->partition_properties = BIT(0) | BIT(1);
-
-		ret_fid = FFA_SUCCESS_32;
-		rc = 1;
-		rxtx->tx_is_mine = false;
-	} else {
-		ret_fid = FFA_ERROR;
-		if (rxtx->size)
-			rc = FFA_BUSY;
-		else
-			rc = FFA_DENIED; /* TX buffer not setup yet */
-	}
-	cpu_spin_unlock(&rxtx->spinlock);
+	ret_fid = FFA_SUCCESS_32;
+	rxtx->tx_is_mine = false;
+	rc = 1;
 
 out:
 	spmc_set_args(args, ret_fid, FFA_PARAM_MBZ, rc, FFA_PARAM_MBZ,
 		      FFA_PARAM_MBZ, FFA_PARAM_MBZ);
+	cpu_spin_unlock(&rxtx->spinlock);
 }
 #endif /*CFG_CORE_SEL1_SPMC*/
 
@@ -472,7 +543,7 @@ static int mem_share_init(void *buf, size_t blen, unsigned int *page_count,
 	unsigned int region_descr_offs = 0;
 	size_t n = 0;
 
-	if (!ALIGNMENT_IS_OK(buf, struct ffa_mem_transaction) ||
+	if (!IS_ALIGNED_WITH_TYPE(buf, struct ffa_mem_transaction) ||
 	    blen < sizeof(struct ffa_mem_transaction))
 		return FFA_INVALID_PARAMETERS;
 
@@ -498,8 +569,8 @@ static int mem_share_init(void *buf, size_t blen, unsigned int *page_count,
 	    n > blen)
 		return FFA_INVALID_PARAMETERS;
 
-	if (!ALIGNMENT_IS_OK((vaddr_t)descr + region_descr_offs,
-			     struct ffa_mem_region))
+	if (!IS_ALIGNED_WITH_TYPE((vaddr_t)descr + region_descr_offs,
+				  struct ffa_mem_region))
 		return FFA_INVALID_PARAMETERS;
 
 	region_descr = (struct ffa_mem_region *)((vaddr_t)descr +
@@ -520,7 +591,7 @@ static int add_mem_share_helper(struct mem_share_state *s, void *buf,
 	if (region_count > s->region_count)
 		region_count = s->region_count;
 
-	if (!ALIGNMENT_IS_OK(buf, struct ffa_address_range))
+	if (!IS_ALIGNED_WITH_TYPE(buf, struct ffa_address_range))
 		return FFA_INVALID_PARAMETERS;
 	arange = buf;
 
@@ -567,6 +638,25 @@ static int add_mem_share_frag(struct mem_frag_state *s, void *buf, size_t flen)
 	free(s);
 
 	return rc;
+}
+
+static bool is_sp_share(void *buf)
+{
+	struct ffa_mem_transaction *input_descr = NULL;
+	struct ffa_mem_access_perm *perm = NULL;
+
+	if (!IS_ENABLED(CFG_SECURE_PARTITION))
+		return false;
+
+	input_descr = buf;
+	perm = &input_descr->mem_access_array[0].access_perm;
+
+	/*
+	 * perm->endpoint_id is read here only to check if the endpoint is
+	 * OP-TEE. We do read it later on again, but there are some additional
+	 * checks there to make sure that the data is correct.
+	 */
+	return READ_ONCE(perm->endpoint_id) != my_endpoint_id;
 }
 
 static int add_mem_share(tee_mm_entry_t *mm, void *buf, size_t blen,
@@ -686,8 +776,15 @@ static int handle_mem_share_rxbuf(size_t blen, size_t flen,
 
 	cpu_spin_lock(&rxtx->spinlock);
 
-	if (rxtx->rx && flen <= rxtx->size)
-		rc = add_mem_share(NULL, rxtx->rx, blen, flen, global_handle);
+	if (rxtx->rx && flen <= rxtx->size) {
+		if (is_sp_share(rxtx->rx)) {
+			rc = spmc_sp_add_share(rxtx, blen,
+					       global_handle, NULL);
+		} else {
+			rc = add_mem_share(NULL, rxtx->rx, blen, flen,
+					   global_handle);
+		}
+	}
 
 	cpu_spin_unlock(&rxtx->spinlock);
 
@@ -871,7 +968,7 @@ void thread_spmc_msg_recv(struct thread_smc_args *args)
 		spmc_handle_rx_release(args, &nw_rxtx);
 		break;
 	case FFA_PARTITION_INFO_GET:
-		handle_partition_info_get(args, &nw_rxtx);
+		spmc_handle_partition_info_get(args, &nw_rxtx);
 		break;
 #endif /*CFG_CORE_SEL1_SPMC*/
 	case FFA_INTERRUPT:
@@ -898,7 +995,9 @@ void thread_spmc_msg_recv(struct thread_smc_args *args)
 		handle_mem_share(args, &nw_rxtx);
 		break;
 	case FFA_MEM_RECLAIM:
-		handle_mem_reclaim(args);
+		if (!IS_ENABLED(CFG_SECURE_PARTITION) ||
+		    !ffa_mem_reclaim(args, NULL))
+			handle_mem_reclaim(args);
 		break;
 	case FFA_MEM_FRAG_TX:
 		handle_mem_frag_tx(args, &nw_rxtx);
@@ -932,11 +1031,8 @@ static uint32_t yielding_call_with_arg(uint64_t cookie, uint32_t offset)
 		goto out_put_mobj;
 
 	rv = TEE_ERROR_BAD_PARAMETERS;
-	arg = mobj_get_va(mobj, offset);
+	arg = mobj_get_va(mobj, offset, sizeof(*arg));
 	if (!arg)
-		goto out_dec_map;
-
-	if (!mobj_get_va(mobj, sizeof(*arg)))
 		goto out_dec_map;
 
 	num_params = READ_ONCE(arg->num_params);
@@ -944,8 +1040,9 @@ static uint32_t yielding_call_with_arg(uint64_t cookie, uint32_t offset)
 		goto out_dec_map;
 
 	sz = OPTEE_MSG_GET_ARG_SIZE(num_params);
-	thr->rpc_arg = mobj_get_va(mobj, offset + sz);
-	if (!thr->rpc_arg || !mobj_get_va(mobj, offset + sz + sz_rpc))
+
+	thr->rpc_arg = mobj_get_va(mobj, offset + sz, sz_rpc);
+	if (!thr->rpc_arg)
 		goto out_dec_map;
 
 	rv = tee_entry_std(arg, num_params);
@@ -1154,8 +1251,8 @@ static struct mobj *thread_rpc_alloc(size_t size, size_t align, unsigned int bt)
 	    arg->params->attr != OPTEE_MSG_ATTR_TYPE_FMEM_OUTPUT)
 		return NULL;
 
-	internal_offset = arg->params->u.fmem.internal_offs;
-	cookie = arg->params->u.fmem.global_id;
+	internal_offset = READ_ONCE(arg->params->u.fmem.internal_offs);
+	cookie = READ_ONCE(arg->params->u.fmem.global_id);
 	mobj = mobj_ffa_get_by_cookie(cookie, internal_offset);
 	if (!mobj) {
 		DMSG("mobj_ffa_get_by_cookie(%#"PRIx64", %#x): failed",
@@ -1164,6 +1261,12 @@ static struct mobj *thread_rpc_alloc(size_t size, size_t align, unsigned int bt)
 	}
 
 	assert(mobj_is_nonsec(mobj));
+
+	if (mobj->size < size) {
+		DMSG("Mobj %#"PRIx64": wrong size", cookie);
+		mobj_put(mobj);
+		return NULL;
+	}
 
 	if (mobj_inc_map(mobj)) {
 		DMSG("mobj_inc_map(%#"PRIx64"): failed", cookie);

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /*
- * Copyright (c) 2017-2020, STMicroelectronics
+ * Copyright (c) 2017-2021, STMicroelectronics
  */
 
 #include <assert.h>
@@ -106,7 +106,7 @@
 #define BSEC_LOCK_PROGRAM		0x04
 
 /* Timeout when polling on status */
-#define BSEC_TIMEOUT_US			1000
+#define BSEC_TIMEOUT_US			10000
 
 #define BITS_PER_WORD		(CHAR_BIT * sizeof(uint32_t))
 
@@ -153,7 +153,7 @@ static uint32_t otp_bank_offset(uint32_t otp_id)
 
 static vaddr_t bsec_base(void)
 {
-	return io_pa_or_va_secure(&bsec_dev.base);
+	return io_pa_or_va_secure(&bsec_dev.base, BSEC_IP_MAGIC_ID_OFF + 1);
 }
 
 static uint32_t bsec_status(void)
@@ -242,7 +242,7 @@ TEE_Result stm32_bsec_shadow_register(uint32_t otp_id)
 
 	result = power_up_safmem();
 	if (result)
-		return result;
+		goto out;
 
 	io_write32(bsec_base() + BSEC_OTP_CTRL_OFF, otp_id | BSEC_READ);
 
@@ -252,12 +252,13 @@ TEE_Result stm32_bsec_shadow_register(uint32_t otp_id)
 			break;
 
 	if (bsec_status() & BSEC_MODE_BUSY_MASK)
-		result = TEE_ERROR_GENERIC;
+		result = TEE_ERROR_BUSY;
 	else
 		result = check_no_error(otp_id, true /* check-disturbed */);
 
 	power_down_safmem();
 
+out:
 	bsec_unlock(exceptions);
 
 	return result;
@@ -338,7 +339,7 @@ TEE_Result stm32_bsec_program_otp(uint32_t value, uint32_t otp_id)
 
 	result = power_up_safmem();
 	if (result)
-		return result;
+		goto out;
 
 	io_write32(bsec_base() + BSEC_OTP_WRDATA_OFF, value);
 	io_write32(bsec_base() + BSEC_OTP_CTRL_OFF, otp_id | BSEC_WRITE);
@@ -348,13 +349,16 @@ TEE_Result stm32_bsec_program_otp(uint32_t value, uint32_t otp_id)
 		if (!(bsec_status() & BSEC_MODE_BUSY_MASK))
 			break;
 
-	if (bsec_status() & (BSEC_MODE_BUSY_MASK | BSEC_MODE_PROGFAIL_MASK))
-		result = TEE_ERROR_GENERIC;
+	if (bsec_status() & BSEC_MODE_BUSY_MASK)
+		result = TEE_ERROR_BUSY;
+	else if (bsec_status() & BSEC_MODE_PROGFAIL_MASK)
+		result = TEE_ERROR_BAD_PARAMETERS;
 	else
 		result = check_no_error(otp_id, true /* check-disturbed */);
 
 	power_down_safmem();
 
+out:
 	bsec_unlock(exceptions);
 
 	return result;
@@ -387,7 +391,7 @@ TEE_Result stm32_bsec_permanent_lock_otp(uint32_t otp_id)
 
 	result = power_up_safmem();
 	if (result)
-		return result;
+		goto out;
 
 	io_write32(base + BSEC_OTP_WRDATA_OFF, data);
 	io_write32(base + BSEC_OTP_CTRL_OFF, addr | BSEC_WRITE | BSEC_LOCK);
@@ -397,13 +401,16 @@ TEE_Result stm32_bsec_permanent_lock_otp(uint32_t otp_id)
 		if (!(bsec_status() & BSEC_MODE_BUSY_MASK))
 			break;
 
-	if (bsec_status() & (BSEC_MODE_BUSY_MASK | BSEC_MODE_PROGFAIL_MASK))
+	if (bsec_status() & BSEC_MODE_BUSY_MASK)
+		result = TEE_ERROR_BUSY;
+	else if (bsec_status() & BSEC_MODE_PROGFAIL_MASK)
 		result = TEE_ERROR_BAD_PARAMETERS;
 	else
 		result = check_no_error(otp_id, false /* not-disturbed */);
 
 	power_down_safmem();
 
+out:
 	bsec_unlock(exceptions);
 
 	return result;
@@ -546,7 +553,7 @@ bool stm32_bsec_nsec_can_access_otp(uint32_t otp_id)
 	       nsec_access_granted(otp_id - otp_upper_base());
 }
 
-#ifdef CFG_DT
+#ifdef CFG_EMBED_DTB
 static void enable_nsec_access(unsigned int otp_id)
 {
 	unsigned int idx = (otp_id - otp_upper_base()) / BITS_PER_WORD;
@@ -647,7 +654,7 @@ static void initialize_bsec_from_dt(void)
 static void initialize_bsec_from_dt(void)
 {
 }
-#endif /*CFG_DT*/
+#endif /*CFG_EMBED_DTB*/
 
 static TEE_Result initialize_bsec(void)
 {
@@ -665,4 +672,4 @@ static TEE_Result initialize_bsec(void)
 	return TEE_SUCCESS;
 }
 
-driver_init(initialize_bsec);
+early_init(initialize_bsec);

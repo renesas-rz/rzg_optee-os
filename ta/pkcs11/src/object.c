@@ -85,6 +85,8 @@ static void cleanup_volatile_obj_ref(struct pkcs11_object *obj)
 	if (!obj)
 		return;
 
+	LIST_REMOVE(obj, link);
+
 	if (obj->key_handle != TEE_HANDLE_NULL)
 		TEE_FreeTransientObject(obj->key_handle);
 
@@ -119,8 +121,6 @@ void cleanup_persistent_object(struct pkcs11_object *obj,
 	obj->attribs_hdl = TEE_HANDLE_NULL;
 	destroy_object_uuid(token, obj);
 
-	LIST_REMOVE(obj, link);
-
 	cleanup_volatile_obj_ref(obj);
 }
 
@@ -139,8 +139,6 @@ void destroy_object(struct pkcs11_session *session, struct pkcs11_object *obj,
 	if (obj->uuid)
 		MSG_RAW("[destroy] obj uuid %pUl", (void *)obj->uuid);
 #endif
-
-	LIST_REMOVE(obj, link);
 
 	if (session_only) {
 		/* Destroy object due to session closure */
@@ -280,7 +278,6 @@ enum pkcs11_rc create_object(void *sess, struct obj_attrs *head,
 		/* Move object from temporary list to target session list */
 		LIST_REMOVE(obj, link);
 		LIST_INSERT_HEAD(get_session_objects(session), obj, link);
-		rc = PKCS11_CKR_OK;
 	}
 
 	*out_handle = obj_handle;
@@ -559,6 +556,7 @@ enum pkcs11_rc entry_find_objects_init(struct pkcs11_client *client,
 	case PKCS11_CKO_PUBLIC_KEY:
 	case PKCS11_CKO_PRIVATE_KEY:
 	case PKCS11_CKO_DATA:
+	case PKCS11_CKO_CERTIFICATE:
 		break;
 	default:
 		EMSG("Find object of class %s (%"PRIu32") is not supported",
@@ -604,8 +602,10 @@ enum pkcs11_rc entry_find_objects_init(struct pkcs11_client *client,
 
 		if (!obj->attributes) {
 			rc = load_persistent_object_attributes(obj);
-			if (rc)
-				return PKCS11_CKR_GENERAL_ERROR;
+			if (rc) {
+				rc = PKCS11_CKR_GENERAL_ERROR;
+				goto out;
+			}
 
 			new_load = true;
 		}

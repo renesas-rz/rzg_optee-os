@@ -181,7 +181,7 @@ END_FUNC thread_unwind_user_mode
 
 		/* Update the mapping to use the full kernel mapping */
 		mrs	x0, ttbr0_el1
-		sub	x0, x0, #CORE_MMU_L1_TBL_OFFSET
+		sub	x0, x0, #CORE_MMU_BASE_TABLE_OFFSET
 		/* switch to kernel mode ASID */
 		bic	x0, x0, #BIT(TTBR_ASID_SHIFT)
 		msr	ttbr0_el1, x0
@@ -191,7 +191,7 @@ END_FUNC thread_unwind_user_mode
 		ldr	x0, =1f
 		br	x0
 	1:
-
+BTI(		bti	j)
 		/* Point to the vector into the full mapping */
 		adr_l	x0, thread_user_kcode_offset
 		ldr	x0, [x0]
@@ -225,7 +225,7 @@ END_FUNC thread_unwind_user_mode
 	.endm
 
 #define INV_INSN	0
-FUNC thread_excp_vect , : align=2048
+FUNC thread_excp_vect , : , default, 2048, nobti
 	/* -----------------------------------------------------
 	 * EL1 with SP0 : 0x0 - 0x180
 	 * -----------------------------------------------------
@@ -488,13 +488,13 @@ eret_to_el0:
 	sub	x1, x1, x0
 	br	x1
 1:
-
+BTI(	bti	j)
 	load_xregs sp, THREAD_CORE_LOCAL_X0, 0, 1
 	msr	tpidrro_el0, x0
 
 	/* Update the mapping to exclude the full kernel mapping */
 	mrs	x0, ttbr0_el1
-	add	x0, x0, #CORE_MMU_L1_TBL_OFFSET
+	add	x0, x0, #CORE_MMU_BASE_TABLE_OFFSET
 	orr	x0, x0, #BIT(TTBR_ASID_SHIFT) /* switch to user mode ASID */
 	msr	ttbr0_el1, x0
 	isb
@@ -547,10 +547,10 @@ icache_inv_user_range:
 	sub	x3, x3, x2
 	br	x3
 1:
-
+BTI(	bti	j)
 	/* Update the mapping to exclude the full kernel mapping */
 	mrs	x5, ttbr0_el1	/* this register must be preserved */
-	add	x2, x5, #CORE_MMU_L1_TBL_OFFSET
+	add	x2, x5, #CORE_MMU_BASE_TABLE_OFFSET
 	orr	x2, x2, #BIT(TTBR_ASID_SHIFT) /* switch to user mode ASID */
 	msr	ttbr0_el1, x2
 	isb
@@ -591,7 +591,7 @@ icache_inv_user_range:
 	ldr	x0, =1f
 	br	x0
 1:
-
+BTI(	bti	j)
 	/* Point to the vector into the full mapping */
 	msr	vbar_el1, x4
 	isb
@@ -1028,3 +1028,5 @@ LOCAL_FUNC elx_fiq , :
 	native_intr_handler	fiq
 #endif
 END_FUNC elx_fiq
+
+BTI(emit_aarch64_feature_1_and     GNU_PROPERTY_AARCH64_FEATURE_1_BTI)

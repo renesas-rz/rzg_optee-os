@@ -55,6 +55,7 @@ $(call force,CFG_ARM32_core,y)
 endif
 
 CFG_WITH_STATS ?= y
+CFG_ENABLE_EMBEDDED_TESTS ?= y
 
 ifeq ($(PLATFORM_FLAVOR),fvp)
 CFG_TEE_CORE_NB_CORE = 8
@@ -107,6 +108,8 @@ $(call force,CFG_BOOT_SECONDARY_REQUEST,y)
 $(call force,CFG_PSCI_ARM32,y)
 $(call force,CFG_DT,y)
 CFG_DTB_MAX_SIZE ?= 0x100000
+CFG_CORE_ASYNC_NOTIF ?= y
+CFG_CORE_ASYNC_NOTIF_GIC_INTID ?= 219
 endif
 
 ifeq ($(PLATFORM_FLAVOR),qemu_armv8a)

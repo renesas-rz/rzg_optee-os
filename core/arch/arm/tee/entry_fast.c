@@ -1,17 +1,19 @@
 // SPDX-License-Identifier: BSD-2-Clause
 /*
- * Copyright (c) 2015, Linaro Limited
+ * Copyright (c) 2015-2021, Linaro Limited
  * Copyright (c) 2014, STMicroelectronics International N.V.
  */
 
-#include <tee/entry_fast.h>
-#include <optee_msg.h>
-#include <sm/optee_smc.h>
+#include <config.h>
 #include <kernel/boot.h>
+#include <kernel/misc.h>
+#include <kernel/notif.h>
 #include <kernel/tee_l2cc_mutex.h>
 #include <kernel/virtualization.h>
-#include <kernel/misc.h>
 #include <mm/core_mmu.h>
+#include <optee_msg.h>
+#include <sm/optee_smc.h>
+#include <tee/entry_fast.h>
 
 #ifdef CFG_CORE_RESERVED_SHM
 static void tee_entry_get_shm_config(struct thread_smc_args *args)
@@ -88,10 +90,15 @@ static void tee_entry_exchange_capabilities(struct thread_smc_args *args)
 #ifdef CFG_CORE_RESERVED_SHM
 	args->a1 |= OPTEE_SMC_SEC_CAP_HAVE_RESERVED_SHM;
 #endif
-#ifdef CFG_VIRTUALIZATION
-	args->a1 |= OPTEE_SMC_SEC_CAP_VIRTUALIZATION;
-#endif
+	if (IS_ENABLED(CFG_VIRTUALIZATION))
+		args->a1 |= OPTEE_SMC_SEC_CAP_VIRTUALIZATION;
 	args->a1 |= OPTEE_SMC_SEC_CAP_MEMREF_NULL;
+	if (IS_ENABLED(CFG_CORE_ASYNC_NOTIF)) {
+		args->a1 |= OPTEE_SMC_SEC_CAP_ASYNC_NOTIF;
+		args->a2 = NOTIF_VALUE_MAX;
+	}
+	DMSG("Asynchronous notifications are %sabled",
+	     IS_ENABLED(CFG_CORE_ASYNC_NOTIF) ? "en" : "dis");
 
 #if defined(CFG_CORE_DYN_SHM)
 	dyn_shm_en = core_mmu_nsec_ddr_is_defined();
@@ -158,7 +165,10 @@ static void tee_entry_vm_created(struct thread_smc_args *args)
 		return;
 	}
 
-	args->a0 = virt_guest_created(guest_id);
+	if (virt_guest_created(guest_id))
+		args->a0 = OPTEE_SMC_RETURN_ENOTAVAIL;
+	else
+		args->a0 = OPTEE_SMC_RETURN_OK;
 }
 
 static void tee_entry_vm_destroyed(struct thread_smc_args *args)
@@ -171,7 +181,10 @@ static void tee_entry_vm_destroyed(struct thread_smc_args *args)
 		return;
 	}
 
-	args->a0 = virt_guest_destroyed(guest_id);
+	if (virt_guest_destroyed(guest_id))
+		args->a0 = OPTEE_SMC_RETURN_ENOTAVAIL;
+	else
+		args->a0 = OPTEE_SMC_RETURN_OK;
 }
 #endif
 
@@ -179,6 +192,20 @@ static void tee_entry_vm_destroyed(struct thread_smc_args *args)
 void __weak tee_entry_fast(struct thread_smc_args *args)
 {
 	__tee_entry_fast(args);
+}
+
+static void get_async_notif_value(struct thread_smc_args *args)
+{
+	bool value_valid = false;
+	bool value_pending = false;
+
+	args->a0 = OPTEE_SMC_RETURN_OK;
+	args->a1 = notif_get_value(&value_valid, &value_pending);
+	args->a2 = 0;
+	if (value_valid)
+		args->a2 |= OPTEE_SMC_ASYNC_NOTIF_VALID;
+	if (value_pending)
+		args->a2 |= OPTEE_SMC_ASYNC_NOTIF_PENDING;
 }
 
 /*
@@ -240,6 +267,21 @@ void __tee_entry_fast(struct thread_smc_args *args)
 		break;
 #endif
 
+	case OPTEE_SMC_ENABLE_ASYNC_NOTIF:
+		if (IS_ENABLED(CFG_CORE_ASYNC_NOTIF)) {
+			notif_deliver_atomic_event(NOTIF_EVENT_STARTED);
+			args->a0 = OPTEE_SMC_RETURN_OK;
+		} else {
+			args->a0 = OPTEE_SMC_RETURN_UNKNOWN_FUNCTION;
+		}
+		break;
+	case OPTEE_SMC_GET_ASYNC_NOTIF_VALUE:
+		if (IS_ENABLED(CFG_CORE_ASYNC_NOTIF))
+			get_async_notif_value(args);
+		else
+			args->a0 = OPTEE_SMC_RETURN_UNKNOWN_FUNCTION;
+		break;
+
 	default:
 		args->a0 = OPTEE_SMC_RETURN_UNKNOWN_FUNCTION;
 		break;
@@ -255,9 +297,8 @@ size_t tee_entry_generic_get_api_call_count(void)
 	 */
 	size_t ret = 12;
 
-#if defined(CFG_VIRTUALIZATION)
-	ret += 2;
-#endif
+	if (IS_ENABLED(CFG_VIRTUALIZATION))
+		ret += 2;
 
 	return ret;
 }

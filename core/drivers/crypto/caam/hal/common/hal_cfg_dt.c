@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BSD-2-Clause
 /*
- * Copyright 2017-2019 NXP
+ * Copyright 2017-2019, 2021 NXP
  *
  * Brief   CAAM Configuration.
  */
@@ -8,6 +8,7 @@
 #include <caam_hal_cfg.h>
 #include <caam_hal_jr.h>
 #include <caam_jr.h>
+#include <kernel/boot.h>
 #include <kernel/dt.h>
 #include <kernel/interrupt.h>
 #include <libfdt.h>
@@ -52,7 +53,7 @@ static paddr_t find_jr_offset(void *fdt, int status, int *find_node)
 
 void caam_hal_cfg_get_ctrl_dt(void *fdt, vaddr_t *ctrl_base)
 {
-	ssize_t size = 0;
+	size_t size = 0;
 	int node = 0;
 	paddr_t pctrl_base = 0;
 
@@ -75,7 +76,7 @@ void caam_hal_cfg_get_ctrl_dt(void *fdt, vaddr_t *ctrl_base)
 	}
 
 	size = _fdt_reg_size(fdt, node);
-	if (size < 0) {
+	if (size == DT_INFO_INVALID_REG_SIZE) {
 		HAL_TRACE("CAAM control base address size not defined");
 		return;
 	}
@@ -98,10 +99,12 @@ void caam_hal_cfg_get_jobring_dt(void *fdt, struct caam_jrcfg *jrcfg)
 
 	jr_offset = find_jr_offset(fdt, DT_STATUS_OK_SEC, &node);
 	if (jr_offset) {
-		/* Disable JR for Normal World */
-		if (dt_enable_secure_status(fdt, node)) {
-			EMSG("Not able to disable JR DTB entry");
-			return;
+		if (!is_embedded_dt(fdt)) {
+			/* Disable JR for Normal World */
+			if (dt_enable_secure_status(fdt, node)) {
+				EMSG("Not able to disable JR DTB entry");
+				return;
+			}
 		}
 
 		/* Get the job ring interrupt */

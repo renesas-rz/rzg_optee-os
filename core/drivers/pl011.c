@@ -79,7 +79,7 @@ static vaddr_t chip_to_base(struct serial_chip *chip)
 	struct pl011_data *pd =
 		container_of(chip, struct pl011_data, chip);
 
-	return io_pa_or_va(&pd->base);
+	return io_pa_or_va(&pd->base, PL011_REG_SIZE);
 }
 
 static void pl011_flush(struct serial_chip *chip)
@@ -142,7 +142,7 @@ void pl011_init(struct pl011_data *pd, paddr_t pbase, uint32_t uart_clk,
 	pd->base.pa = pbase;
 	pd->chip.ops = &pl011_ops;
 
-	base = io_pa_or_va(&pd->base);
+	base = io_pa_or_va(&pd->base, PL011_REG_SIZE);
 
 	/* Clear all errors */
 	io_write32(base + UART_RSR_ECR, 0);
@@ -222,8 +222,9 @@ static const struct dt_device_match pl011_match_table[] = {
 	{ 0 }
 };
 
-const struct dt_driver pl011_dt_driver __dt_driver = {
+DEFINE_DT_DRIVER(pl011_dt_driver) = {
 	.name = "pl011",
+	.type = DT_DRIVER_UART,
 	.match_table = pl011_match_table,
 	.driver = &pl011_driver,
 };

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BSD-2-Clause
 /*
- * Copyright (c) 2019, Linaro Limited
+ * Copyright (c) 2019-2021, Linaro Limited
  */
 
 #include <assert.h>
@@ -31,21 +31,19 @@ void thread_handle_fast_smc(struct thread_smc_args *args)
 {
 	thread_check_canaries();
 
-#ifdef CFG_VIRTUALIZATION
-	if (!virt_set_guest(args->a7)) {
+	if (IS_ENABLED(CFG_VIRTUALIZATION) &&
+	    virt_set_guest(args->a7)) {
 		args->a0 = OPTEE_SMC_RETURN_ENOTAVAIL;
 		goto out;
 	}
-#endif
 
 	tee_entry_fast(args);
 
-#ifdef CFG_VIRTUALIZATION
-	virt_unset_guest();
-#endif
-	/* Fast handlers must not unmask any exceptions */
+	if (IS_ENABLED(CFG_VIRTUALIZATION))
+		virt_unset_guest();
+
 out:
-	__maybe_unused;
+	/* Fast handlers must not unmask any exceptions */
 	assert(thread_get_exceptions() == THREAD_EXCP_ALL);
 }
 
@@ -57,10 +55,8 @@ uint32_t thread_handle_std_smc(uint32_t a0, uint32_t a1, uint32_t a2,
 
 	thread_check_canaries();
 
-#ifdef CFG_VIRTUALIZATION
-	if (!virt_set_guest(a7))
+	if (IS_ENABLED(CFG_VIRTUALIZATION) && virt_set_guest(a7))
 		return OPTEE_SMC_RETURN_ENOTAVAIL;
-#endif
 
 	/*
 	 * thread_resume_from_rpc() and thread_alloc_and_run() only return
@@ -75,9 +71,8 @@ uint32_t thread_handle_std_smc(uint32_t a0, uint32_t a1, uint32_t a2,
 		rv = OPTEE_SMC_RETURN_ETHREAD_LIMIT;
 	}
 
-#ifdef CFG_VIRTUALIZATION
-	virt_unset_guest();
-#endif
+	if (IS_ENABLED(CFG_VIRTUALIZATION))
+		virt_unset_guest();
 
 	return rv;
 }
@@ -104,7 +99,8 @@ static struct mobj *get_cmd_buffer(paddr_t parg, uint32_t *num_params)
 	struct optee_msg_arg *arg;
 	size_t args_size;
 
-	arg = phys_to_virt(parg, MEM_AREA_NSEC_SHM);
+	arg = phys_to_virt(parg, MEM_AREA_NSEC_SHM,
+			   sizeof(struct optee_msg_arg));
 	if (!arg)
 		return NULL;
 
@@ -130,7 +126,7 @@ static struct mobj *map_cmd_buffer(paddr_t parg, uint32_t *num_params)
 	if (!mobj)
 		return NULL;
 
-	arg = mobj_get_va(mobj, 0);
+	arg = mobj_get_va(mobj, 0, SMALL_PAGE_SIZE);
 	if (!arg)
 		goto err;
 
@@ -183,13 +179,13 @@ static uint32_t std_smc_entry(uint32_t a0, uint32_t a1, uint32_t a2,
 		mobj = map_cmd_buffer(parg, &num_params);
 	}
 
-	if (!mobj || !ALIGNMENT_IS_OK(parg, struct optee_msg_arg)) {
+	if (!mobj || !IS_ALIGNED_WITH_TYPE(parg, struct optee_msg_arg)) {
 		EMSG("Bad arg address 0x%" PRIxPA, parg);
 		mobj_put(mobj);
 		return OPTEE_SMC_RETURN_EBADADDR;
 	}
 
-	arg = mobj_get_va(mobj, 0);
+	arg = mobj_get_va(mobj, 0, OPTEE_MSG_GET_ARG_SIZE(num_params));
 	assert(arg && mobj_is_nonsec(mobj));
 	rv = tee_entry_std(arg, num_params);
 	mobj_put(mobj);
@@ -209,9 +205,9 @@ uint32_t __weak __thread_std_smc_entry(uint32_t a0, uint32_t a1, uint32_t a2,
 {
 	uint32_t rv = 0;
 
-#ifdef CFG_VIRTUALIZATION
-	virt_on_stdcall();
-#endif
+	if (IS_ENABLED(CFG_VIRTUALIZATION))
+		virt_on_stdcall();
+
 	rv = std_smc_entry(a0, a1, a2, a3);
 
 	if (rv == OPTEE_SMC_RETURN_OK) {
@@ -231,8 +227,8 @@ uint32_t __weak __thread_std_smc_entry(uint32_t a0, uint32_t a1, uint32_t a2,
 
 bool thread_disable_prealloc_rpc_cache(uint64_t *cookie)
 {
-	bool rv;
-	size_t n;
+	bool rv = false;
+	size_t n = 0;
 	uint32_t exceptions = thread_mask_exceptions(THREAD_EXCP_FOREIGN_INTR);
 
 	thread_lock_global();
@@ -245,13 +241,16 @@ bool thread_disable_prealloc_rpc_cache(uint64_t *cookie)
 	}
 
 	rv = true;
-	for (n = 0; n < CFG_NUM_THREADS; n++) {
-		if (threads[n].rpc_arg) {
-			*cookie = mobj_get_cookie(threads[n].rpc_mobj);
-			mobj_put(threads[n].rpc_mobj);
-			threads[n].rpc_arg = NULL;
-			threads[n].rpc_mobj = NULL;
-			goto out;
+
+	if (IS_ENABLED(CFG_PREALLOC_RPC_CACHE)) {
+		for (n = 0; n < CFG_NUM_THREADS; n++) {
+			if (threads[n].rpc_arg) {
+				*cookie = mobj_get_cookie(threads[n].rpc_mobj);
+				mobj_put(threads[n].rpc_mobj);
+				threads[n].rpc_arg = NULL;
+				threads[n].rpc_mobj = NULL;
+				goto out;
+			}
 		}
 	}
 
@@ -265,10 +264,14 @@ out:
 
 bool thread_enable_prealloc_rpc_cache(void)
 {
-	bool rv;
-	size_t n;
-	uint32_t exceptions = thread_mask_exceptions(THREAD_EXCP_FOREIGN_INTR);
+	bool rv = false;
+	size_t n = 0;
+	uint32_t exceptions = 0;
 
+	if (!IS_ENABLED(CFG_PREALLOC_RPC_CACHE))
+		return true;
+
+	exceptions = thread_mask_exceptions(THREAD_EXCP_FOREIGN_INTR);
 	thread_lock_global();
 
 	for (n = 0; n < CFG_NUM_THREADS; n++) {
@@ -322,7 +325,7 @@ static struct mobj *thread_rpc_alloc_arg(size_t size)
 	/* Registers 4 and 5 passed from normal world */
 	co = reg_pair_to_64(rpc_args[2], rpc_args[3]);
 
-	if (!ALIGNMENT_IS_OK(pa, struct optee_msg_arg))
+	if (!IS_ALIGNED_WITH_TYPE(pa, struct optee_msg_arg))
 		goto err;
 
 	mobj = rpc_shm_mobj_alloc(pa, size, co);
@@ -395,7 +398,7 @@ static uint32_t get_rpc_arg(uint32_t cmd, size_t num_params,
 		if (!mobj)
 			return TEE_ERROR_OUT_OF_MEMORY;
 
-		arg = mobj_get_va(mobj, 0);
+		arg = mobj_get_va(mobj, 0, sz);
 		if (!arg) {
 			thread_rpc_free_arg(mobj_get_cookie(mobj));
 			return TEE_ERROR_OUT_OF_MEMORY;
@@ -528,7 +531,7 @@ static void thread_rpc_free(unsigned int bt, uint64_t cookie, struct mobj *mobj)
 }
 
 static struct mobj *get_rpc_alloc_res(struct optee_msg_arg *arg,
-				      unsigned int bt)
+				      unsigned int bt, size_t size)
 {
 	struct mobj *mobj = NULL;
 	uint64_t cookie = 0;
@@ -544,8 +547,10 @@ static struct mobj *get_rpc_alloc_res(struct optee_msg_arg *arg,
 		return NULL;
 
 	p = arg->params[0].u.tmem.buf_ptr;
-	sz = arg->params[0].u.tmem.size;
+	sz = READ_ONCE(arg->params[0].u.tmem.size);
 	cookie = arg->params[0].u.tmem.shm_ref;
+	if (sz < size)
+		return NULL;
 
 	if (arg->params[0].attr == OPTEE_MSG_ATTR_TYPE_TMEM_OUTPUT)
 		mobj = rpc_shm_mobj_alloc(p, sz, cookie);
@@ -586,7 +591,7 @@ static struct mobj *thread_rpc_alloc(size_t size, size_t align, unsigned int bt)
 	reg_pair_from_64(carg, rpc_args + 1, rpc_args + 2);
 	thread_rpc(rpc_args);
 
-	return get_rpc_alloc_res(arg, bt);
+	return get_rpc_alloc_res(arg, bt, size);
 }
 
 struct mobj *thread_rpc_alloc_payload(size_t size)

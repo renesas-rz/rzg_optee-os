@@ -6,6 +6,7 @@
 #ifndef __STM32_I2C_H
 #define __STM32_I2C_H
 
+#include <drivers/clk.h>
 #include <drivers/stm32_gpio.h>
 #include <kernel/dt.h>
 #include <mm/core_memprot.h>
@@ -31,6 +32,7 @@
  *
  * @dt_status: non-secure/secure status read from DT
  * @pbase: I2C interface base address
+ * @reg_size: I2C interface register map size
  * @clock: I2C bus/interface clock
  * @addr_mode_10b_not_7b: True if 10bit addressing mode, otherwise 7bit mode
  * @own_address1: 7-bit or 10-bit first device own address.
@@ -48,7 +50,8 @@
 struct stm32_i2c_init_s {
 	unsigned int dt_status;
 	paddr_t pbase;
-	unsigned int clock;
+	size_t reg_size;
+	struct clk *clock;
 	bool addr_mode_10b_not_7b;
 	uint32_t own_address1;
 	bool dual_address_mode;
@@ -100,6 +103,7 @@ struct i2c_cfg {
 /*
  * I2C bus device
  * @base: I2C SoC registers base address
+ * @reg_size: I2C SoC registers address map size
  * @dt_status: non-secure/secure status read from DT
  * @clock: clock ID
  * @i2c_state: Driver state ID I2C_STATE_*
@@ -112,8 +116,9 @@ struct i2c_cfg {
  */
 struct i2c_handle_s {
 	struct io_pa_va base;
+	size_t reg_size;
 	unsigned int dt_status;
-	unsigned long clock;
+	struct clk *clock;
 	enum i2c_state_e i2c_state;
 	uint32_t i2c_err;
 	uint32_t saved_timing;
@@ -137,13 +142,13 @@ struct i2c_handle_s {
  * @node: Target I2C node in the DT
  * @init: Output stm32_i2c_init_s structure
  * @pinctrl: Reference to output pinctrl array
- * @pinctrl_count: Input @pinctrl array size, output expected size
- * Return 0 on success else a negative value
+ * @pinctrl_count: Input @pinctrl array size, output expected size upon success
+ * Return a TEE_Result compliant value
  */
-int stm32_i2c_get_setup_from_fdt(void *fdt, int node,
-				 struct stm32_i2c_init_s *init,
-				 struct stm32_pinctrl **pinctrl,
-				 size_t *pinctrl_count);
+TEE_Result stm32_i2c_get_setup_from_fdt(void *fdt, int node,
+					struct stm32_i2c_init_s *init,
+					struct stm32_pinctrl **pinctrl,
+					size_t *pinctrl_count);
 
 /*
  * Initialize I2C bus handle from input configuration directives

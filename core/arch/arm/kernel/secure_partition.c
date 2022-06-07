@@ -56,6 +56,23 @@ static void set_sp_ctx_ops(struct ts_ctx *ctx)
 	ctx->ops = &sp_ops;
 }
 
+TEE_Result sp_find_session_id(const TEE_UUID *uuid, uint32_t *session_id)
+{
+	struct sp_session *s = NULL;
+
+	TAILQ_FOREACH(s, &open_sp_sessions, link) {
+		if (!memcmp(&s->ts_sess.ctx->uuid, uuid, sizeof(*uuid))) {
+			if (s->state == sp_dead)
+				return TEE_ERROR_TARGET_DEAD;
+
+			*session_id  = s->endpoint_id;
+			return TEE_SUCCESS;
+		}
+	}
+
+	return TEE_ERROR_ITEM_NOT_FOUND;
+}
+
 struct sp_session *sp_get_session(uint32_t session_id)
 {
 	struct sp_session *s = NULL;
@@ -66,6 +83,54 @@ struct sp_session *sp_get_session(uint32_t session_id)
 	}
 
 	return NULL;
+}
+
+TEE_Result sp_partition_info_get_all(struct ffa_partition_info *fpi,
+				     size_t *elem_count)
+{
+	size_t in_count = *elem_count;
+	struct sp_session *s = NULL;
+	size_t count = 0;
+
+	TAILQ_FOREACH(s, &open_sp_sessions, link) {
+		if (s->state == sp_dead)
+			continue;
+		if (count < in_count) {
+			spmc_fill_partition_entry(fpi, s->endpoint_id, 1);
+			fpi++;
+		}
+		count++;
+	}
+
+	*elem_count = count;
+	if (count > in_count)
+		return TEE_ERROR_SHORT_BUFFER;
+
+	return TEE_SUCCESS;
+}
+
+bool sp_has_exclusive_access(struct sp_mem_map_region *mem,
+			     struct user_mode_ctx *uctx)
+{
+	/*
+	 * Check that we have access to the region if it is supposed to be
+	 * mapped to the current context.
+	 */
+	if (uctx) {
+		struct vm_region *region = NULL;
+
+		/* Make sure that each mobj belongs to the SP */
+		TAILQ_FOREACH(region, &uctx->vm_info.regions, link) {
+			if (region->mobj == mem->mobj)
+				break;
+		}
+
+		if (!region)
+			return false;
+	}
+
+	/* Check that it is not shared with another SP */
+	return !sp_mem_is_shared(mem);
 }
 
 static void sp_init_info(struct sp_ctx *ctx, struct thread_smc_args *args)
@@ -163,6 +228,71 @@ static TEE_Result sp_init_set_registers(struct sp_ctx *ctx)
 	memset(sp_regs, 0, sizeof(*sp_regs));
 	sp_regs->sp = ctx->uctx.stack_ptr;
 	sp_regs->pc = ctx->uctx.entry_func;
+
+	return TEE_SUCCESS;
+}
+
+TEE_Result sp_map_shared(struct sp_session *s,
+			 struct sp_mem_receiver *receiver,
+			 struct sp_mem *smem,
+			 uint64_t *va)
+{
+	TEE_Result res = TEE_SUCCESS;
+	struct sp_ctx *ctx = NULL;
+	uint32_t perm = TEE_MATTR_UR;
+	struct sp_mem_map_region *reg = NULL;
+
+	ctx = to_sp_ctx(s->ts_sess.ctx);
+
+	/* Get the permission */
+	if (receiver->perm.perm & FFA_MEM_ACC_EXE)
+		perm |= TEE_MATTR_UX;
+
+	if (receiver->perm.perm & FFA_MEM_ACC_RW) {
+		if (receiver->perm.perm & FFA_MEM_ACC_EXE)
+			return TEE_ERROR_ACCESS_CONFLICT;
+
+		perm |= TEE_MATTR_UW;
+	}
+	/*
+	 * Currently we don't support passing a va. We can't guarantee that the
+	 * full region will be mapped in a contiguous region. A smem->region can
+	 * have multiple mobj for one share. Currently there doesn't seem to be
+	 * an option to guarantee that these will be mapped in a contiguous va
+	 * space.
+	 */
+	if (*va)
+		return TEE_ERROR_NOT_SUPPORTED;
+
+	SLIST_FOREACH(reg, &smem->regions, link) {
+		res = vm_map(&ctx->uctx, va, reg->page_count * SMALL_PAGE_SIZE,
+			     perm, 0, reg->mobj, reg->page_offset);
+
+		if (res != TEE_SUCCESS) {
+			EMSG("Failed to map memory region %#"PRIx32, res);
+			return res;
+		}
+	}
+	return TEE_SUCCESS;
+}
+
+TEE_Result sp_unmap_ffa_regions(struct sp_session *s, struct sp_mem *smem)
+{
+	TEE_Result res = TEE_SUCCESS;
+	vaddr_t vaddr = 0;
+	size_t len = 0;
+	struct sp_ctx *ctx = to_sp_ctx(s->ts_sess.ctx);
+	struct sp_mem_map_region *reg = NULL;
+
+	SLIST_FOREACH(reg, &smem->regions, link) {
+		vaddr = (vaddr_t)sp_mem_get_va(&ctx->uctx, reg->page_offset,
+					       reg->mobj);
+		len = reg->page_count * SMALL_PAGE_SIZE;
+
+		res = vm_unmap(&ctx->uctx, vaddr, len);
+		if (res != TEE_SUCCESS)
+			return res;
+	}
 
 	return TEE_SUCCESS;
 }

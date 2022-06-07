@@ -12,6 +12,7 @@
 
 #define STAT		0x14
 #define DATA		0x1C
+#define UART_SIZE	0x20
 #define STAT_TDRE	BIT(23)
 #define STAT_RDRF	BIT(21)
 #define STAT_OR		BIT(19)
@@ -21,7 +22,7 @@ static vaddr_t chip_to_base(struct serial_chip *chip)
 	struct imx_uart_data *pd =
 		container_of(chip, struct imx_uart_data, chip);
 
-	return io_pa_or_va(&pd->base);
+	return io_pa_or_va(&pd->base, UART_SIZE);
 }
 
 static void imx_lpuart_flush(struct serial_chip *chip __unused)
@@ -124,8 +125,9 @@ static const struct dt_device_match imx_match_table[] = {
 	{ 0 }
 };
 
-const struct dt_driver imx_dt_driver __dt_driver = {
+DEFINE_DT_DRIVER(imx_dt_driver) = {
 	.name = "imx_lpuart",
+	.type = DT_DRIVER_UART,
 	.match_table = imx_match_table,
 	.driver = &imx_lpuart_driver,
 };

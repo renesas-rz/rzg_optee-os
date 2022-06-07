@@ -34,12 +34,12 @@
 #include <kernel/misc.h>
 #include <kernel/panic.h>
 #include <kernel/tz_ssvce_def.h>
-#include <kernel/tz_ssvce_pl310.h>
 #include <matrix.h>
 #include <mm/core_mmu.h>
 #include <mm/core_memprot.h>
 #include <platform_config.h>
 #include <sama5d2.h>
+#include <sam_sfr.h>
 #include <stdint.h>
 #include <sm/optee_smc.h>
 #include <tz_matrix.h>
@@ -54,59 +54,18 @@ void console_init(void)
 	register_serial_console(&console_data.chip);
 }
 
-register_phys_mem_pgdir(MEM_AREA_IO_SEC, PL310_BASE, CORE_MMU_PGDIR_SIZE);
 register_phys_mem_pgdir(MEM_AREA_IO_SEC, SFR_BASE, CORE_MMU_PGDIR_SIZE);
 
-static vaddr_t sfr_base(void)
+vaddr_t sam_sfr_base(void)
 {
 	static void *va;
 
 	if (cpu_mmu_enabled()) {
 		if (!va)
-			va = phys_to_virt(SFR_BASE, MEM_AREA_IO_SEC);
+			va = phys_to_virt(SFR_BASE, MEM_AREA_IO_SEC, 1);
 		return (vaddr_t)va;
 	}
 	return SFR_BASE;
-}
-
-enum ram_config {RAMC_SRAM = 0, RAMC_L2CC};
-
-static void l2_sram_config(enum ram_config setting)
-{
-	if (setting == RAMC_L2CC)
-		io_write32(sfr_base() + SFR_L2CC_HRAMC, 0x1);
-	else
-		io_write32(sfr_base() + SFR_L2CC_HRAMC, 0x0);
-}
-
-vaddr_t pl310_base(void)
-{
-	static void *va;
-
-	if (cpu_mmu_enabled()) {
-		if (!va)
-			va = phys_to_virt(PL310_BASE, MEM_AREA_IO_SEC);
-		return (vaddr_t)va;
-	}
-	return PL310_BASE;
-}
-
-void arm_cl2_config(vaddr_t pl310_base)
-{
-	io_write32(pl310_base + PL310_CTRL, 0);
-	l2_sram_config(RAMC_L2CC);
-	io_write32(pl310_base + PL310_AUX_CTRL, PL310_AUX_CTRL_INIT);
-	io_write32(pl310_base + PL310_PREFETCH_CTRL, PL310_PREFETCH_CTRL_INIT);
-	io_write32(pl310_base + PL310_POWER_CTRL, PL310_POWER_CTRL_INIT);
-
-	/* invalidate all cache ways */
-	arm_cl2_invbyway(pl310_base);
-}
-
-void arm_cl2_enable(vaddr_t pl310_base)
-{
-	/* Enable PL310 ctrl -> only set lsb bit */
-	io_write32(pl310_base + PL310_CTRL, 1);
 }
 
 register_phys_mem_pgdir(MEM_AREA_IO_SEC, AT91C_BASE_MATRIX32,
@@ -120,7 +79,8 @@ vaddr_t matrix32_base(void)
 
 	if (cpu_mmu_enabled()) {
 		if (!va)
-			va = phys_to_virt(AT91C_BASE_MATRIX32, MEM_AREA_IO_SEC);
+			va = phys_to_virt(AT91C_BASE_MATRIX32, MEM_AREA_IO_SEC,
+					  1);
 		return (vaddr_t)va;
 	}
 	return AT91C_BASE_MATRIX32;
@@ -132,7 +92,8 @@ vaddr_t matrix64_base(void)
 
 	if (cpu_mmu_enabled()) {
 		if (!va)
-			va = phys_to_virt(AT91C_BASE_MATRIX64, MEM_AREA_IO_SEC);
+			va = phys_to_virt(AT91C_BASE_MATRIX64, MEM_AREA_IO_SEC,
+					  1);
 		return (vaddr_t)va;
 	}
 	return AT91C_BASE_MATRIX64;
@@ -167,23 +128,31 @@ static void matrix_configure_slave_h64mx(void)
 					sasplit_setting,
 					ssr_setting);
 
+	/*
+	 * Matrix DDR configuration is hardcoded here and is difficult to
+	 * generate at runtime. Since this configuration expect the secure
+	 * DRAM to be at start of RAM and 8M of size, enforce it here.
+	 */
+	COMPILE_TIME_ASSERT(CFG_TZDRAM_START == AT91C_BASE_DDRCS);
+	COMPILE_TIME_ASSERT(CFG_TZDRAM_SIZE == 0x800000);
+
 	/* 2 ~ 9 DDR2 Port1 ~ 7: Non-Secure, except op-tee tee/ta memory */
 	srtop_setting = MATRIX_SRTOP(0, MATRIX_SRTOP_VALUE_128M);
-	sasplit_setting = (MATRIX_SASPLIT(0, MATRIX_SASPLIT_VALUE_128M)
+	sasplit_setting = (MATRIX_SASPLIT(0, MATRIX_SASPLIT_VALUE_8M)
 				| MATRIX_SASPLIT(1, MATRIX_SASPLIT_VALUE_128M)
-				| MATRIX_SASPLIT(2, MATRIX_SASPLIT_VALUE_8M)
+				| MATRIX_SASPLIT(2, MATRIX_SASPLIT_VALUE_128M)
 				| MATRIX_SASPLIT(3, MATRIX_SASPLIT_VALUE_128M));
-	ssr_setting = (MATRIX_LANSECH_NS(0)
+	ssr_setting = (MATRIX_LANSECH_S(0)
 			| MATRIX_LANSECH_NS(1)
-			| MATRIX_LANSECH_S(2)
+			| MATRIX_LANSECH_NS(2)
 			| MATRIX_LANSECH_NS(3)
-			| MATRIX_RDNSECH_NS(0)
+			| MATRIX_RDNSECH_S(0)
 			| MATRIX_RDNSECH_NS(1)
-			| MATRIX_RDNSECH_S(2)
+			| MATRIX_RDNSECH_NS(2)
 			| MATRIX_RDNSECH_NS(3)
-			| MATRIX_WRNSECH_NS(0)
+			| MATRIX_WRNSECH_S(0)
 			| MATRIX_WRNSECH_NS(1)
-			| MATRIX_WRNSECH_S(2)
+			| MATRIX_WRNSECH_NS(2)
 			| MATRIX_WRNSECH_NS(3));
 	/* DDR port 0 not used from NWd */
 	for (ddr_port = 1; ddr_port < 8; ddr_port++) {
@@ -207,8 +176,20 @@ static void matrix_configure_slave_h64mx(void)
 					ssr_setting);
 
 	/* 11:  Internal SRAM 128K (Cache L2): Default */
-	/* 12:  QSPI0: Default */
-	/* 13:  QSPI1: Default */
+
+	/* 12:  QSPI0: Normal world */
+	/* 13:  QSPI1: Normal world */
+	srtop_setting = MATRIX_SRTOP(0, MATRIX_SRTOP_VALUE_128M);
+	sasplit_setting = MATRIX_SASPLIT(0, MATRIX_SASPLIT_VALUE_128M);
+	ssr_setting = MATRIX_LANSECH_NS(0) | MATRIX_RDNSECH_NS(0) |
+		      MATRIX_WRNSECH_NS(0);
+
+	matrix_configure_slave_security(matrix64_base(), H64MX_SLAVE_QSPI0,
+					srtop_setting, sasplit_setting,
+					ssr_setting);
+	matrix_configure_slave_security(matrix64_base(), H64MX_SLAVE_QSPI1,
+					srtop_setting, sasplit_setting,
+					ssr_setting);
 	/* 14:  AESB: Default */
 }
 
@@ -287,7 +268,7 @@ static void matrix_configure_slave_h32mx(void)
 }
 
 static unsigned int security_ps_peri_id[] = {
-	AT91C_ID_1,
+	AT91C_ID_PMC,
 	AT91C_ID_ARM,
 	AT91C_ID_PIT,
 	AT91C_ID_WDT,
@@ -360,7 +341,7 @@ static int matrix_init(void)
 	matrix_configure_slave_h64mx();
 	matrix_configure_slave_h32mx();
 
-	return matrix_configure_peri_security(security_ps_peri_id,
+	return matrix_configure_periph_non_secure(security_ps_peri_id,
 					      ARRAY_SIZE(security_ps_peri_id));
 }
 

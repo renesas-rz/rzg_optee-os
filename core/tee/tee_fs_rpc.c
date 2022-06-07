@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string_ext.h>
 #include <string.h>
+#include <tee/fs_dirfile.h>
 #include <tee/tee_fs.h>
 #include <tee/tee_fs_rpc.h>
 #include <tee/tee_pobj.h>
@@ -23,6 +24,26 @@ struct tee_fs_dir {
 	struct tee_fs_dirent d;
 };
 
+/* "/dirf.db" or "/<file number>" */
+static TEE_Result create_filename(void *buf, size_t blen,
+				  const struct tee_fs_dirfile_fileh *dfh)
+{
+	char *file = buf;
+	size_t pos = 0;
+	size_t l;
+
+	if (pos >= blen)
+		return TEE_ERROR_SHORT_BUFFER;
+
+	file[pos] = '/';
+	pos++;
+	if (pos >= blen)
+		return TEE_ERROR_SHORT_BUFFER;
+
+	l = blen - pos;
+	return tee_fs_dirfile_fileh_to_fname(dfh, file + pos, &l);
+}
+
 static TEE_Result operation_commit(struct tee_fs_rpc_operation *op)
 {
 	return thread_rpc_cmd(op->id, op->num_params, op->params);
@@ -32,9 +53,10 @@ static TEE_Result operation_open_dfh(uint32_t id, unsigned int cmd,
 				 const struct tee_fs_dirfile_fileh *dfh,
 				 int *fd)
 {
-	struct mobj *mobj;
-	TEE_Result res;
-	void *va;
+	struct tee_fs_rpc_operation op = { };
+	struct mobj *mobj = NULL;
+	TEE_Result res = TEE_SUCCESS;
+	void *va = NULL;
 
 	va = thread_rpc_shm_cache_alloc(THREAD_SHM_CACHE_USER_FS,
 					THREAD_SHM_TYPE_APPLICATION,
@@ -42,11 +64,11 @@ static TEE_Result operation_open_dfh(uint32_t id, unsigned int cmd,
 	if (!va)
 		return TEE_ERROR_OUT_OF_MEMORY;
 
-	res = tee_svc_storage_create_filename_dfh(va, TEE_FS_NAME_MAX, dfh);
+	res = create_filename(va, TEE_FS_NAME_MAX, dfh);
 	if (res != TEE_SUCCESS)
 		return res;
 
-	struct tee_fs_rpc_operation op = {
+	op = (struct tee_fs_rpc_operation){
 		.id = id, .num_params = 3, .params = {
 			[0] = THREAD_PARAM_VALUE(IN, cmd, 0, 0),
 			[1] = THREAD_PARAM_MEMREF(IN, mobj, 0, TEE_FS_NAME_MAX),
@@ -174,9 +196,10 @@ TEE_Result tee_fs_rpc_truncate(uint32_t id, int fd, size_t len)
 TEE_Result tee_fs_rpc_remove_dfh(uint32_t id,
 				 const struct tee_fs_dirfile_fileh *dfh)
 {
-	TEE_Result res;
-	struct mobj *mobj;
-	void *va;
+	struct tee_fs_rpc_operation op = { };
+	TEE_Result res = TEE_SUCCESS;
+	struct mobj *mobj = NULL;
+	void *va = NULL;
 
 	va = thread_rpc_shm_cache_alloc(THREAD_SHM_CACHE_USER_FS,
 					THREAD_SHM_TYPE_APPLICATION,
@@ -185,11 +208,11 @@ TEE_Result tee_fs_rpc_remove_dfh(uint32_t id,
 		return TEE_ERROR_OUT_OF_MEMORY;
 
 
-	res = tee_svc_storage_create_filename_dfh(va, TEE_FS_NAME_MAX, dfh);
+	res = create_filename(va, TEE_FS_NAME_MAX, dfh);
 	if (res != TEE_SUCCESS)
 		return res;
 
-	struct tee_fs_rpc_operation op = {
+	op = (struct tee_fs_rpc_operation){
 		.id = id, .num_params = 2, .params = {
 			[0] = THREAD_PARAM_VALUE(IN, OPTEE_RPC_FS_REMOVE, 0, 0),
 			[1] = THREAD_PARAM_MEMREF(IN, mobj, 0, TEE_FS_NAME_MAX),

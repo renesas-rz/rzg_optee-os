@@ -7,6 +7,7 @@
 #define __STM32_UTIL_H__
 
 #include <assert.h>
+#include <drivers/clk.h>
 #include <drivers/stm32_bsec.h>
 #include <kernel/panic.h>
 #include <stdint.h>
@@ -42,6 +43,7 @@ vaddr_t get_gicd_base(void);
 vaddr_t stm32_get_gpio_bank_base(unsigned int bank);
 unsigned int stm32_get_gpio_bank_offset(unsigned int bank);
 unsigned int stm32_get_gpio_bank_clock(unsigned int bank);
+struct clk *stm32_get_gpio_bank_clk(unsigned int bank);
 
 /* Platform util for PMIC support */
 bool stm32mp_with_pmic(void);
@@ -71,8 +73,13 @@ void stm32_clock_disable(unsigned long id);
 unsigned long stm32_clock_get_rate(unsigned long id);
 bool stm32_clock_is_enabled(unsigned long id);
 
+/* Helper from platform RCC clock driver */
+struct clk *stm32mp_rcc_clock_id_to_clk(unsigned long clock_id);
+
 /* Return true if @clock_id is shared by secure and non-secure worlds */
 bool stm32mp_nsec_can_access_clock(unsigned long clock_id);
+
+extern const struct clk_ops stm32mp1_clk_ops;
 
 #if defined(CFG_STPMIC1)
 /* Return true if non-secure world can manipulate regulator @pmic_regu_name */

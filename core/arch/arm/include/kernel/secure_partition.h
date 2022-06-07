@@ -7,9 +7,11 @@
 
 #include <assert.h>
 #include <config.h>
+#include <ffa.h>
 #include <kernel/embedded_ts.h>
 #include <kernel/thread_spmc.h>
 #include <kernel/user_mode_ctx_struct.h>
+#include <mm/sp_mem.h>
 #include <stdint.h>
 #include <tee_api_types.h>
 #include <tee/entry_std.h>
@@ -73,6 +75,17 @@ static inline struct sp_ctx *to_sp_ctx(struct ts_ctx *ctx)
 
 struct sp_session *sp_get_session(uint32_t session_id);
 TEE_Result sp_enter(struct thread_smc_args *args, struct sp_session *sp);
+TEE_Result sp_partition_info_get_all(struct ffa_partition_info *fpi,
+				     size_t *elem_count);
+
+TEE_Result sp_find_session_id(const TEE_UUID *uuid, uint32_t *session_id);
+bool sp_has_exclusive_access(struct sp_mem_map_region *mem,
+			     struct user_mode_ctx *uctx);
+TEE_Result sp_map_shared(struct sp_session *s,
+			 struct sp_mem_receiver *receiver,
+			 struct sp_mem *mem,
+			 uint64_t *va);
+TEE_Result sp_unmap_ffa_regions(struct sp_session *s, struct sp_mem *smem);
 
 #define for_each_secure_partition(_sp) \
 	SCATTERED_ARRAY_FOREACH(_sp, sp_images, struct embedded_ts)

@@ -8,7 +8,8 @@ srcs-$(CFG_SECSTOR_TA_MGMT_PTA) += secstor_ta_mgmt.c
 endif
 srcs-$(CFG_WITH_STATS) += stats.c
 srcs-$(CFG_SYSTEM_PTA) += system.c
-srcs-$(CFG_NXP_SE05X) += scp03.c
+srcs-$(CFG_SCP03_PTA) += scp03.c
+srcs-$(CFG_APDU_PTA) += apdu.c
 srcs-$(CFG_SCMI_PTA) += scmi.c
 srcs-$(CFG_HWRNG_PTA) += hwrng.c
 

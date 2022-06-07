@@ -189,6 +189,24 @@ static TEE_Result get_prop_ta_app_id(struct ts_session *sess,
 	return copy_to_user(buf, &sess->ctx->uuid, sizeof(TEE_UUID));
 }
 
+#ifdef CFG_TA_BTI
+static TEE_Result
+get_prop_feat_bti_implemented(struct ts_session *sess __unused, void *buf,
+			      size_t *blen)
+{
+	bool bti_impl = false;
+
+	if (*blen < sizeof(bti_impl)) {
+		*blen = sizeof(bti_impl);
+		return TEE_ERROR_SHORT_BUFFER;
+	}
+	*blen = sizeof(bti_impl);
+	bti_impl = feat_bti_is_implemented();
+
+	return copy_to_user(buf, &bti_impl, sizeof(bti_impl));
+}
+#endif
+
 /* Properties of the set TEE_PROPSET_CURRENT_CLIENT */
 const struct tee_props tee_propset_client[] = {
 	{
@@ -297,6 +315,13 @@ const struct tee_props tee_propset_tee[] = {
 		.data = fw_manufacturer,
 		.len = sizeof(fw_manufacturer)
 	},
+#ifdef CFG_TA_BTI
+	{
+		.name = "org.trustedfirmware.optee.cpu.feat_bti_implemented",
+		.prop_type = USER_TA_PROP_TYPE_BOOL,
+		.get_prop_func = get_prop_feat_bti_implemented
+	},
+#endif
 
 	/*
 	 * Following properties are processed directly in libutee:
@@ -541,16 +566,26 @@ static TEE_Result utee_param_to_param(struct user_ta_ctx *utc,
 static TEE_Result alloc_temp_sec_mem(size_t size, struct mobj **mobj,
 				     uint8_t **va)
 {
+	struct mobj *m = NULL;
+	void *v = NULL;
+
 	/* Allocate section in secure DDR */
 #ifdef CFG_PAGED_USER_TA
-	*mobj = mobj_seccpy_shm_alloc(size);
+	m = mobj_seccpy_shm_alloc(size);
 #else
-	*mobj = mobj_mm_alloc(mobj_sec_ddr, size, &tee_mm_sec_ddr);
+	m = mobj_mm_alloc(mobj_sec_ddr, size, &tee_mm_sec_ddr);
 #endif
-	if (!*mobj)
+	if (!m)
 		return TEE_ERROR_GENERIC;
 
-	*va = mobj_get_va(*mobj, 0);
+	v = mobj_get_va(*mobj, 0, size);
+	if (!v) {
+		mobj_put(m);
+		return TEE_ERROR_GENERIC;
+	}
+
+	*mobj = m;
+	*va = v;
 	return TEE_SUCCESS;
 }
 

@@ -32,6 +32,8 @@ endif
 include core/arch/arm/cpu/cortex-a7.mk
 
 $(call force,CFG_BOOT_SECONDARY_REQUEST,y)
+$(call force,CFG_DRIVERS_CLK,y)
+$(call force,CFG_DRIVERS_CLK_FIXED,n)
 $(call force,CFG_GIC,y)
 $(call force,CFG_INIT_CNTVOFF,y)
 $(call force,CFG_PSCI_ARM32,y)
@@ -64,22 +66,36 @@ CFG_DTB_MAX_SIZE ?= (256 * 1024)
 
 ifeq ($(CFG_EMBED_DTB_SOURCE_FILE),)
 # Some drivers mandate DT support
+$(call force,CFG_DRIVERS_CLK_DT,n)
+$(call force,CFG_STM32_CRYP,n)
+$(call force,CFG_STM32_GPIO,n)
 $(call force,CFG_STM32_I2C,n)
 $(call force,CFG_STPMIC1,n)
+$(call force,CFG_STM32MP1_SCMI_SIP,n)
+$(call force,CFG_SCMI_PTA,n)
+else
+$(call force,CFG_DRIVERS_CLK_DT,y)
 endif
 
 CFG_STM32_BSEC ?= y
+CFG_STM32_CRYP ?= y
 CFG_STM32_ETZPC ?= y
 CFG_STM32_GPIO ?= y
 CFG_STM32_I2C ?= y
 CFG_STM32_RNG ?= y
 CFG_STM32_UART ?= y
+$(call force,CFG_STM32MP15_CLK,y)
 CFG_STPMIC1 ?= y
 CFG_TZC400 ?= y
 
 ifeq ($(CFG_STPMIC1),y)
 $(call force,CFG_STM32_I2C,y)
 $(call force,CFG_STM32_GPIO,y)
+endif
+
+# if any crypto driver is enabled, enable the crypto-framework layer
+ifeq ($(call cfg-one-enabled, CFG_STM32_CRYP),y)
+$(call force,CFG_STM32_CRYPTO_DRIVER,y)
 endif
 
 # Platform specific configuration
@@ -109,7 +125,7 @@ $(call force,CFG_SCMI_MSG_VOLTAGE_DOMAIN,y)
 endif
 
 # Default enable some test facitilites
-CFG_TEE_CORE_EMBED_INTERNAL_TESTS ?= y
+CFG_ENABLE_EMBEDDED_TESTS ?= y
 CFG_WITH_STATS ?= y
 
 # Default disable some support for pager memory size constraint

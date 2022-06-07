@@ -19,7 +19,7 @@
 #endif
 
 /* Size needed for xtest to pass reliably on both ARM32 and ARM64 */
-#define MPI_MEMPOOL_SIZE	(42 * 1024)
+#define MPI_MEMPOOL_SIZE	(46 * 1024)
 
 /* From mbedtls/library/bignum.c */
 #define ciL		(sizeof(mbedtls_mpi_uint))	/* chars in limb  */
@@ -545,8 +545,7 @@ static int montgomery_reduce(void *a, void *b, void *c)
 	if (mbedtls_mpi_grow(&A, N->n + 1))
 		goto out;
 
-	if (mbedtls_mpi_montred(&A, N, *mm, &T))
-		goto out;
+	mbedtls_mpi_montred(&A, N, *mm, &T);
 
 	if (mbedtls_mpi_copy(a, &A))
 		goto out;

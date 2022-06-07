@@ -128,7 +128,7 @@ void console_init(void)
 static TEE_Result get_gic_base_addr_from_dt(paddr_t *gic_addr)
 {
 	paddr_t paddr = 0;
-	ssize_t size = 0;
+	size_t size = 0;
 
 	void *fdt = get_embedded_dt();
 	int gic_offset = 0;
@@ -147,7 +147,7 @@ static TEE_Result get_gic_base_addr_from_dt(paddr_t *gic_addr)
 		}
 
 		size = _fdt_reg_size(fdt, gic_offset);
-		if (size < 0) {
+		if (size == DT_INFO_INVALID_REG_SIZE) {
 			EMSG("GIC: Unable to get size of base addr from DT");
 			return TEE_ERROR_ITEM_NOT_FOUND;
 		}
@@ -186,9 +186,9 @@ void main_init_gic(void)
 #endif
 
 	gicc_base = (vaddr_t)phys_to_virt(gic_base + gicc_offset,
-					  MEM_AREA_IO_SEC);
+					  MEM_AREA_IO_SEC, 1);
 	gicd_base = (vaddr_t)phys_to_virt(gic_base + gicd_offset,
-					  MEM_AREA_IO_SEC);
+					  MEM_AREA_IO_SEC, 1);
 	if (!gicc_base || !gicd_base)
 		panic();
 

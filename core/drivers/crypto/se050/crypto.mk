@@ -13,8 +13,6 @@ CFG_CORE_SE05X_DISPLAY_INFO ?= y
 CFG_CORE_SE05X_SCP03_EARLY ?= y
 # Deletes all persistent storage from the SE050 at boot
 CFG_CORE_SE05X_INIT_NVM ?= n
-# Selects the default SCP03 keys based on the configured OEFID
-CFG_CORE_SE05X_OEFID ?= 0
 
 # I2C bus baudrate (depends on SoC)
 CFG_CORE_SE05X_BAUDRATE ?= 3400000
@@ -29,8 +27,20 @@ ifeq ($(shell test $(CFG_STACK_TMP_EXTRA) -lt 8192; echo $$?), 0)
 $(error Error: SE050 requires CFG_STACK_TMP_EXTRA at least 8192)
 endif
 
-# SE05X Unique Key Identifier
-CFG_NXP_SE05X_HUK_DRV ?= y
+# SE05X Die Identifier
+CFG_NXP_SE05X_DIEID_DRV ?= y
+
+# Allow a secure client to enable the SCP03 session
+CFG_NXP_SE05X_SCP03_DRV ?= y
+ifeq ($(CFG_NXP_SE05X_SCP03_DRV),y)
+$(call force,CFG_SCP03_PTA,y,Mandated by CFG_NXP_SE05X_SCP03)
+endif
+
+# Allow a secure client to send APDU raw frames
+CFG_NXP_SE05X_APDU_DRV ?= y
+ifeq ($(CFG_NXP_SE05X_APDU_DRV),y)
+$(call force,CFG_APDU_PTA,y,Mandated by CFG_NXP_SE05X_APDU)
+endif
 
 # Random Number Generator
 CFG_NXP_SE05X_RNG_DRV ?= y
@@ -71,6 +81,4 @@ ifeq ($(CFG_NXP_SE05X_CIPHER_DRV),y)
 $(call force,CFG_CRYPTO_DRV_CIPHER,y,Mandated by CFG_NXP_SE05X_CIPHER_DRV)
 endif
 
-# Plug and Trust NXP SE050X OP-TEE enabled static library
-ldflags-external += $(CFG_NXP_SE05X_PLUG_AND_TRUST_LIB)
 endif  # CFG_NXP_SE05X

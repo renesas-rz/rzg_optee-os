@@ -86,6 +86,15 @@ R:	Jorge Ramirez <jorge@foundries.io>
 S:	Maintained
 F:	core/drivers/crypto/se050
 
+Core Drivers ZYNQMP
+R:	Jorge Ramirez <jorge@foundries.io> [@ldts]
+S:	Maintained
+F:	core/drivers/zynqmp_csu_aes.c
+F:	core/drivers/zynqmp_csu_puf.c
+F:	core/drivers/zynqmp_csudma.c
+F:	core/drivers/zynqmp_huk.c
+F:	core/drivers/zynqmp_pm.c
+
 Function Graph Tracer (ftrace) support
 R:	Sumit Garg <sumit.garg@linaro.org> [@b49020]
 S:	Maintained
@@ -137,13 +146,13 @@ R:	Sahil Malhotra <sahil.malhotra@nxp.com>
 S:	Maintained
 F:	core/drivers/ls_i2c.c
 
-Core Drivers GPIO
-R:	Manish Tomar <manish.tomar@nxp.com>
+LS Core Drivers GPIO
+R:	Sahil Malhotra <sahil.malhotra@nxp.com>
 S:	Maintained
 F:	core/drivers/ls_gpio.c
 
-Core Drivers DSPI
-R:	Manish Tomar <manish.tomar@nxp.com>
+LS Core Drivers DSPI
+R:	Sahil Malhotra <sahil.malhotra@nxp.com>
 S:	Maintained
 F:	core/drivers/ls_dspi.c
 
@@ -158,6 +167,11 @@ F:	core/arch/arm/plat-imx/
 F:	core/arch/arm/plat-imx/registers
 F:	core/drivers/crypto/caam/
 
+Clock driver framework
+R:	Clement Leger <clement.leger@bootlin.com> [@clementleger]
+S:	Maintained
+F:	core/drivers/clk/
+
 Crypto driver interface
 R:	Cedric Neveux <cedric.neveux@nxp.com> [@cneveux]
 R:	Silvano Di Ninno <silvano.dininno@nxp.com> [@sdininno]
@@ -170,6 +184,13 @@ R:	Peng Fan <peng.fan@nxp.com> [@MrVan]
 R:	Bryan O'Donoghue <bryan.odonoghue@linaro.org> [@bryanodonoghue]
 S:	Maintained
 F:	core/arch/arm/plat-imx/conf.mk
+
+PKCS#11 TA
+R:	Etienne Carriere <etienne.carriere@st.com> [@etienne-lms]
+R:	Ruchika Gupta <ruchika.gupta@linaro.org> [@ruchi393]
+R:	Vesa Jääskeläinen <vesa.jaaskelainen@vaisala.com> [@vesajaaskelainen]
+S:	Maintained
+F:	ta/pkcs11
 
 QEMU (32 and 64 bits)
 R:	Linaro <op-tee@linaro.org> [@OP-TEE/linaro]
@@ -258,6 +279,13 @@ Virtualization support
 R:	Volodymyr Babchuk <vlad.babchuk@gmail.com>
 S:	Maintained
 F:	core/arch/arm/kernel/virtualization.c
+
+Aspeed AST2600
+R:	Chia-Wei Wang <chiawei_wang@aspeedtech.com> [@ChiaweiW]
+R:	Neal Liu <neal_liu@aspeedtech.com> [@Neal-liu]
+R:	[@OP-TEE/plat-aspeed]
+S:	Maintained
+F:	core/arch/arm/plat-aspeed/
 
 THE REST
 M:	Joakim Bech <joakim.bech@linaro.org> [@jbech-linaro]

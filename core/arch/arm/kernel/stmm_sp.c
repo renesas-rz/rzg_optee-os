@@ -69,8 +69,8 @@ static const uint16_t ffa_storage_id = 4U;
 
 static const unsigned int stmm_stack_size = 4 * SMALL_PAGE_SIZE;
 static const unsigned int stmm_heap_size = 398 * SMALL_PAGE_SIZE;
-static const unsigned int stmm_sec_buf_size = SMALL_PAGE_SIZE;
-static const unsigned int stmm_ns_comm_buf_size = SMALL_PAGE_SIZE;
+static const unsigned int stmm_sec_buf_size = 4 * SMALL_PAGE_SIZE;
+static const unsigned int stmm_ns_comm_buf_size = 4 * SMALL_PAGE_SIZE;
 
 extern unsigned char stmm_image[];
 extern const unsigned int stmm_image_size;
@@ -405,7 +405,7 @@ static TEE_Result stmm_enter_invoke_cmd(struct ts_session *s, uint32_t cmd)
 	if (res)
 		return res;
 
-	va = mobj_get_va(mem->mobj, mem->offs);
+	va = mobj_get_va(mem->mobj, mem->offs, mem->size);
 	if (!va) {
 		EMSG("Can't get a valid VA for NS buffer");
 		res = TEE_ERROR_BAD_PARAMETERS;

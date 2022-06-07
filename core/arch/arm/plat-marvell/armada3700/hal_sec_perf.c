@@ -32,7 +32,7 @@
 #include <mm/core_memprot.h>
 #include <util.h>
 
-#define PHY_2_VIR(addr)	((vaddr_t)phys_to_virt((addr), MEM_AREA_IO_SEC))
+#define PHY_2_VIR(addr)	((vaddr_t)phys_to_virt((addr), MEM_AREA_IO_SEC, 1))
 
 #define MCU_BASE	0xD0000000
 #define MCU_MC_CONTROL_0_REG	PHY_2_VIR(MCU_BASE + 0x044)
@@ -132,8 +132,6 @@
 		 io_write32(MCU_MC_CONTROL_0_REG, (x));	\
 	} while (0)
 
-#define _IS_ALIGNED(_addr, _algn)	(!((_addr) & ((_algn) - 1)))
-
 register_phys_mem_pgdir(MEM_AREA_IO_SEC, MCU_BASE, CORE_MMU_PGDIR_SIZE);
 
 static int32_t _find_valid_range(void)
@@ -156,13 +154,13 @@ static int32_t set_range(uint32_t addr, uint32_t size, uint32_t perm)
 	int32_t valid_range;
 	uint32_t i;
 
-	if (!_IS_ALIGNED(addr, SIZE_1M)) {
+	if (!IS_ALIGNED(addr, SIZE_1M)) {
 		EMSG("region addr(0x%" PRIx32 ") is not aligned with 1M!",
 			addr);
 		return -1;
 	}
 
-	if (!_IS_ALIGNED(size, SIZE_1M)) {
+	if (!IS_ALIGNED(size, SIZE_1M)) {
 		EMSG("region size(0x%" PRIx32 ") is not aligned with 1M!",
 			size);
 		return -1;

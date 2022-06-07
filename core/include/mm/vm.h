@@ -87,7 +87,7 @@ TEE_Result vm_buf_to_mboj_offs(const struct user_mode_ctx *uctx,
 TEE_Result vm_va2pa(const struct user_mode_ctx *uctx, void *ua, paddr_t *pa);
 
 /* Helper function for phys_to_virt(), shouldn't be used directly elsewhere */
-void *vm_pa2va(const struct user_mode_ctx *uctx, paddr_t pa);
+void *vm_pa2va(const struct user_mode_ctx *uctx, paddr_t pa, size_t pa_size);
 
 /*
  * Return TEE_SUCCESS or TEE_ERROR_ACCESS_DENIED when buffer exists or return
@@ -99,4 +99,6 @@ TEE_Result vm_check_access_rights(const struct user_mode_ctx *uctx,
 /* Set user context @ctx or core privileged context if @ctx is NULL */
 void vm_set_ctx(struct ts_ctx *ctx);
 
+struct mobj *vm_get_mobj(struct user_mode_ctx *uctx, vaddr_t va, size_t *len,
+			 uint16_t *prot, size_t *offs);
 #endif /*TEE_MMU_H*/

@@ -26,6 +26,14 @@ libname := $(LIBNAME)
 shlibname := $(SHLIBNAME)
 shlibuuid := $(SHLIBUUID)
 
+arch-bits-ta_arm32 := 32
+arch-bits-ta_arm64 := 64
+
+# For convenience
+ifdef CFLAGS
+CFLAGS32 ?= $(CFLAGS)
+CFLAGS64 ?= $(CFLAGS)
+endif
 
 ifneq ($V,1)
 q := @
@@ -135,7 +143,7 @@ cleanfiles += $(libname).a
 
 $(libname).a: $(objs)
 	@echo '  AR      $@'
-	$(q)rm -f $@ && $(AR$(sm)) rcs -o $@ $^
+	$(q)rm -f $@ && $(AR$(sm)) rcs $@ $^
 endif
 
 ifneq (,$(shlibname))

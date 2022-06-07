@@ -30,6 +30,7 @@
 	ldr	x16, =1111f
 	br	x16
 1111:
+BTI(	bti	j)
 #endif
 	.endm
 
@@ -131,7 +132,7 @@ END_FUNC vector_system_reset_entry
  * Note that ARM-TF depends on the layout of this vector table, any change
  * in layout has to be synced with ARM-TF.
  */
-FUNC thread_vector_table , : , .identity_map
+FUNC thread_vector_table , : , .identity_map, , nobti
 	b	vector_std_smc_entry
 	b	vector_fast_smc_entry
 	b	vector_cpu_on_entry
@@ -235,3 +236,5 @@ FUNC thread_foreign_intr_exit , :
 	smc	#0
 	b	.	/* SMC should not return */
 END_FUNC thread_foreign_intr_exit
+
+BTI(emit_aarch64_feature_1_and     GNU_PROPERTY_AARCH64_FEATURE_1_BTI)

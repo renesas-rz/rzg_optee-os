@@ -5,7 +5,6 @@
 
 #if defined(__KERNEL__)
 #include <platform_config.h>
-#include <kernel/misc.h>
 #endif
 
 #include <printk.h>
@@ -57,7 +56,9 @@ static char trace_level_to_string(int level, bool level_ok)
 
 static int print_thread_id(char *buf, size_t bs)
 {
-#if CFG_NUM_THREADS > 9
+#if CFG_NUM_THREADS > 100
+	int num_thread_digits = 3;
+#elif CFG_NUM_THREADS > 10
 	int num_thread_digits = 2;
 #else
 	int num_thread_digits = 1;
@@ -73,16 +74,22 @@ static int print_thread_id(char *buf, size_t bs)
 #if defined(__KERNEL__)
 static int print_core_id(char *buf, size_t bs)
 {
-#if CFG_TEE_CORE_NB_CORE > 10
+#if CFG_TEE_CORE_NB_CORE > 100
+	const int num_digits = 3;
+	const char qm[] = "???";
+#elif CFG_TEE_CORE_NB_CORE > 10
 	const int num_digits = 2;
+	const char qm[] = "??";
 #else
 	const int num_digits = 1;
+	const char qm[] = "?";
 #endif
+	int core_id = trace_ext_get_core_id();
 
-	if (thread_get_exceptions() & THREAD_EXCP_FOREIGN_INTR)
-		return snprintk(buf, bs, "%0*zu ", num_digits, get_core_pos());
+	if (core_id >= 0)
+		return snprintk(buf, bs, "%0*u ", num_digits, core_id);
 	else
-		return snprintk(buf, bs, "%s ", num_digits > 1 ? "??" : "?");
+		return snprintk(buf, bs, "%s ", qm);
 }
 #else  /* defined(__KERNEL__) */
 static int print_core_id(char *buf __unused, size_t bs __unused)

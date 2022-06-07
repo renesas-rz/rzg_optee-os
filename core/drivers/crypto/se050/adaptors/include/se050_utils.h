@@ -32,7 +32,7 @@ struct s050_scp_rotate_cmd {
 #define WATERMARKED(x)	\
 	((uint64_t)(((uint64_t)SE050_KEY_WATERMARK) << 32) + (x))
 
-sss_status_t se050_get_oid(sss_key_object_mode_t type, uint32_t *val);
+sss_status_t se050_get_oid(uint32_t *val);
 
 struct rsa_keypair;
 struct ecc_keypair;
@@ -44,7 +44,7 @@ uint64_t se050_generate_private_key(uint32_t oid);
 void se050_refcount_init_ctx(uint8_t **cnt);
 int se050_refcount_final_ctx(uint8_t *cnt);
 
-void se050_display_board_info(sss_se05x_session_t *session);
+sss_status_t se050_get_se_info(sss_se05x_session_t *session, bool display);
 
 enum se050_scp03_ksrc { SCP03_CFG, SCP03_DERIVED, SCP03_OFID };
 void se050_scp03_set_enable(enum se050_scp03_ksrc ksrc);

@@ -69,7 +69,7 @@
 #define FFA_MEM_RECLAIM			U(0x84000077)
 #define FFA_MEM_FRAG_RX			U(0x8400007A)
 #define FFA_MEM_FRAG_TX			U(0x8400007B)
-#define FFA_SECONDARY_EP_REGISTER_64	U(0xC4000084)
+#define FFA_SECONDARY_EP_REGISTER_64	U(0xC4000087)
 
 /* Special value for traffic targeted to the Hypervisor or SPM */
 #define FFA_TARGET_INFO_MBZ		U(0x0)
@@ -78,7 +78,13 @@
 #define FFA_NORMAL_MEM_REG_ATTR		U(0x2f)
 
 /* Memory access permissions: Read-write */
-#define FFA_MEM_ACC_RW			U(0x2)
+#define FFA_MEM_ACC_RW			BIT(1)
+
+/* Memory access permissions: executable */
+#define FFA_MEM_ACC_EXE			BIT(3)
+
+/* Memory access permissions mask */
+#define FFA_MEM_ACC_MASK		0xf
 
 /* Clear memory before mapping in receiver */
 #define FFA_MEMORY_REGION_FLAG_CLEAR		BIT(0)
@@ -94,6 +100,20 @@
 
 /* Special value for MBZ parameters */
 #define FFA_PARAM_MBZ			U(0x0)
+
+/*
+ * Flags used for the FFA_PARTITION_INFO_GET return message:
+ * BIT(0): Supports receipt of direct requests
+ * BIT(1): Can send direct requests
+ * BIT(2): Cannot send and receive indirect messages
+ * BIT(3): Does not support receipt of notifications
+ * BIT(4-5): Partition ID is a PE endpoint ID
+ */
+#define FFA_PARTITION_DIRECT_REQ_RECV_SUPPORT BIT(0)
+#define FFA_PARTITION_DIRECT_REQ_SEND_SUPPORT BIT(1)
+
+#define FFA_MEMORY_HANDLE_SECURE_BIT	BIT64(45)
+#define FFA_MEMORY_HANDLE_NONE_SECURE_BIT	BIT64(44)
 
 #ifndef __ASSEMBLER__
 /* Constituent memory region descriptor */

@@ -86,7 +86,7 @@ static struct etzpc_instance etzpc_dev;
 
 static vaddr_t etzpc_base(void)
 {
-	return io_pa_or_va_secure(&etzpc_dev.base);
+	return io_pa_or_va_secure(&etzpc_dev.base, 1);
 }
 
 static bool __maybe_unused valid_decprot_id(unsigned int id)
@@ -264,7 +264,7 @@ static void init_pm(struct etzpc_instance *dev)
 			dev->tzma_cfg[n] |= TZMA_PM_LOCK_BIT;
 	}
 
-	register_pm_core_service_cb(etzpc_pm, dev);
+	register_pm_core_service_cb(etzpc_pm, dev, "stm32-etzpc");
 }
 
 struct etzpc_hwcfg {
@@ -295,7 +295,7 @@ static void init_device_from_hw_config(struct etzpc_instance *dev,
 
 	assert(!dev->base.pa && cpu_mmu_enabled());
 	dev->base.pa = pbase;
-	dev->base.va = (vaddr_t)phys_to_virt(dev->base.pa, MEM_AREA_IO_SEC);
+	dev->base.va = (vaddr_t)phys_to_virt(dev->base.pa, MEM_AREA_IO_SEC, 1);
 	assert(etzpc_base());
 
 	get_hwcfg(&hwcfg);
@@ -315,7 +315,7 @@ void stm32_etzpc_init(paddr_t base)
 	init_device_from_hw_config(&etzpc_dev, base);
 }
 
-#ifdef CFG_DT
+#ifdef CFG_EMBED_DTB
 static TEE_Result init_etzpc_from_dt(void)
 {
 	void *fdt = get_embedded_dt();
@@ -343,4 +343,4 @@ static TEE_Result init_etzpc_from_dt(void)
 }
 
 service_init(init_etzpc_from_dt);
-#endif /*CFG_DT*/
+#endif /*CFG_EMBED_DTB*/

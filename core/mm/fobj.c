@@ -267,7 +267,7 @@ static struct fobj *rwp_unpaged_iv_alloc(unsigned int num_pages)
 	mm = tee_mm_alloc(&tee_mm_sec_ddr, size);
 	if (!mm)
 		goto err_free_state;
-	rwp->store = phys_to_virt(tee_mm_get_smem(mm), MEM_AREA_TA_RAM);
+	rwp->store = phys_to_virt(tee_mm_get_smem(mm), MEM_AREA_TA_RAM, size);
 	assert(rwp->store);
 
 	fobj_init(&rwp->fobj, &ops_rwp_unpaged_iv, num_pages);
@@ -359,7 +359,6 @@ static TEE_Result rwp_init(void)
 	struct fobj *fobj = NULL;
 	size_t num_pool_pages = 0;
 	size_t num_fobj_pages = 0;
-	size_t sz = 0;
 
 	if (crypto_rng_read(key, sizeof(key)) != TEE_SUCCESS)
 		panic("failed to generate random");
@@ -371,11 +370,9 @@ static TEE_Result rwp_init(void)
 	if (!IS_ENABLED(CFG_CORE_PAGE_TAG_AND_IV))
 		return TEE_SUCCESS;
 
-	assert(tee_mm_sec_ddr.hi > tee_mm_sec_ddr.lo);
-	sz = tee_mm_sec_ddr.hi - tee_mm_sec_ddr.lo;
-	assert(!(sz & SMALL_PAGE_SIZE));
+	assert(tee_mm_sec_ddr.size && !(tee_mm_sec_ddr.size & SMALL_PAGE_SIZE));
 
-	num_pool_pages = sz / SMALL_PAGE_SIZE;
+	num_pool_pages = tee_mm_sec_ddr.size / SMALL_PAGE_SIZE;
 	num_fobj_pages = ROUNDUP(num_pool_pages * sizeof(*rwp_state_base),
 				 SMALL_PAGE_SIZE) / SMALL_PAGE_SIZE;
 
@@ -393,7 +390,8 @@ static TEE_Result rwp_init(void)
 	rwp_state_base = (void *)tee_pager_init_iv_region(fobj);
 	assert(rwp_state_base);
 
-	rwp_store_base = phys_to_virt(tee_mm_sec_ddr.lo, MEM_AREA_TA_RAM);
+	rwp_store_base = phys_to_virt(tee_mm_sec_ddr.lo, MEM_AREA_TA_RAM,
+				      tee_mm_sec_ddr.size);
 	assert(rwp_store_base);
 
 	return TEE_SUCCESS;
@@ -545,7 +543,7 @@ static unsigned int get_num_rels(unsigned int num_pages,
 	 * relocations and sorted in order of address which it applies to.
 	 */
 	for (; n < num_relocs; n++) {
-		assert(ALIGNMENT_IS_OK(reloc[n], unsigned long));
+		assert(IS_ALIGNED_WITH_TYPE(reloc[n], unsigned long));
 		assert(offs < reloc[n]);	/* check that it's sorted */
 		offs = reloc[n];
 		if (offs >= reloc_offs &&
@@ -597,8 +595,8 @@ struct fobj *fobj_ro_reloc_paged_alloc(unsigned int num_pages, void *hashes,
 	const unsigned int num_relocs = reloc_len / sizeof(uint32_t);
 	unsigned int nrels = 0;
 
-	assert(ALIGNMENT_IS_OK(reloc, uint32_t));
-	assert(ALIGNMENT_IS_OK(reloc_len, uint32_t));
+	assert(IS_ALIGNED_WITH_TYPE(reloc, uint32_t));
+	assert(IS_ALIGNED_WITH_TYPE(reloc_len, uint32_t));
 	assert(num_pages && hashes && store);
 	if (!reloc_len) {
 		assert(!reloc);
@@ -763,7 +761,7 @@ struct fobj *fobj_sec_mem_alloc(unsigned int num_pages)
 	if (!f->mm)
 		goto err;
 
-	va = phys_to_virt(tee_mm_get_smem(f->mm), MEM_AREA_TA_RAM);
+	va = phys_to_virt(tee_mm_get_smem(f->mm), MEM_AREA_TA_RAM, size);
 	if (!va)
 		goto err;
 

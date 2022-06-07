@@ -4,6 +4,8 @@
  */
 
 #include <assert.h>
+#include <drivers/clk.h>
+#include <drivers/clk_dt.h>
 #include <drivers/stm32_rng.h>
 #include <io.h>
 #include <kernel/delay.h>
@@ -36,7 +38,7 @@
 
 struct stm32_rng_instance {
 	struct io_pa_va base;
-	unsigned long clock;
+	struct clk *clock;
 	unsigned int lock;
 	unsigned int refcount;
 };
@@ -124,13 +126,13 @@ TEE_Result stm32_rng_read_raw(vaddr_t rng_base, uint8_t *out, size_t *size)
 
 static void gate_rng(bool enable, struct stm32_rng_instance *dev)
 {
-	vaddr_t rng_cr = io_pa_or_va(&dev->base) + RNG_CR;
+	vaddr_t rng_cr = io_pa_or_va(&dev->base, 1) + RNG_CR;
 	uint32_t exceptions = may_spin_lock(&dev->lock);
 
 	if (enable) {
 		/* incr_refcnt return non zero if resource shall be enabled */
 		if (incr_refcnt(&dev->refcount)) {
-			stm32_clock_enable(dev->clock);
+			clk_enable(dev->clock);
 			io_write32(rng_cr, 0);
 			io_write32(rng_cr, RNG_CR_RNGEN | RNG_CR_CED);
 		}
@@ -138,7 +140,7 @@ static void gate_rng(bool enable, struct stm32_rng_instance *dev)
 		/* decr_refcnt return non zero if resource shall be disabled */
 		if (decr_refcnt(&dev->refcount)) {
 			io_write32(rng_cr, 0);
-			stm32_clock_disable(dev->clock);
+			clk_disable(dev->clock);
 		}
 	}
 
@@ -149,7 +151,7 @@ TEE_Result stm32_rng_read(uint8_t *out, size_t size)
 {
 	TEE_Result rc = 0;
 	uint32_t exceptions = 0;
-	vaddr_t rng_base = io_pa_or_va(&stm32_rng->base);
+	vaddr_t rng_base = io_pa_or_va(&stm32_rng->base, 1);
 	uint8_t *out_ptr = out;
 	size_t out_size = 0;
 
@@ -192,6 +194,7 @@ static TEE_Result stm32_rng_init(void)
 	int node = -1;
 	struct dt_node_info dt_info;
 	enum teecore_memtypes mtype = MEM_AREA_END;
+	TEE_Result res = TEE_ERROR_GENERIC;
 
 	memset(&dt_info, 0, sizeof(dt_info));
 
@@ -217,7 +220,8 @@ static TEE_Result stm32_rng_init(void)
 			panic();
 
 		assert(dt_info.clock != DT_INFO_INVALID_CLOCK &&
-		       dt_info.reg != DT_INFO_INVALID_REG);
+		       dt_info.reg != DT_INFO_INVALID_REG &&
+		       dt_info.reg_size != DT_INFO_INVALID_REG_SIZE);
 
 		if (dt_info.status & DT_STATUS_OK_NSEC) {
 			stm32mp_register_non_secure_periph_iomem(dt_info.reg);
@@ -228,9 +232,14 @@ static TEE_Result stm32_rng_init(void)
 		}
 
 		stm32_rng->base.pa = dt_info.reg;
-		stm32_rng->base.va = (vaddr_t)phys_to_virt(dt_info.reg, mtype);
+		stm32_rng->base.va = (vaddr_t)phys_to_virt(dt_info.reg, mtype,
+							   dt_info.reg_size);
 
-		stm32_rng->clock = (unsigned long)dt_info.clock;
+		res = clk_dt_get_by_index(fdt, node, 0, &stm32_rng->clock);
+		if (res)
+			return res;
+
+		assert(stm32_rng->clock);
 
 		DMSG("RNG init");
 	}

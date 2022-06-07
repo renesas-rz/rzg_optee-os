@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BSD-2-Clause
 /**
- * Copyright 2017-2019 NXP
+ * Copyright 2017-2021 NXP
  *
  * Brief   CAAM Random Number Generator manager.
  *         Implementation of RNG functions.
@@ -237,6 +237,9 @@ static enum caam_status do_check_data(void)
 	case DATA_OK:
 		return CAAM_NO_ERROR;
 
+	case DATA_FAILURE:
+		return CAAM_FAILURE;
+
 	default:
 		/* Wait until one of the data buffer completes */
 		do {
@@ -429,11 +432,11 @@ enum caam_status caam_rng_instantiation(void)
 	RNG_TRACE("RNG Instantation");
 
 	/* Check if RNG is already instantiated */
-	if (caam_hal_rng_instantiated(rng_privdata->baseaddr)) {
-		RNG_TRACE("RNG already instantiated");
-		retstatus = CAAM_NO_ERROR;
+	retstatus = caam_hal_rng_instantiated(rng_privdata->baseaddr);
+
+	/* RNG is already instantiated or an error occurred */
+	if (retstatus != CAAM_NOT_INIT)
 		goto end_inst;
-	}
 
 	/*
 	 * RNG needs to be instantiated. Allocate and prepare the

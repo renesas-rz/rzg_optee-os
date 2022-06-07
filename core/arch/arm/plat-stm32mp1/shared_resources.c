@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /*
- * Copyright (c) 2017-2019, STMicroelectronics
+ * Copyright (c) 2017-2021, STMicroelectronics
  */
 
+#include <config.h>
 #include <drivers/stm32_etzpc.h>
 #include <drivers/stm32_gpio.h>
 #include <drivers/stm32mp1_etzpc.h>
@@ -162,7 +163,7 @@ static __maybe_unused const char *shres2str_state(enum shres_state id)
 }
 
 /* GPIOZ bank pin count depends on SoC variants */
-#ifdef CFG_DT
+#ifdef CFG_EMBED_DTB
 /* A light count routine for unpaged context to not depend on DTB support */
 static int gpioz_nbpin = -1;
 
@@ -619,8 +620,8 @@ static void set_etzpc_secure_configuration(void)
 	/* Some peripherals shall be secure */
 	config_lock_decprot(STM32MP1_ETZPC_STGENC_ID, ETZPC_DECPROT_S_RW);
 	config_lock_decprot(STM32MP1_ETZPC_BKPSRAM_ID, ETZPC_DECPROT_S_RW);
-	config_lock_decprot(STM32MP1_ETZPC_DDRCTRL_ID, ETZPC_DECPROT_S_RW);
-	config_lock_decprot(STM32MP1_ETZPC_DDRPHYC_ID, ETZPC_DECPROT_S_RW);
+	config_lock_decprot(STM32MP1_ETZPC_DDRCTRL_ID, ETZPC_DECPROT_NS_R_S_W);
+	config_lock_decprot(STM32MP1_ETZPC_DDRPHYC_ID, ETZPC_DECPROT_NS_R_S_W);
 
 	/* Configure ETZPC with peripheral registering */
 	config_lock_decprot(STM32MP1_ETZPC_IWDG1_ID,
@@ -710,8 +711,11 @@ static TEE_Result stm32mp1_init_final_shres(void)
 	}
 
 	set_etzpc_secure_configuration();
-	set_gpio_secure_configuration();
-	register_pm_driver_cb(gpioz_pm, NULL);
+	if (IS_ENABLED(CFG_STM32_GPIO)) {
+		set_gpio_secure_configuration();
+		register_pm_driver_cb(gpioz_pm, NULL,
+				      "stm32mp1-shared-resources");
+	}
 	check_rcc_secure_configuration();
 
 	return TEE_SUCCESS;

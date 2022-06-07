@@ -92,8 +92,6 @@ endif
 
 # SPMC configuration "S-EL1 SPMC" where SPM Core is implemented at S-EL1,
 # that is, OP-TEE.
-# Note that this is an experimental feature, ABIs etc may have incompatible
-# changes
 ifeq ($(CFG_CORE_SEL1_SPMC),y)
 $(call force,CFG_CORE_FFA,y)
 $(call force,CFG_CORE_SEL2_SPMC,n)
@@ -113,6 +111,15 @@ CFG_CORE_UNMAP_CORE_AT_EL0 ?= y
 # Initialize PMCR.DP to 1 to prohibit cycle counting in secure state, and
 # save/restore PMCR during world switch.
 CFG_SM_NO_CYCLE_COUNTING ?= y
+
+
+# CFG_CORE_ASYNC_NOTIF_GIC_INTID is defined by the platform to some free
+# interrupt. Setting it to a non-zero number enables support for using an
+# Arm-GIC to notify normal world. This config variable should use a value
+# larger the 32 to make it of the type SPI.
+# Note that asynchronous notifactions must be enabled with
+# CFG_CORE_ASYNC_NOTIF=y for this variable to be used.
+CFG_CORE_ASYNC_NOTIF_GIC_INTID ?= 0
 
 ifeq ($(CFG_ARM32_core),y)
 # Configration directive related to ARMv7 optee boot arguments.
@@ -149,21 +156,8 @@ arm64-platform-cflags-no-hard-float ?= -mgeneral-regs-only
 arm64-platform-cflags-hard-float ?=
 arm64-platform-cflags-generic := -mstrict-align $(call cc-option,-mno-outline-atomics,)
 
-ifeq ($(DEBUG),1)
-# For backwards compatibility
-$(call force,CFG_CC_OPT_LEVEL,0)
-$(call force,CFG_DEBUG_INFO,y)
-endif
-ifeq ($(CFG_CC_OPTIMIZE_FOR_SIZE),n)
-# For backwards compatibility
-$(call force,CFG_CC_OPT_LEVEL,0)
-endif
-
-# Optimize for size by default, usually gives good performance too
-CFG_CC_OPT_LEVEL ?= s
 platform-cflags-optimization ?= -O$(CFG_CC_OPT_LEVEL)
 
-CFG_DEBUG_INFO ?= y
 ifeq ($(CFG_DEBUG_INFO),y)
 platform-cflags-debug-info ?= -g3
 platform-aflags-debug-info ?= -g
@@ -178,6 +172,14 @@ core-platform-aflags += $(platform-aflags-debug-info)
 
 ifeq ($(CFG_CORE_ASLR),y)
 core-platform-cflags += -fpie
+endif
+
+ifeq ($(CFG_CORE_BTI),y)
+bti-opt := $(call cc-option,-mbranch-protection=bti)
+ifeq (,$(bti-opt))
+$(error -mbranch-protection=bti not supported)
+endif
+core-platform-cflags += $(bti-opt)
 endif
 
 ifeq ($(CFG_ARM64_core),y)
@@ -294,6 +296,14 @@ ta_arm64-platform-aflags += $(arm64-platform-aflags)
 ta_arm64-platform-cxxflags += -fpic
 ta_arm64-platform-cxxflags += $(platform-cflags-optimization)
 ta_arm64-platform-cxxflags += $(platform-cflags-debug-info)
+
+ifeq ($(CFG_TA_BTI),y)
+bti-ta-opt := $(call cc-option,-mbranch-protection=bti)
+ifeq (,$(bti-ta-opt))
+$(error -mbranch-protection=bti not supported)
+endif
+ta_arm64-platform-cflags += $(bti-ta-opt)
+endif
 
 ta-mk-file-export-vars-ta_arm64 += CFG_ARM64_ta_arm64
 ta-mk-file-export-vars-ta_arm64 += ta_arm64-platform-cppflags

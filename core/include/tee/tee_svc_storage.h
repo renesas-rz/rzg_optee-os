@@ -60,15 +60,4 @@ void tee_svc_storage_close_all_enum(struct user_ta_ctx *utc);
 
 void tee_svc_storage_init(void);
 
-struct tee_pobj;
-TEE_Result tee_svc_storage_create_filename(void *buf, size_t blen,
-					   struct tee_pobj *po, bool transient);
-struct tee_fs_dirfile_fileh;
-TEE_Result
-tee_svc_storage_create_filename_dfh(void *buf, size_t blen,
-				    const struct tee_fs_dirfile_fileh *dfh);
-
-TEE_Result tee_svc_storage_create_dirname(void *buf, size_t blen,
-					  const TEE_UUID *uuid);
-
 #endif /* TEE_SVC_STORAGE_H */

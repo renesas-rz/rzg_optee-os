@@ -46,15 +46,31 @@
 #define CORE_MMU_USER_PARAM_SIZE	BIT(CORE_MMU_USER_PARAM_SHIFT)
 #define CORE_MMU_USER_PARAM_MASK	((paddr_t)CORE_MMU_USER_PARAM_SIZE - 1)
 
+/*
+ * Level of base table (i.e. first level of page table),
+ * depending on address space
+ */
+#if !defined(CFG_WITH_LPAE) || (CFG_LPAE_ADDR_SPACE_BITS < 40)
+#define CORE_MMU_BASE_TABLE_SHIFT	U(30)
+#define CORE_MMU_BASE_TABLE_LEVEL	U(1)
+#elif (CFG_LPAE_ADDR_SPACE_BITS <= 48)
+#define CORE_MMU_BASE_TABLE_SHIFT	U(39)
+#define CORE_MMU_BASE_TABLE_LEVEL	U(0)
+#else /* (CFG_LPAE_ADDR_SPACE_BITS > 48) */
+#error "CFG_WITH_LPAE with CFG_LPAE_ADDR_SPACE_BITS > 48 isn't supported!"
+#endif
+
 #ifdef CFG_WITH_LPAE
 /*
- * CORE_MMU_L1_TBL_OFFSET is used when switching to/from reduced kernel
+ * CORE_MMU_BASE_TABLE_OFFSET is used when switching to/from reduced kernel
  * mapping. The actual value depends on internals in core_mmu_lpae.c which
  * we rather not expose here. There's a compile time assertion to check
  * that these magic numbers are correct.
  */
-#define CORE_MMU_L1_TBL_OFFSET \
-	(CFG_TEE_CORE_NB_CORE * BIT(CFG_LPAE_ADDR_SPACE_BITS - U(30)) * U(8))
+#define CORE_MMU_BASE_TABLE_OFFSET \
+	(CFG_TEE_CORE_NB_CORE * \
+	 BIT(CFG_LPAE_ADDR_SPACE_BITS - CORE_MMU_BASE_TABLE_SHIFT) * \
+	 U(8))
 #endif
 /*
  * TEE_RAM_VA_START:            The start virtual address of the TEE RAM
@@ -89,6 +105,9 @@
  * MEM_AREA_TEE_RAM_RX:  core private read-only/executable memory (secure)
  * MEM_AREA_TEE_RAM_RO:  core private read-only/non-executable memory (secure)
  * MEM_AREA_TEE_RAM_RW:  core private read/write/non-executable memory (secure)
+ * MEM_AREA_INIT_RAM_RO: init private read-only/non-executable memory (secure)
+ * MEM_AREA_INIT_RAM_RX: init private read-only/executable memory (secure)
+ * MEM_AREA_NEX_RAM_RO: nexus private read-only/non-executable memory (secure)
  * MEM_AREA_NEX_RAM_RW: nexus private r/w/non-executable memory (secure)
  * MEM_AREA_TEE_COHERENT: teecore coherent RAM (secure, reserved to TEE)
  * MEM_AREA_TEE_ASAN: core address sanitizer RAM (secure, reserved to TEE)
@@ -102,7 +121,7 @@
  * MEM_AREA_EXT_DT:   Memory loads external device tree
  * MEM_AREA_RES_VASPACE: Reserved virtual memory space
  * MEM_AREA_SHM_VASPACE: Virtual memory space for dynamic shared memory buffers
- * MEM_AREA_TA_VASPACE: TA va space, only used with phys_to_virt()
+ * MEM_AREA_TS_VASPACE: TS va space, only used with phys_to_virt()
  * MEM_AREA_DDR_OVERALL: Overall DDR address range, candidate to dynamic shm.
  * MEM_AREA_SEC_RAM_OVERALL: Whole secure RAM
  * MEM_AREA_MAXTYPE:  lower invalid 'type' value
@@ -113,6 +132,9 @@ enum teecore_memtypes {
 	MEM_AREA_TEE_RAM_RX,
 	MEM_AREA_TEE_RAM_RO,
 	MEM_AREA_TEE_RAM_RW,
+	MEM_AREA_INIT_RAM_RO,
+	MEM_AREA_INIT_RAM_RX,
+	MEM_AREA_NEX_RAM_RO,
 	MEM_AREA_NEX_RAM_RW,
 	MEM_AREA_TEE_COHERENT,
 	MEM_AREA_TEE_ASAN,
@@ -126,7 +148,7 @@ enum teecore_memtypes {
 	MEM_AREA_EXT_DT,
 	MEM_AREA_RES_VASPACE,
 	MEM_AREA_SHM_VASPACE,
-	MEM_AREA_TA_VASPACE,
+	MEM_AREA_TS_VASPACE,
 	MEM_AREA_PAGER_VASPACE,
 	MEM_AREA_SDP_MEM,
 	MEM_AREA_DDR_OVERALL,
@@ -142,6 +164,9 @@ static inline const char *teecore_memtype_name(enum teecore_memtypes type)
 		[MEM_AREA_TEE_RAM_RX] = "TEE_RAM_RX",
 		[MEM_AREA_TEE_RAM_RO] = "TEE_RAM_RO",
 		[MEM_AREA_TEE_RAM_RW] = "TEE_RAM_RW",
+		[MEM_AREA_INIT_RAM_RO] = "INIT_RAM_RO",
+		[MEM_AREA_INIT_RAM_RX] = "INIT_RAM_RX",
+		[MEM_AREA_NEX_RAM_RO] = "NEX_RAM_RO",
 		[MEM_AREA_NEX_RAM_RW] = "NEX_RAM_RW",
 		[MEM_AREA_TEE_ASAN] = "TEE_ASAN",
 		[MEM_AREA_IDENTITY_MAP_RX] = "IDENTITY_MAP_RX",
@@ -155,7 +180,7 @@ static inline const char *teecore_memtype_name(enum teecore_memtypes type)
 		[MEM_AREA_EXT_DT] = "EXT_DT",
 		[MEM_AREA_RES_VASPACE] = "RES_VASPACE",
 		[MEM_AREA_SHM_VASPACE] = "SHM_VASPACE",
-		[MEM_AREA_TA_VASPACE] = "TA_VASPACE",
+		[MEM_AREA_TS_VASPACE] = "TS_VASPACE",
 		[MEM_AREA_PAGER_VASPACE] = "PAGER_VASPACE",
 		[MEM_AREA_SDP_MEM] = "SDP_MEM",
 		[MEM_AREA_DDR_OVERALL] = "DDR_OVERALL",
@@ -622,6 +647,17 @@ void *core_mmu_add_mapping(enum teecore_memtypes type, paddr_t addr,
 			   size_t len);
 
 /*
+ * core_mmu_find_mapping_exclusive() - Find mapping of specified type and
+ *				       length. If more than one mapping of
+ *				       specified type is present, NULL will be
+ *				       returned.
+ * @type:	memory type
+ * @len:	length in bytes
+ */
+struct tee_mmap_region *
+core_mmu_find_mapping_exclusive(enum teecore_memtypes type, size_t len);
+
+/*
  * tlbi_mva_range() - Invalidate TLB for virtual address range
  * @va:		start virtual address, must be a multiple of @granule
  * @len:	length in bytes of range, must be a multiple of @granule
@@ -705,9 +741,9 @@ void core_free_mmu_prtn(struct mmu_partition *prtn);
 void core_mmu_set_prtn(struct mmu_partition *prtn);
 void core_mmu_set_default_prtn(void);
 void core_mmu_set_default_prtn_tbl(void);
+#endif
 
 void core_mmu_init_virtualization(void);
-#endif
 
 /* init some allocation pools */
 void core_mmu_init_ta_ram(void);

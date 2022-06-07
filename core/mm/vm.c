@@ -2,6 +2,7 @@
 /*
  * Copyright (c) 2016-2021, Linaro Limited
  * Copyright (c) 2014, STMicroelectronics International N.V.
+ * Copyright (c) 2021, Arm Limited
  */
 
 #include <arm.h>
@@ -293,7 +294,7 @@ TEE_Result vm_map_pad(struct user_mode_ctx *uctx, vaddr_t *va, size_t len,
 
 	res = umap_add_region(&uctx->vm_info, reg, pad_begin, pad_end, align);
 	if (res)
-		goto err_free_reg;
+		goto err_put_mobj;
 
 	res = alloc_pgt(uctx);
 	if (res)
@@ -326,8 +327,9 @@ TEE_Result vm_map_pad(struct user_mode_ctx *uctx, vaddr_t *va, size_t len,
 
 err_rem_reg:
 	TAILQ_REMOVE(&uctx->vm_info.regions, reg, link);
-err_free_reg:
+err_put_mobj:
 	mobj_put(reg->mobj);
+err_free_reg:
 	free(reg);
 	return res;
 }
@@ -793,15 +795,19 @@ TEE_Result vm_unmap(struct user_mode_ctx *uctx, vaddr_t va, size_t len)
 
 static TEE_Result map_kinit(struct user_mode_ctx *uctx)
 {
-	TEE_Result res;
-	struct mobj *mobj;
-	size_t offs;
-	vaddr_t va;
-	size_t sz;
+	TEE_Result res = TEE_SUCCESS;
+	struct mobj *mobj = NULL;
+	size_t offs = 0;
+	vaddr_t va = 0;
+	size_t sz = 0;
+	uint32_t prot = 0;
 
 	thread_get_user_kcode(&mobj, &offs, &va, &sz);
 	if (sz) {
-		res = vm_map(uctx, &va, sz, TEE_MATTR_PRX, VM_FLAG_PERMANENT,
+		prot = TEE_MATTR_PRX;
+		if (IS_ENABLED(CFG_CORE_BTI))
+			prot |= TEE_MATTR_GUARDED;
+		res = vm_map(uctx, &va, sz, prot, VM_FLAG_PERMANENT,
 			     mobj, offs);
 		if (res)
 			return res;
@@ -1180,7 +1186,7 @@ TEE_Result vm_va2pa(const struct user_mode_ctx *uctx, void *ua, paddr_t *pa)
 	return tee_mmu_user_va2pa_attr(uctx, ua, pa, NULL);
 }
 
-void *vm_pa2va(const struct user_mode_ctx *uctx, paddr_t pa)
+void *vm_pa2va(const struct user_mode_ctx *uctx, paddr_t pa, size_t pa_size)
 {
 	paddr_t p = 0;
 	struct vm_region *region = NULL;
@@ -1213,7 +1219,7 @@ void *vm_pa2va(const struct user_mode_ctx *uctx, paddr_t pa)
 			if (mobj_get_pa(region->mobj, ofs, granule, &p))
 				continue;
 
-			if (core_is_buffer_inside(pa, 1, p, size)) {
+			if (core_is_buffer_inside(pa, pa_size, p, size)) {
 				/* Remove region offset (mobj phys offset) */
 				ofs -= region->offset;
 				/* Get offset-in-granule */
@@ -1301,3 +1307,23 @@ void vm_set_ctx(struct ts_ctx *ctx)
 	tsd->ctx = ctx;
 }
 
+struct mobj *vm_get_mobj(struct user_mode_ctx *uctx, vaddr_t va, size_t *len,
+			 uint16_t *prot, size_t *offs)
+{
+	struct vm_region *r = NULL;
+	size_t r_offs = 0;
+
+	if (!len || ((*len | va) & SMALL_PAGE_MASK))
+		return NULL;
+
+	r = find_vm_region(&uctx->vm_info, va);
+	if (!r)
+		return NULL;
+
+	r_offs = va - r->va;
+
+	*len = MIN(r->size - r_offs, *len);
+	*offs = r->offset + r_offs;
+	*prot = r->attr & TEE_MATTR_PROT_MASK;
+	return mobj_get(r->mobj);
+}

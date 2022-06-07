@@ -5,10 +5,12 @@
 
 #include <assert.h>
 #include <bitstring.h>
+#include <ffa.h>
 #include <initcall.h>
 #include <keep.h>
 #include <kernel/refcount.h>
 #include <kernel/spinlock.h>
+#include <kernel/thread_spmc.h>
 #include <mm/mobj.h>
 #include <sys/queue.h>
 
@@ -100,7 +102,8 @@ struct mobj_ffa *mobj_ffa_sel1_spmc_new(unsigned int num_pages)
 		 * Setting bit 44 to use one of the upper 32 bits too for
 		 * testing.
 		 */
-		mf->cookie = i | BIT64(44);
+		mf->cookie = i | FFA_MEMORY_HANDLE_NONE_SECURE_BIT;
+
 	}
 	cpu_spin_unlock_xrestore(&shm_lock, exceptions);
 
@@ -395,10 +398,25 @@ struct mobj *mobj_ffa_get_by_cookie(uint64_t cookie,
 			assert(refcount_val(&mf->mobj.refc) == 0);
 			refcount_set(&mf->mobj.refc, 1);
 			refcount_set(&mf->mapcount, 0);
+
+			/*
+			 * mf->page_offset is offset into the first page.
+			 * This offset is assigned from the internal_offs
+			 * parameter to this function.
+			 *
+			 * While a mobj_ffa is active (ref_count > 0) this
+			 * will not change, but when being pushed to the
+			 * inactive list it can be changed again.
+			 *
+			 * So below we're backing out the old
+			 * mf->page_offset and then assigning a new from
+			 * internal_offset.
+			 */
 			mf->mobj.size += mf->page_offset;
 			assert(!(mf->mobj.size & SMALL_PAGE_MASK));
 			mf->mobj.size -= internal_offs;
 			mf->page_offset = internal_offs;
+
 			SLIST_INSERT_HEAD(&shm_head, mf, link);
 		}
 	}
@@ -452,11 +470,11 @@ static size_t ffa_get_phys_offs(struct mobj *mobj,
 	return to_mobj_ffa(mobj)->page_offset;
 }
 
-static void *ffa_get_va(struct mobj *mobj, size_t offset)
+static void *ffa_get_va(struct mobj *mobj, size_t offset, size_t len)
 {
 	struct mobj_ffa *mf = to_mobj_ffa(mobj);
 
-	if (!mf->mm || offset >= mobj->size)
+	if (!mf->mm || !mobj_check_offset_and_len(mobj, offset, len))
 		return NULL;
 
 	return (void *)(tee_mm_get_smem(mf->mm) + offset + mf->page_offset);
@@ -512,29 +530,45 @@ static uint64_t ffa_get_cookie(struct mobj *mobj)
 static TEE_Result ffa_inc_map(struct mobj *mobj)
 {
 	TEE_Result res = TEE_SUCCESS;
-	uint32_t exceptions = 0;
 	struct mobj_ffa *mf = to_mobj_ffa(mobj);
+	uint32_t exceptions = 0;
+	size_t sz = 0;
 
-	if (refcount_inc(&mf->mapcount))
-		return TEE_SUCCESS;
+	while (true) {
+		if (refcount_inc(&mf->mapcount))
+			return TEE_SUCCESS;
 
-	exceptions = cpu_spin_lock_xsave(&shm_lock);
+		exceptions = cpu_spin_lock_xsave(&shm_lock);
 
-	if (refcount_val(&mf->mapcount))
-		goto out;
-
-	mf->mm = tee_mm_alloc(&tee_mm_shm, mf->mobj.size);
-	if (!mf->mm) {
-		res = TEE_ERROR_OUT_OF_MEMORY;
-		goto out;
+		if (!refcount_val(&mf->mapcount))
+			break; /* continue to reinitialize */
+		/*
+		 * If another thread beat us to initialize mapcount,
+		 * restart to make sure we still increase it.
+		 */
+		cpu_spin_unlock_xrestore(&shm_lock, exceptions);
 	}
 
-	res = core_mmu_map_pages(tee_mm_get_smem(mf->mm), mf->pages,
-				 get_page_count(mf), MEM_AREA_NSEC_SHM);
-	if (res) {
-		tee_mm_free(mf->mm);
-		mf->mm = NULL;
-		goto out;
+	/*
+	 * If we have beated another thread calling ffa_dec_map()
+	 * to get the lock we need only to reinitialize mapcount to 1.
+	 */
+	if (!mf->mm) {
+		sz = ROUNDUP(mobj->size + mf->page_offset, SMALL_PAGE_SIZE);
+		mf->mm = tee_mm_alloc(&tee_mm_shm, sz);
+		if (!mf->mm) {
+			res = TEE_ERROR_OUT_OF_MEMORY;
+			goto out;
+		}
+
+		res = core_mmu_map_pages(tee_mm_get_smem(mf->mm), mf->pages,
+					 sz / SMALL_PAGE_SIZE,
+					 MEM_AREA_NSEC_SHM);
+		if (res) {
+			tee_mm_free(mf->mm);
+			mf->mm = NULL;
+			goto out;
+		}
 	}
 
 	refcount_set(&mf->mapcount, 1);
@@ -553,7 +587,8 @@ static TEE_Result ffa_dec_map(struct mobj *mobj)
 		return TEE_SUCCESS;
 
 	exceptions = cpu_spin_lock_xsave(&shm_lock);
-	unmap_helper(mf);
+	if (!refcount_val(&mf->mapcount))
+		unmap_helper(mf);
 	cpu_spin_unlock_xrestore(&shm_lock, exceptions);
 
 	return TEE_SUCCESS;
@@ -593,4 +628,4 @@ const struct mobj_ops mobj_ffa_ops __weak __rodata_unpaged("mobj_ffa_ops") = {
 	.dec_map = ffa_dec_map,
 };
 
-service_init(mapped_shm_init);
+preinit(mapped_shm_init);

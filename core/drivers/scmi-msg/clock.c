@@ -260,7 +260,7 @@ static void write_rate_desc_array_in_buffer(char *dest, unsigned long *rates,
 	uint32_t *out = NULL;
 	size_t n = 0;
 
-	assert(ALIGNMENT_IS_OK(dest, uint32_t));
+	assert(IS_ALIGNED_WITH_TYPE(dest, uint32_t));
 	out = (uint32_t *)(uintptr_t)dest;
 
 	for (n = 0; n < nb_elt; n++) {
@@ -319,7 +319,7 @@ static void scmi_clock_describe_rates(struct scmi_msg *msg)
 	} else if (status == SCMI_NOT_SUPPORTED) {
 		unsigned long triplet[3] = { 0, 0, 0 };
 
-		/* Platform may support min§max/step triplet description */
+		/* Platform may support min/max/step triplet description */
 		status =  plat_scmi_clock_rates_by_step(msg->channel_id,
 							clock_id, triplet);
 		if (status == SCMI_SUCCESS) {
