@@ -51,7 +51,7 @@ static vaddr_t chip_to_base(struct serial_chip *chip)
 	struct scif_uart_data *pd =
 		container_of(chip, struct scif_uart_data, chip);
 
-	return io_pa_or_va(&pd->base);
+	return io_pa_or_va(&pd->base, SCIF_REG_SIZE);
 }
 
 static void scif_uart_flush(struct serial_chip *chip)
