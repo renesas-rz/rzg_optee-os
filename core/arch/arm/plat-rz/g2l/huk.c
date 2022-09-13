@@ -23,7 +23,7 @@ static void read_chipid(uint8_t *chipid)
 	vaddr_t  addr_va;
 	uint32_t read_num = CHIPID_SIZE / REGISTER_SIZE;
 
-	addr_va = (vaddr_t)phys_to_virt_io(CHIPID_BASE);
+	addr_va = (vaddr_t)phys_to_virt_io(CHIPID_BASE, CHIPID_SIZE);
 
 	for (i = 0U; i < read_num; i++) {
 		uint32_t read_data = io_read32(addr_va);
