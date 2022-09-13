@@ -22,7 +22,7 @@ static TEE_Result SCE_Init(void)
 
     int32_t retry_cnt = 3;
 
-    gp_sce = (uint32_t *) phys_to_virt_io(HW_SCE_BASE);
+    gp_sce = (uint32_t *) phys_to_virt_io(HW_SCE_BASE, HW_SCE_SIZE);
 
     while (0 < retry_cnt)
     {
