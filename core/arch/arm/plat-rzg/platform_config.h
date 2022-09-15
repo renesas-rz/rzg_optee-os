@@ -12,40 +12,24 @@
 /* Make stacks aligned to data cache line length */
 #define STACK_ALIGNMENT		64
 
+#define DEVICE0_BASE		0xE6000000
+#define DEVICE0_SIZE		0x002FFFFF
+
 #define GIC_BASE		0xF1000000
 #define GICC_BASE		0xF1020000
 #define GICD_BASE		0xF1010000
 
+#define PRR_BASE		0xFFF00044
+#define PRR_REG_SIZE		0x00000200
+#define RPC_BASE		0xEE200000
+#define RPC_REG_SIZE		0x00009000
+
+#define S_INST_DATA_ADDR	0x440FE000
+#define S_INST_DATA_SIZE	0x00002000
+#define TSIP_BASE_ADDR		0xE7800000
+#define TSIP_SIZE		0x00000200
+
 #define CONSOLE_UART_BASE	0xE6E88000
-
-#if defined(PLATFORM_FLAVOR_ek874)
-#define NSEC_DDR_0_BASE		0x47E00000U
-#define NSEC_DDR_0_SIZE		0x78200000
-
-#elif defined(PLATFORM_FLAVOR_hihope_rzg2h)
-
-#define NSEC_DDR_0_BASE		0x47E00000U
-#define NSEC_DDR_0_SIZE		0x78200000
-#define NSEC_DDR_1_BASE		0x500000000U
-#define NSEC_DDR_1_SIZE		0x80000000
-
-#elif defined(PLATFORM_FLAVOR_hihope_rzg2m)
-
-#define NSEC_DDR_0_BASE		0x47E00000U
-#define NSEC_DDR_0_SIZE		0x78200000
-#define NSEC_DDR_1_BASE		0x600000000U
-#define NSEC_DDR_1_SIZE		0x80000000
-
-#elif defined(PLATFORM_FLAVOR_hihope_rzg2n)
-
-#define NSEC_DDR_0_BASE		0x47E00000U
-#define NSEC_DDR_0_SIZE		0x78200000
-#define NSEC_DDR_1_BASE		0x480000000U
-#define NSEC_DDR_1_SIZE		0x80000000
-
-#else
-#error "Unknown platform flavor"
-#endif
 
 #define TEE_SHMEM_START		(TZDRAM_BASE + TZDRAM_SIZE)
 #define TEE_SHMEM_SIZE		0x100000
