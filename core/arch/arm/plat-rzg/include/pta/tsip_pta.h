@@ -16,36 +16,38 @@
     }
 
 /*
- * TSIP_CMD_UPDATE_KEYRING - Re-encrypt Keyring
- * param[0] (memref) Input Temp-encrypt Keyring data (688 bytes size)
- * param[1] (memref) Output Re-encrypted Keyring data (1296 bytes size)
+ * TSIP_CMD_UPDATE_KEYRING - re-encrypt keyring
+ * param[0] (memref)  [in]     input temp-encrypted keyring (688 bytes)
+ * param[1] (memref)  [out]    output re-encrypted keyring (1296 bytes)
  * param[2] unused
  * param[3] unused
  */
-#define TSIP_CMD_UPDATE_KEYRING 1
+#define TSIP_CMD_UPDATE_KEYRING		1
 
 /*
- * TSIP_CMD_UPDATE_FIRMWARE - Re-Encrypt Firmware data
- * param[0] (value.a) Firmware data index number (maximum 16)
- * param[1] (memref) Input Temp-Encrypt firmware data (update_fw_t array)
- * param[2] (memref) Output Re-Encrypt firmware data (update_fw_t array)
- * param[3] unused
+ * TSIP_CMD_UPDATE_FIRMWARE - re-encrypt firmware
+ * param[0] (value.a) [in]     Number of firmware info (maximum 16)
+ * param[1] (memref)  [in/out] firmware info (array of st_update_fw_t)
+ * param[2] (memref)  [in]     input temp-encrypted firmware buffer
+ *                             place all temp-encrypted firmware in this area.
+ * param[3] (memref)  [out]    output re-encrypted firmware buffer
+ *                             (input length + 48 + (Number * 16) bytes)
  */
-#define TSIP_CMD_UPDATE_FIRMWARE 2
+#define TSIP_CMD_UPDATE_FIRMWARE	2
 
 /*
- * Input/Output structure for TSIP_CMD_UPDATE_FIRMWARE
- * [Input]
- *   unsigned long size  : Input data size
- *   unsigned char *data : Input data
- * [Output] 
- *   unsigned long size  : Input data size + 64 (update_fw_t[0])
- *                         Input data size + 16 (update_fw_t[1-15])
- *   unsigned char *data : Output data
+ * firmware info structure
+ *
+ * [in]
+ *   offset : offset from input buffer
+ *   length : length of input data
+ * [out]
+ *   offset : offset from output buffer
+ *   length : length of output data
  */
 typedef struct {
-    unsigned long size;
-    unsigned char *data;
-} update_fw_t;
+    unsigned long offset;
+    unsigned long length;
+} st_update_fw_t;
 
 #endif /* TSIP_PTA_H_ */

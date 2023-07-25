@@ -4,18 +4,16 @@
  * Copyright (c) 2021, Renesas Electronics Corporation
  */
 
+#include <string.h>
 #include <compiler.h>
 #include <crypto/crypto.h>
 #include <rng_support.h>
 #include <tee/tee_cryp_utl.h>
 #include <types_ext.h>
 #include <trace.h>
+#include "drivers/R_TSIP_Core_Lib.h"
 
-#include <string.h>
-
-#include "drivers/tsip/R_TSIP_Core_Lib.h"
-
-TEE_Result crypto_rng_read(void *buf, size_t blen)
+TEE_Result hw_get_random_bytes(void *buf, size_t blen)
 {
     uint32_t err;
 
@@ -36,9 +34,3 @@ TEE_Result crypto_rng_read(void *buf, size_t blen)
 
     return TEE_SUCCESS;
 }
-
-uint8_t hw_get_random_byte(void)
-{
-    return 0;
-}
-

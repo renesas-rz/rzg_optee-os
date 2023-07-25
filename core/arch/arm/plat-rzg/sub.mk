@@ -2,7 +2,7 @@ global-incdirs-y += .
 global-incdirs-y += include
 srcs-y += main.c
 srcs-y += tee_common_otp.c
-srcs-$(CFG_RZG_SEC_IP_RNG) += rzg_rng.c
+srcs-$(CFG_RZG_SEC_IP_DRV) += rzg_rng.c
 
 ifeq (${PLATFORM_FLAVOR_hihope_rzg2n},y)
   ifeq (${PMIC_ROHM_BD9571},1)

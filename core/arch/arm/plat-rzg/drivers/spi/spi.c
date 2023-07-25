@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, Renesas Electronics Corporation. All rights reserved.
+ * Copyright (c) 2021-2023, Renesas Electronics Corporation. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -8,18 +8,18 @@
 #include <string.h>
 
 #include "rpc_accessor.h"
-#include "drivers/spi/spi.h"
+#include "drivers/spi.h"
 
 static void spi_write_buff(uint64_t buff, uint32_t spi_addr, uint32_t len);
 static void spi_erase_1sector(uint32_t sec_addr);
 uint32_t page_fraction_buff[QSPI_PAGE_SIZE] = {0};
 
-int32_t rzg_spi_init_driver(void)
+void rzg_spi_init_driver(void)
 {
     rzg_rpc_power_on();
 }
 
-int32_t rzg_spi_deinit_driver(void)
+void rzg_spi_deinit_driver(void)
 {
     rzg_rpc_power_off();
 }
@@ -111,7 +111,7 @@ static void spi_write_buff(uint64_t buff, uint32_t spi_addr, uint32_t len)
         page_fraction_buff[i] = 0xFFFFFFFF;
     }
 
-    fraction_buff = &page_fraction_buff;
+    fraction_buff = (uint8_t *)&page_fraction_buff[0];
     fraction_len = len;
 
     for (flash_addr = spi_addr; flash_addr < (spi_addr + len); flash_addr += 256)

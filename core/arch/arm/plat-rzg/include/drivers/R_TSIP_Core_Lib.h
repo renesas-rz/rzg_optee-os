@@ -6,11 +6,11 @@
 
 /*! *****************************************************************************
     @file    R_TSIP_Core_Lib.h
-    @brief   TSIP Security Driver Core Library API(Linux)
-    
+    @brief   TSIP Security Driver Core Library API
+
     @par    History
-    @subsection sub_history 
-      - Initial version\n
+    @subsection sub_history
+      - Initial version
  ********************************************************************************/
 
 #ifndef  R_TSIP_CORE_LIB_H_

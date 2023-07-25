@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, Renesas Electronics Corporation. All rights reserved.
+ * Copyright (c) 2021-2023, Renesas Electronics Corporation. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -14,9 +14,10 @@
 #include <mm/core_memprot.h>
 #include <kernel/delay.h>
 
+#include "platform_config.h"
 #include "rpc_accessor.h"
 
-static vaddr_t prr_vaddr; 
+static vaddr_t prr_vaddr;
 static vaddr_t base_cpg_vaddr;
 static vaddr_t base_rpc_vaddr;
 
@@ -102,7 +103,7 @@ void rzg_rpc_read_ext_mode_init(void)
     product = io_read32(prr_vaddr) & PRR_PRODUCT_MASK;
     cut = io_read32(prr_vaddr) & PRR_CUT_MASK;
 
-    if ((product == PRR_PRODUCT_G2M) && (cut < PRR_CUT_30))
+    if ((product == PRR_PRODUCT_G2M) && (cut < PRR_PRODUCT_30))
     {
         io_write32((base_rpc_vaddr + RPC_PHYCNT), 0x00030260);
         io_write32((base_rpc_vaddr + RPC_PHYCNT), 0x80030260);
@@ -157,7 +158,7 @@ void rzg_rpc_erase_sector(uint32_t sector_addr)
     product = io_read32(prr_vaddr) & PRR_PRODUCT_MASK;
     cut = io_read32(prr_vaddr) & PRR_CUT_MASK;
 
-    if ((product == PRR_PRODUCT_G2M) && (cut < PRR_CUT_30))
+    if ((product == PRR_PRODUCT_G2M) && (cut < PRR_PRODUCT_30))
     {
         io_write32((base_rpc_vaddr + RPC_PHYCNT), 0x80030260);
     }
@@ -206,7 +207,7 @@ void rzg_rpc_write_buff(uint32_t addr, uint64_t source_addr)
     product = io_read32(prr_vaddr) & PRR_PRODUCT_MASK;
     cut = io_read32(prr_vaddr) & PRR_CUT_MASK;
 
-    if ((product == PRR_PRODUCT_G2M) && (cut < PRR_CUT_30))
+    if ((product == PRR_PRODUCT_G2M) && (cut < PRR_PRODUCT_30))
     {
         io_write32((base_rpc_vaddr + RPC_PHYCNT), 0x80030274);
     }
@@ -250,7 +251,7 @@ void rzg_rpc_write_buff(uint32_t addr, uint64_t source_addr)
 
     rpc_wait_trans_end();
 
-    if ((product == PRR_PRODUCT_G2M) && (cut < PRR_CUT_30))
+    if ((product == PRR_PRODUCT_G2M) && (cut < PRR_PRODUCT_30))
     {
         io_write32((base_rpc_vaddr + RPC_PHYCNT), 0x00030273);
     }
@@ -273,7 +274,7 @@ void rzg_rpc_read_status(uint32_t *readData)
     product = io_read32(prr_vaddr) & PRR_PRODUCT_MASK;
     cut = io_read32(prr_vaddr) & PRR_CUT_MASK;
 
-    if ((product == PRR_PRODUCT_G2M) && (cut < PRR_CUT_30))
+    if ((product == PRR_PRODUCT_G2M) && (cut < PRR_PRODUCT_30))
     {
         io_write32((base_rpc_vaddr + RPC_PHYCNT), 0x00030260);
         io_write32((base_rpc_vaddr + RPC_PHYCNT), 0x80030260);
@@ -319,7 +320,7 @@ void rzg_rpc_write_cmd(uint32_t command)
     product = io_read32(prr_vaddr) & PRR_PRODUCT_MASK;
     cut = io_read32(prr_vaddr) & PRR_CUT_MASK;
 
-    if ((product == PRR_PRODUCT_G2M) && (cut < PRR_CUT_30))
+    if ((product == PRR_PRODUCT_G2M) && (cut < PRR_PRODUCT_30))
     {
         io_write32((base_rpc_vaddr + RPC_PHYCNT), 0x80030260);
     }
@@ -370,12 +371,12 @@ static void rpc_wait_trans_end(void)
 
 static void convert_pa_to_va(void)
 {
-    prr_vaddr = (vaddr_t)phys_to_virt(PRR,MEM_AREA_IO_SEC,PRR_REG_SIZE);
+    prr_vaddr = (vaddr_t)phys_to_virt(PRR_BASE,MEM_AREA_IO_SEC,PRR_REG_SIZE);
 
     if (prr_vaddr == 0U) {
-        prr_vaddr = (vaddr_t)phys_to_virt(PRR,MEM_AREA_IO_NSEC,PRR_REG_SIZE);
+        prr_vaddr = (vaddr_t)phys_to_virt(PRR_BASE,MEM_AREA_IO_NSEC,PRR_REG_SIZE);
         if (prr_vaddr == 0U) {
-            EMSG("Convert error! phys_to_virt reg_paddr=%08X",PRR);
+            EMSG("Convert error! phys_to_virt reg_paddr=%08X",PRR_BASE);
         }
     }
 
@@ -388,10 +389,10 @@ static void convert_pa_to_va(void)
         }
     }
 
-    base_cpg_vaddr = (vaddr_t)phys_to_virt(CPG_BASE,MEM_AREA_IO_SEC,0x0bb0);
+    base_cpg_vaddr = (vaddr_t)phys_to_virt(CPG_BASE,MEM_AREA_IO_SEC,CPG_REG_SIZE);
 
     if (base_cpg_vaddr == 0U) {
-        base_cpg_vaddr = (vaddr_t)phys_to_virt(CPG_BASE,MEM_AREA_IO_NSEC,0x0bb0);
+        base_cpg_vaddr = (vaddr_t)phys_to_virt(CPG_BASE,MEM_AREA_IO_NSEC,CPG_REG_SIZE);
         if (base_cpg_vaddr == 0U) {
             EMSG("Convert error! phys_to_virt reg_paddr=%08X",CPG_BASE);
         }

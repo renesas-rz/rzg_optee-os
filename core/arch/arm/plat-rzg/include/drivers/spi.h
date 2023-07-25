@@ -21,7 +21,7 @@
 
 int32_t rzg_spi_erase_sectors(uint32_t spi_addr, uint32_t len);
 int32_t rzg_spi_write_buff(uint32_t spi_addr, uint64_t buff, uint32_t len);
-int32_t rzg_spi_init_driver(void);
-int32_t rzg_spi_deinit_driver(void);
+void    rzg_spi_init_driver(void);
+void    rzg_spi_deinit_driver(void);
 
 #endif /* SPI_H_ */
