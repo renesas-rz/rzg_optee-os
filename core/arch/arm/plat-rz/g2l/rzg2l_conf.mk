@@ -10,7 +10,6 @@ $(call force,CFG_CORE_LARGE_PHYS_ADDR,y)
 $(call force,CFG_CORE_ARM64_PA_BITS,36)
 $(call force,CFG_GIC,y)
 $(call force,CFG_ARM_GICV3,y)
-$(call force,CFG_CORE_ASLR,n)
 
 ifeq ($(PLATFORM_FLAVOR),g2ul_smarc)
 CFG_TEE_CORE_NB_CORE ?= 1
