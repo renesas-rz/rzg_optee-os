@@ -32,3 +32,9 @@ CFG_RZ_SCE ?= n
 ifeq ($(CFG_RZ_SCE),y)
 CFG_WITH_SOFTWARE_PRNG ?= n
 endif
+
+ifeq ($(PLATFORM_FLAVOR),g2ul_smarc)
+CFG_SPI_FLASH_DEV ?= AT25QL128A
+else
+CFG_SPI_FLASH_DEV ?= MT25QU512ABB
+endif
