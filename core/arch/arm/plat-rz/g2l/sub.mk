@@ -1,5 +1,5 @@
 global-incdirs-y += .
-srcs-y += main.c huk.c
+srcs-y += main.c
 
 srcs-$(CFG_RZ_SCE) += hw_rng.c
 

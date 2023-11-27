@@ -10,8 +10,7 @@
 #include <mm/core_memprot.h>
 #include <tee/tee_cryp_pbkdf2.h>
 
-#define CHIPID_BASE		(0x11861140U)
-#define CHIPID_SIZE		(16)
+#include "platform_config.h"
 
 #define REGISTER_SIZE	(sizeof(uint32_t))
 

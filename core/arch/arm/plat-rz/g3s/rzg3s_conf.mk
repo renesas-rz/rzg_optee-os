@@ -12,11 +12,7 @@ $(call force,CFG_GIC,y)
 $(call force,CFG_ARM_GICV3,y)
 $(call force,CFG_RZ_HUK,y)
 
-ifeq ($(PLATFORM_FLAVOR),g2ul_smarc)
 CFG_TEE_CORE_NB_CORE ?= 1
-else
-CFG_TEE_CORE_NB_CORE ?= 2
-endif
 
 CFG_TZDRAM_START ?= 0x44100000
 CFG_TZDRAM_SIZE ?= 0x03D00000
@@ -31,10 +27,4 @@ endif
 CFG_RZ_SCE ?= n
 ifeq ($(CFG_RZ_SCE),y)
 CFG_WITH_SOFTWARE_PRNG ?= n
-endif
-
-ifeq ($(PLATFORM_FLAVOR),g2ul_smarc)
-CFG_SPI_FLASH_DEV ?= AT25QL128A
-else
-CFG_SPI_FLASH_DEV ?= MT25QU512ABB
 endif

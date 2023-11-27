@@ -1,7 +1,5 @@
 global-incdirs-y += .
-
 srcs-y += cpg.c
-srcs-y += scif.c
 srcs-y += sflash.c
 srcs-$(CFG_RZ_SCE) += sce.c
 

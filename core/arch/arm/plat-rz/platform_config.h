@@ -8,6 +8,8 @@
 
 #if defined(CFG_PLATFORM_GROUP_g2l)
 #include "g2l/rzg2l_config.h"
+#elif defined(CFG_PLATFORM_GROUP_g3s)
+#include "g3s/rzg3s_config.h"
 #endif
 
 #endif /*PLATFORM_CONFIG_H*/
