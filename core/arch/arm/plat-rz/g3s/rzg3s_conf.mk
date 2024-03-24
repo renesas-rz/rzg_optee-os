@@ -11,6 +11,7 @@ $(call force,CFG_CORE_ARM64_PA_BITS,36)
 $(call force,CFG_GIC,y)
 $(call force,CFG_ARM_GICV3,y)
 $(call force,CFG_RZ_HUK,y)
+$(call force,CFG_RZ_XSPI,y)
 
 CFG_TEE_CORE_NB_CORE ?= 1
 
