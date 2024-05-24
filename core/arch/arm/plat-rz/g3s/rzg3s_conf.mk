@@ -12,6 +12,7 @@ $(call force,CFG_GIC,y)
 $(call force,CFG_ARM_GICV3,y)
 $(call force,CFG_RZ_HUK,y)
 $(call force,CFG_RZ_XSPI,y)
+$(call force,CFG_RZ_RSIP,y)
 
 CFG_TEE_CORE_NB_CORE ?= 1
 
