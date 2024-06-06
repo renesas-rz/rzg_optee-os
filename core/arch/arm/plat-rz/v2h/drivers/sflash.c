@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, Renesas Electronics Corporation. All rights reserved.
+ * Copyright (c) 2023, Renesas Electronics Corporation. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -10,8 +10,8 @@
 #include <initcall.h>
 #include <mm/core_memprot.h>
 #include <platform_config.h>
-#include <sflash.h>
 #include <cpg.h>
+#include <sflash.h>
 #include <xspi.h>
 #include <xspi_regs.h>
 
@@ -79,6 +79,7 @@ void sflash_write_buffer(uint32_t addr, uintptr_t buff, size_t len)
 void sflash_open(void)
 {
 	cpg_xspi_start();
+
 	xspi_setup();
 }
 

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BSD-2-Clause
 /*
- * Copyright (c) 2021, Renesas Electronics
+ * Copyright (c) 2021-2024, Renesas Electronics
  */
 #include <string.h>
 #include <assert.h>
