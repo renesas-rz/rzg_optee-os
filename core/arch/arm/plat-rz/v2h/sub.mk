@@ -2,4 +2,4 @@ global-incdirs-y += .
 srcs-y += main.c
 
 
-subdirs-y += drivers pta
+subdirs-y += drivers

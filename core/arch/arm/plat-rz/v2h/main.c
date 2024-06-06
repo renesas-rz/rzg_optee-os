@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-2-Clause
 /*
  * Copyright (c) 2016, GlobalLogic
- * Copyright (c) 2021-2024, Renesas Electronics
+ * Copyright (c) 2021, Renesas Electronics
  */
 
 #include <console.h>

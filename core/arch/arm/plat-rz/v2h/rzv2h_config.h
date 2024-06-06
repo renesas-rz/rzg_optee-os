@@ -29,6 +29,8 @@
 #define XSPI_BASE			0x11030000U
 #define XSPI_REG_SIZE		0x10000
 
+#define HW_SCE_BASE			0x10440000
+
 #if defined(PLATFORM_FLAVOR_v2h_evk_1)
 /* DDR 8Gbyte x1 */
 #define NSEC_DDR_0_BASE		0x47E00000U

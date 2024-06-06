@@ -14,8 +14,8 @@
 #define CPG_CLKMON_5							(0x0814)	/* CGC Monitor Register xSPI */
 
 
-#define	CPG_BUS_4_MSTOP							(0x0D0C)	/* MSTOP register 4 */
-#define	CPG_BUS_5_MSTOP							(0x0D10)	/* MSTOP register 5 */
+#define CPG_BUS_4_MSTOP							(0x0D0C)	/* MSTOP register 4 */
+#define CPG_BUS_5_MSTOP							(0x0D10)	/* MSTOP register 5 */
 #define CPG_RST_10								(0x0928)	/* Reset Control Register xSPI */
 #define CPG_RSTMON_4							(0x0A10)	/* Reset Monitor Registers xSPI */
 
