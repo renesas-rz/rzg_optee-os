@@ -20,10 +20,10 @@
 #ifndef R_RSIP_CFG_H_
 #define R_RSIP_CFG_H_
 
-#define RSIP_CFG_BYTE_POS_WRAPPED_PUBLIC_KEY_ECC_192_QX                    (16U)
-#define RSIP_CFG_BYTE_POS_WRAPPED_PUBLIC_KEY_ECC_192_QY                    (48U)
-#define RSIP_CFG_BYTE_POS_WRAPPED_PUBLIC_KEY_ECC_224_QX                    (16U)
-#define RSIP_CFG_BYTE_POS_WRAPPED_PUBLIC_KEY_ECC_224_QY                    (48U)
+#define RSIP_CFG_BYTE_POS_WRAPPED_PUBLIC_KEY_ECC_192_QX                    (24U)
+#define RSIP_CFG_BYTE_POS_WRAPPED_PUBLIC_KEY_ECC_192_QY                    (56U)
+#define RSIP_CFG_BYTE_POS_WRAPPED_PUBLIC_KEY_ECC_224_QX                    (20U)
+#define RSIP_CFG_BYTE_POS_WRAPPED_PUBLIC_KEY_ECC_224_QY                    (52U)
 #define RSIP_CFG_BYTE_POS_WRAPPED_PUBLIC_KEY_ECC_256_QX                    (16U)
 #define RSIP_CFG_BYTE_POS_WRAPPED_PUBLIC_KEY_ECC_256_QY                    (48U)
 #define RSIP_CFG_BYTE_POS_WRAPPED_PUBLIC_KEY_RSA_1024_N                    (16U)
