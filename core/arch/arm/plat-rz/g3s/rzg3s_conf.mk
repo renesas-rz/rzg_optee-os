@@ -12,7 +12,6 @@ $(call force,CFG_GIC,y)
 $(call force,CFG_ARM_GICV3,y)
 $(call force,CFG_RZ_HUK,y)
 $(call force,CFG_RZ_XSPI,y)
-$(call force,CFG_RZ_RSIP,y)
 
 CFG_TEE_CORE_NB_CORE ?= 1
 
@@ -26,7 +25,10 @@ else
 $(call force,CFG_ARM32_core,y)
 endif
 
-CFG_RZ_SCE ?= n
 ifeq ($(CFG_RZ_SCE),y)
+CFG_RZ_RSIP ?= y
+endif
+
+ifeq ($(CFG_RZ_RSIP),y)
 CFG_WITH_SOFTWARE_PRNG ?= n
 endif

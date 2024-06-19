@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: BSD-2-Clause */
 /*
  * Copyright (c) 2016, GlobalLogic
- * Copyright (c) 2023, Renesas Electronics
+ * Copyright (c) 2024, Renesas Electronics
  */
 
 #ifndef RZG3S_CONFIG_H
@@ -28,6 +28,9 @@
 
 #define XSPI_BASE			0x10060000U
 #define XSPI_REG_SIZE		0x30000
+
+#define RSIP_BASE			0x11850000
+#define RSIP_SIZE			0x00010000
 
 #if defined(PLATFORM_FLAVOR_g3s_dev14_1)
 /* DDR 1Gbyte x1 */
