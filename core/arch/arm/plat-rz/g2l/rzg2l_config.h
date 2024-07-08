@@ -27,6 +27,8 @@
 #define SPI_FLASH_BASE		0x20000000U
 #define SPI_FLASH_SIZE		0x10000000
 
+#define HW_SCE_BASE			0x11850000
+
 #if defined(PLATFORM_FLAVOR_g2l_dev13_1)
 /* DDR 512Mbyte x2 */
 #define NSEC_DDR_0_BASE		0x47E00000U

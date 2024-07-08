@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BSD-2-Clause
 /*
- * Copyright (c) 2021, Renesas Electronics
+ * Copyright (c) 2021-2024, Renesas Electronics
  */
 #include <string.h>
 #include <assert.h>
@@ -10,6 +10,7 @@
 #include <kernel/panic.h>
 
 #include <r_sce.h>
+#include "platform_config.h"
 
 register_phys_mem_pgdir(MEM_AREA_IO_SEC, HW_SCE_BASE, HW_SCE_SIZE);
 
