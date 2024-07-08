@@ -14,7 +14,7 @@
  * following link:
  * http://www.renesas.com/disclaimer
  *
- * Copyright (C) 2022 Renesas Electronics Corporation. All rights reserved.
+ * Copyright (C) 2022-2024 Renesas Electronics Corporation. All rights reserved.
  *********************************************************************************************************************/
 /**********************************************************************************************************************
  * File Name    : r_sce.h
@@ -43,7 +43,6 @@
  **********************************************************************************************************************/
 
 /* Various information. */
-#define HW_SCE_BASE                     (0x11850000)
 #define HW_SCE_SIZE                     (0x10000)
 #define HW_SCE_SRAM_WORD_SIZE           (20U)
 #define HW_SCE_SINST_WORD_SIZE          (140U)
