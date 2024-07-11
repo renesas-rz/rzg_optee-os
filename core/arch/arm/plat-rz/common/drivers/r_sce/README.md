@@ -13,7 +13,7 @@ The SCE Driver is software for controlling SCE, which is the security IP of RZ M
 
 ### 1.1. Requirements
 
-  - RZ/G2L Secure Crypto Engine library 1.0.0 (libr_secure_ip_1_0.a.1.0.0)
+  - RZ Secure Crypto Engine library 1.0.0 (libr_secure_ip_1_0.a.1.0.0)
   - RZ/V2H Secure Crypto Engine library 1.0.0 (libr_secure_ip_2_0.a.1.0.0)
 
 ### 1.2. Notice
@@ -32,7 +32,6 @@ The following table shows the document related to this function.
 |--------|---------|----------------------------------------------------------------|-------------------|
 | 1      | Renesas | RZ/G2L Security Manual                                         | Rev.1.00 or later |
 | 2      | Renesas | RZ/V2H Security Manual                                         | Rev.1.00 or later |
-
 
 ## 2. Driver Specifications
 

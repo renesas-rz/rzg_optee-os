@@ -25,7 +25,10 @@ else
 $(call force,CFG_ARM32_core,y)
 endif
 
-CFG_RZ_SCE ?= n
 ifeq ($(CFG_RZ_SCE),y)
+CFG_RZ_RSIP ?= y
+endif
+
+ifeq ($(CFG_RZ_RSIP),y)
 CFG_WITH_SOFTWARE_PRNG ?= n
 endif

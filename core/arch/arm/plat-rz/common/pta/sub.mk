@@ -1,4 +1,7 @@
 global-incdirs-y += include
 
-srcs-$(CFG_RZ_XSPI) += pta_flash.c
-srcs-$(CFG_RZ_SCE) += pta_sce.c pta_sce_ecc.c pta_sce_rsa.c pta_sce_sha.c pta_sce_aes.c
+srcs-y += pta_flash.c
+
+subdirs-$(CFG_RZ_RSIP) += rsip
+
+subdirs-$(CFG_RZ_TSIP) += tsip
