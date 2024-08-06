@@ -54,7 +54,7 @@ The following table lists the hardware needed to use this utility.
 .. csv-table:: Hardware environment
     :header: "Name", "Note"
 
-    Target board,"RZ/G2L Device"
+    Target board,"RZ/G2L Device" and "RZ/V2H Device"
 
 -------------------------------------------------------
 1.4.1.Software Environment
@@ -65,7 +65,7 @@ This driver are designed for use with generic (or no specific) operating systems
 1.5.Requirement
 *************************************************************************
 
- - RZ Secure Crypto Engine library 1.0.0
+ - RZ Secure Crypto Engine library
 
 *************************************************************************
 1.6.Notice
