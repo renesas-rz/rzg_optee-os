@@ -57,7 +57,7 @@ TEE_Result hw_get_random_bytes(void *buf, size_t len)
 		{
 			return ret;
 		}
-		memcpy(buf + i, buffer, MIN(sizeof(buffer), len - i));
+		memcpy((uintptr_t)buf + i, buffer, MIN(sizeof(buffer), len - i));
 	}
 
 	return ret;
