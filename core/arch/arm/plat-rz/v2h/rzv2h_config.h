@@ -34,7 +34,7 @@
 #if defined(PLATFORM_FLAVOR_v2h_evk_1)
 /* DDR 8Gbyte x1 */
 #define NSEC_DDR_0_BASE		0x47E00000U
-#define NSEC_DDR_0_SIZE		0x1F8000000U
+#define NSEC_DDR_0_SIZE		0x1F8200000U
 
 /* DDR 8Gbyte x1 */
 #define NSEC_DDR_1_BASE		0x240000000U
