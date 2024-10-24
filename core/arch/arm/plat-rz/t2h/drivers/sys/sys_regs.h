@@ -1,0 +1,61 @@
+/*
+ * Copyright (c) 2023-2024, Renesas Electronics Corporation. All rights reserved.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+
+#ifndef __SYS_REGS_H__
+#define __SYS_REGS_H__
+
+#include <rzt2h_config.h>						/* Get the System base address */
+
+#define MRCTLA					    		(0x00000240)
+#define MSTPCRA 							(0x00000300)
+
+#define MD_MON				    			(0x00004100)
+#define PRCRN								(0x00004200)
+
+#define SSTPCR6						    	(0x00000208)
+
+#define PRCRS								(0x00006000)
+
+/* xSPI0 */
+#define MRCTLA_MRCTLA04						UL(4)
+/* xSPI1 */
+#define MRCTLA_MRCTLA05						UL(5)
+
+/* Boot Mode */
+#define MD_MON_MD0MON_BIT					UL(12)
+#define MD_MON_MDxMON_MSK					UL(7)					/* 3 bits wide - MD0MON, MD1MON and MD2MON */
+#define MD_MON_MODE_XSPI0_x1				UL(0)
+#define MD_MON_MODE_XSPI0_x8				UL(1)
+#define MD_MON_MODE_XSPI1_x1				UL(2)
+#define MD_MON_MODE_ESD						UL(3)
+#define MD_MON_MODE_EMMC					UL(4)
+#define MD_MON_MODE_SCIF					UL(5)
+#define MD_MON_MODE_USB						UL(6)
+#define MD_MON_MODE_COUNT					UL(7)
+
+#define PRCRx_CLOCK_GEN						UL(1)
+#define PRCRx_LOW_POWER						UL(2)
+#define PRCRx_GPIO							UL(4)
+#define PRCRx_SYS_CTRL						UL(8)
+
+/* xSPI0 */
+#define MSTPCRA_MSTPCRA04					UL(4)
+#define MSTPCRA_MSTPCRA04_MSK				(0x00000001U << MSTPCRA_MSTPCRA04)
+/* xSPI1 */
+#define MSTPCRA_MSTPCRA05					UL(5)
+#define MSTPCRA_MSTPCRA05_MSK				(0x00000001U << MSTPCRA_MSTPCRA05)
+
+/* xSPI */
+#define SSTPCR6_XSPI0_REQ					UL(0)
+#define SSTPCR6_XSPI0_REQ_MSK				(0x00000001U << SSTPCR6_XSPI0_REQ)
+#define SSTPCR6_XSPI0_ACK					UL(1)
+#define SSTPCR6_XSPI0_ACK_MSK				(0x00000001U << SSTPCR6_XSPI0_ACK)
+#define SSTPCR6_XSPI1_REQ					UL(4)
+#define SSTPCR6_XSPI1_REQ_MSK				(0x00000001U << SSTPCR6_XSPI1_REQ)
+#define SSTPCR6_XSPI1_ACK					UL(5)
+#define SSTPCR6_XSPI1_ACK_MSK				(0x00000001U << SSTPCR6_XSPI1_ACK)
+
+#endif	/* __SYS_REGS_H__ */

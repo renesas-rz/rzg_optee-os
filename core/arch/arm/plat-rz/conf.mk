@@ -30,6 +30,9 @@ include core/arch/arm/plat-rz/g3s/rzg3s_conf.mk
 else ifeq ($(PLATFORM_FLAVOR),v2h_evk_1)
 $(call force,CFG_PLATFORM_GROUP_v2h,y)
 include core/arch/arm/plat-rz/v2h/rzv2h_conf.mk
+else ifeq ($(PLATFORM_FLAVOR),t2h_dev_1)
+$(call force,CFG_PLATFORM_GROUP_t2h,y)
+include core/arch/arm/plat-rz/t2h/rzt2h_conf.mk
 else
 $(error Unsupported PLATFORM_FLAVOR "$(PLATFORM_FLAVOR)")
 endif

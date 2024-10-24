@@ -1,10 +1,13 @@
 global-incdirs-y += .
 
 srcs-$(CFG_RZ_SCIF) += scif.c
+srcs-$(CFG_RZ_SCI) += sci.c
 
 subdirs-$(CFG_RZ_SPI_MULTI) += spi_multi
 
 subdirs-$(CFG_RZ_XSPI) += xspi
+
+subdirs-$(CFG_RZ_OTP_PUCCINI) += otp/puccini
 
 srcs-$(CFG_RZ_TSIP) += sce.c
 subdirs-$(CFG_RZ_TSIP) += r_sce

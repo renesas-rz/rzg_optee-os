@@ -17,5 +17,8 @@
 int xspi_setup(void);
 int xspi_erase(const uintptr_t addr, uint32_t byte_count);
 int xspi_write(const uintptr_t addr, uintptr_t data, uint32_t byte_count);
+#if defined(CFG_PLATFORM_GROUP_t2h)
+uint32_t xspi_dummy_read(uint32_t reg);
+#endif
 
 #endif	/* _XSPI_H_ */
