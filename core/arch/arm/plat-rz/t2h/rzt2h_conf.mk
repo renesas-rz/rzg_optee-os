@@ -5,13 +5,11 @@ include core/arch/arm/plat-rz/link.mk
 $(call force,CFG_SECURE_TIME_SOURCE_CNTPCT,y)
 $(call force,CFG_WITH_ARM_TRUSTED_FW,y)
 $(call force,CFG_SCIF,n)
-$(call force,CFG_RZ_SCIF,n)
 $(call force,CFG_RZ_SCI,y)
 $(call force,CFG_CORE_LARGE_PHYS_ADDR,y)
 $(call force,CFG_CORE_ARM64_PA_BITS,36)
 $(call force,CFG_GIC,y)
 $(call force,CFG_ARM_GICV3,y)
-$(call force,CFG_RZ_HUK,n)
 $(call force,CFG_RZ_XSPI,y)
 $(call force,CFG_RZ_OTP_PUCCINI,y)
 

@@ -5,6 +5,8 @@ srcs-$(CFG_RZ_SCI) += sci.c
 
 subdirs-$(CFG_RZ_SPI_MULTI) += spi_multi
 
+subdirs-$(CFG_RZ_SYS) += sys
+
 subdirs-$(CFG_RZ_XSPI) += xspi
 
 subdirs-$(CFG_RZ_OTP_PUCCINI) += otp/puccini

@@ -12,14 +12,9 @@
 #include <xspi_regs.h>
 #include <xspi.h>
 
-#if defined(CFG_PLATFORM_GROUP_t2h)
 #include <sys.h>
 register_phys_mem_pgdir(MEM_AREA_IO_NSEC, XSPI_BASE_0, XSPI_REG_SIZE);
 register_phys_mem_pgdir(MEM_AREA_IO_NSEC, XSPI_BASE_1, XSPI_REG_SIZE);
-#endif
-#if defined(CFG_PLATFORM_GROUP_g3s) || defined(CFG_PLATFORM_GROUP_v2h)
-register_phys_mem_pgdir(MEM_AREA_IO_NSEC, XSPI_BASE, XSPI_REG_SIZE);
-#endif
 
 vaddr_t xspi_base;
 
@@ -273,14 +268,9 @@ uint32_t xspi_dummy_read(uint32_t reg)
 
 static TEE_Result xspi_init(void)
 {
-#if defined(CFG_PLATFORM_GROUP_g3s) || defined(CFG_PLATFORM_GROUP_v2h)
-	xspi_base = (vaddr_t)phys_to_virt_io(XSPI_BASE, XSPI_REG_SIZE);
-#endif
-#if defined(CFG_PLATFORM_GROUP_t2h)
 	xspi_base = (vaddr_t)phys_to_virt_io(
 		(SYS_BOOT_MODE_XSPI1_x1 == sys_get_boot_mode()) ? XSPI_BASE_1 : XSPI_BASE_0,
 		XSPI_REG_SIZE);
-#endif
 
 	return TEE_SUCCESS;
 }

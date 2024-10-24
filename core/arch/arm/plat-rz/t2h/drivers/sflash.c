@@ -93,9 +93,7 @@ void sflash_close(void)
 
 static TEE_Result sflash_init(void)
 {
-	sflash_base = (vaddr_t)phys_to_virt_io(
-		(SYS_BOOT_MODE_XSPI1_x1 == sys_get_boot_mode()) ? SPI_FLASH_BASE_1 : SPI_FLASH_BASE_0,
-		SPI_FLASH_SIZE);
+	sflash_base = sys_get_flash_base();
 
 	return TEE_SUCCESS;
 }

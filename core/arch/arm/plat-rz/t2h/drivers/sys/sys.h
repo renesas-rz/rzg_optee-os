@@ -24,5 +24,6 @@ extern void sys_base_unlock(uint32_t unlock_mask);
 extern void sys_base_lock(uint32_t lock_mask);
 extern void sys_safetybase_unlock(uint32_t unlock_mask);
 extern void sys_safetybase_lock(uint32_t lock_mask);
+extern uint32_t sys_get_flash_base(void);
 
 #endif	/* __SYS_H__ */

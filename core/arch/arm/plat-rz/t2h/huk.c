@@ -19,7 +19,7 @@ static void read_chipid(uint8_t *chipid)
 	uint32_t read_num = CHIPID_SIZE / REGISTER_SIZE;
 	uint8_t password[CHIPID_SIZE]={0};
 
-	r_otp_read(OTP_UNIQUE_ID_ADDR, (uint32_t *)&password[0], OTP_UNIQUE_ID_ADDR_LEN);
+	r_otp_read(CHIPID_BASE, (uint32_t *)&password[0], read_num);
 
 	for (i = 0U; i < read_num; i++) {
 		(void)memcpy(&read_data, &password[i * REGISTER_SIZE], REGISTER_SIZE);
