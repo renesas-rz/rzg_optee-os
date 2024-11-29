@@ -41,7 +41,7 @@
 #define OTP_BASE			0x810C0000U
 #define OTP_REG_SIZE		0x00004000
 
-#if defined(PLATFORM_FLAVOR_t2h_dev_1)
+#if defined(PLATFORM_FLAVOR_t2h_dev_1) || defined(PLATFORM_FLAVOR_n2h_eval)
 /* DDR 8Gbyte x1 */
 #define NSEC_DDR_0_BASE		0x203E00000
 #define NSEC_DDR_0_SIZE		0x1FC200000
