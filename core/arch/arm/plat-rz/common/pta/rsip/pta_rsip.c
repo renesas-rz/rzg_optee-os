@@ -3,12 +3,14 @@
  * Copyright (c) 2024, Renesas Electronics
  */
 
+#include <utee_defines.h>
 #include <kernel/pseudo_ta.h>
+#include <platform_config.h>
 
-#include <pta_rsip.h>
+#include <sflash.h>
 #include <r_rsip.h>
 #include <r_rsip_api.h>
-#include <utee_defines.h>
+#include <pta_rsip.h>
 
 #define PTA_NAME "rsip.pta"
 
@@ -205,12 +207,13 @@ static TEE_Result keyimportwithkuk(uint32_t types, TEE_Param params[TEE_NUM_PARA
 
     uint8_t * initial_vector;
     uint8_t * encrypted_key;
-    rsip_wrapped_key_t * key_update_key;
     rsip_wrapped_key_t * wrapped_key;
 
+    uint32_t key_update_key[RSIP_BYTE_SIZE_WRAPPED_KEY_VALUE_KEY_UPDATE_KEY / sizeof(uint32_t)];
+
     if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
-                    TEE_PARAM_TYPE_MEMREF_INPUT,
                     TEE_PARAM_TYPE_MEMREF_INOUT,
+                    TEE_PARAM_TYPE_NONE,
                     TEE_PARAM_TYPE_NONE)) {
         return TEE_ERROR_BAD_PARAMETERS;
     }
@@ -223,15 +226,12 @@ static TEE_Result keyimportwithkuk(uint32_t types, TEE_Param params[TEE_NUM_PARA
         return TEE_ERROR_BAD_PARAMETERS;
     }
 
-    key_update_key = (rsip_wrapped_key_t *)params[1].memref.buffer;
-    if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) || (RSIP_BYTE_SIZE_WRAPPED_KEY_KEY_UPDATE_KEY != params[1].memref.size)) {
+    wrapped_key = (rsip_wrapped_key_t *)params[1].memref.buffer;
+    if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) || (wrap_key_size > params[1].memref.size)) {
         return TEE_ERROR_BAD_PARAMETERS;
     }
 
-    wrapped_key = (rsip_wrapped_key_t *)params[2].memref.buffer;
-    if ((!IS_ALIGNED_WITH_TYPE(params[2].memref.buffer, uint32_t)) || (wrap_key_size > params[2].memref.size)) {
-        return TEE_ERROR_BAD_PARAMETERS;
-    }
+    sflash_read(key_update_key, SCE_KUK_BASE, sizeof(key_update_key));
 
     err = R_RSIP_KeyImportWithKUK(&rsip_instance_ctrl, key_update_key, initial_vector, key_type, encrypted_key, wrapped_key);
     switch ((uint32_t)err)
@@ -258,7 +258,7 @@ static TEE_Result keyimportwithkuk(uint32_t types, TEE_Param params[TEE_NUM_PARA
             return TEE_ERROR_BAD_STATE;
     }
 
-    params[2].memref.size = wrap_key_size;
+    params[1].memref.size = wrap_key_size;
 
     return TEE_SUCCESS;
 }
@@ -622,6 +622,20 @@ static TEE_Result eccbrainpoolp256r1publickeyexport(uint32_t types, TEE_Param pa
         WRAPPED_KEY_BYTE_SIZE_ECC_BRAINPOOLP256R1_PUBLIC_QX, WRAPPED_KEY_BYTE_SIZE_ECC_BRAINPOOLP256R1_PUBLIC_QY);
 }
 
+static TEE_Result open_session(uint32_t nParamTypes __unused,
+							   TEE_Param pParams[TEE_NUM_PARAMS] __unused,
+							   void **ppSessionContext __unused)
+{
+	DMSG("open entry point for pseudo ta \"%s\"", PTA_NAME);
+	sflash_open();
+	return TEE_SUCCESS;
+}
+
+static void close_session(void *pSessionContext __unused)
+{
+	DMSG("close entry point for pseudo ta \"%s\"", PTA_NAME);
+	sflash_close();
+}
 
 static TEE_Result invoke_command(void *session __unused, uint32_t cmd,
                       uint32_t ptypes,
@@ -735,4 +749,6 @@ static TEE_Result invoke_command(void *session __unused, uint32_t cmd,
 
 pseudo_ta_register(.uuid = PTA_RSIP_UUID, .name = PTA_NAME,
             .flags = PTA_DEFAULT_FLAGS,
+			.open_session_entry_point = open_session,
+			.close_session_entry_point = close_session,
             .invoke_command_entry_point = invoke_command);

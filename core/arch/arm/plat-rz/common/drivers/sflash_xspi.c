@@ -12,9 +12,8 @@
 #include <platform_config.h>
 #include <cpg.h>
 #include <sflash.h>
-#include <spi_multi.h>
-#include <spi_multi_regs.h>
-#include <spi_multi_reg_values.h>
+#include <xspi.h>
+#include <xspi_regs.h>
 
 register_phys_mem_pgdir(MEM_AREA_IO_NSEC, SPI_FLASH_BASE, SPI_FLASH_SIZE);
 
@@ -26,23 +25,7 @@ static vaddr_t sflash_phys_to_virt(uint32_t addr)
 	return (vaddr_t)(sflash_base + (addr & 0x00FFFFFF));
 }
 
-static void sflash_page_program(uint32_t addr, uintptr_t buff, size_t len)
-{
-	for (size_t i = 0; i < len; i += SPI_PAGE_SIZE)
-		spi_multi_page_program(addr + i, buff + i);
-
-	spi_multi_setup();
-}
-
-static void sflash_sector_erase(uint32_t addr, size_t len)
-{
-	for (size_t i = 0; i < len; i += SPI_SECTOR_SIZE)
-		spi_multi_erase_sector(addr + i);
-
-	spi_multi_setup();
-}
-
-void sflash_write_buffer(uint32_t addr, uintptr_t buff, size_t len)
+void sflash_write_buffer(uintptr_t addr, uintptr_t buff, size_t len)
 {
 	uintptr_t sflash_work_base = (uintptr_t)&sflash_work[0];
 	uintptr_t base_sector_addr = ROUNDDOWN(addr, SPI_SECTOR_SIZE);
@@ -63,9 +46,7 @@ void sflash_write_buffer(uint32_t addr, uintptr_t buff, size_t len)
 
 		memcpy((void *)(sflash_work_base + write_offset), (void *)buff, write_length);
 
-		sflash_sector_erase(base_sector_addr, SPI_SECTOR_SIZE);
-
-		sflash_page_program(base_sector_addr, sflash_work_base, SPI_SECTOR_SIZE);
+		xspi_write(base_sector_addr, sflash_work_base, SPI_SECTOR_SIZE);
 
 		base_sector_addr += SPI_SECTOR_SIZE;
 
@@ -82,9 +63,7 @@ void sflash_write_buffer(uint32_t addr, uintptr_t buff, size_t len)
 
 		memcpy((void *)sflash_work_base, (void *)((buff + len) - write_length), write_length);
 
-		sflash_sector_erase(last_sector_addr, SPI_SECTOR_SIZE);
-
-		sflash_page_program(last_sector_addr, sflash_work_base, SPI_SECTOR_SIZE);
+		xspi_write(last_sector_addr, sflash_work_base, SPI_SECTOR_SIZE);
 
 		secotr_count--;
 	}
@@ -93,22 +72,26 @@ void sflash_write_buffer(uint32_t addr, uintptr_t buff, size_t len)
 
 	if(secotr_count > 0) {
 
-		sflash_sector_erase(base_sector_addr, write_length);
-
-		sflash_page_program(base_sector_addr, buff + (base_sector_addr - addr), write_length);
+		xspi_write(base_sector_addr, buff + (base_sector_addr - addr), write_length);
 	}
+}
+
+void sflash_read(uintptr_t addr, uintptr_t buff, size_t len)
+{
+	vaddr_t virt_addr = sflash_phys_to_virt(addr);
+	memcpy((void *)buff, (void *)virt_addr, len);
 }
 
 void sflash_open(void)
 {
-	cpg_spi_multi_start();
+	cpg_xspi_start();
 
-	spi_multi_setup();
+	xspi_setup();
 }
 
 void sflash_close(void)
 {
-	cpg_spi_multi_stop();
+	cpg_xspi_stop();
 }
 
 static TEE_Result sflash_init(void)

@@ -31,6 +31,7 @@ endif
 
 ifeq ($(CFG_RZ_SCE),y)
 CFG_RZ_TSIP ?= y
+ldflags-external += $(CFG_RZ_SCE_LIB_DIR)/libr_secure_ip_1_0.a.1.0.0
 endif
 
 ifeq ($(CFG_RZ_TSIP),y)

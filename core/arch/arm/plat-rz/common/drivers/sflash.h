@@ -9,6 +9,7 @@
 
 extern void sflash_open(void);
 extern void sflash_close(void);
-extern void sflash_write_buffer(uint32_t addr, uintptr_t buff, size_t len);
+extern void sflash_read(uintptr_t addr, uintptr_t buff, size_t len);
+extern void sflash_write_buffer(uintptr_t addr, uintptr_t buff, size_t len);
 
 #endif /* _SFLASH_H_ */

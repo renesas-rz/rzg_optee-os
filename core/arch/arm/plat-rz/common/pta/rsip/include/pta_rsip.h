@@ -105,8 +105,7 @@
 
 /*
  * [in]        memref[0] : Encrypted Key (st_encrypted_aes128_key_t)
- * [in]        memref[1] : Key Update Key (64byte)
- * [in/out]    memref[2] : Wrapped key (rsip_wrapped_key_t:52byte)
+ * [in/out]    memref[1] : Wrapped key (rsip_wrapped_key_t:52byte)
  */
 typedef struct {
     uint32_t unused[2];
@@ -118,8 +117,7 @@ typedef struct {
 
 /*
  * [in]        memref[0] : Encrypted Key (st_encrypted_aes256_key_t)
- * [in]        memref[1] : Key Update Key (64byte)
- * [in/out]    memref[2] : Wrapped key (rsip_wrapped_key_t:68byte)
+ * [in/out]    memref[1] : Wrapped key (rsip_wrapped_key_t:68byte)
  */
 typedef struct {
     uint32_t unused[2];
@@ -131,8 +129,7 @@ typedef struct {
 
 /*
  * [in]        memref[0] : Encrypted Key (st_encrypted_aes128xts_key_t)
- * [in]        memref[1] : Key Update Key (64byte)
- * [in/out]    memref[2] : Wrapped key (rsip_wrapped_key_t:68byte)
+ * [in/out]    memref[1] : Wrapped key (rsip_wrapped_key_t:68byte)
  */
 typedef struct {
     uint32_t unused[2];
@@ -144,8 +141,7 @@ typedef struct {
 
 /*
  * [in]        memref[0] : Encrypted Key (st_encrypted_aes256xts_key_t)
- * [in]        memref[1] : Key Update Key (64byte)
- * [in/out]    memref[2] : Wrapped key (rsip_wrapped_key_t:100byte)
+ * [in/out]    memref[1] : Wrapped key (rsip_wrapped_key_t:100byte)
  */
 typedef struct {
     uint32_t unused[2];
@@ -157,8 +153,7 @@ typedef struct {
 
 /*
  * [in]        memref[0] : Encrypted Key (st_encrypted_rsa_1024_public_key_t)
- * [in]        memref[1] : Key Update Key (64byte)
- * [in/out]    memref[2] : Wrapped key (rsip_wrapped_key_t:180byte)
+ * [in/out]    memref[1] : Wrapped key (rsip_wrapped_key_t:180byte)
  */
 typedef struct {
     uint32_t unused[2];
@@ -170,8 +165,7 @@ typedef struct {
 
 /*
  * [in]        memref[0] : Encrypted Key (st_encrypted_rsa_1024_private_key_t)
- * [in]        memref[1] : Key Update Key (64byte)
- * [in/out]    memref[2] : Wrapped key (rsip_wrapped_key_t:292byte)
+ * [in/out]    memref[1] : Wrapped key (rsip_wrapped_key_t:292byte)
  */
 typedef struct {
     uint32_t unused[2];
@@ -183,8 +177,7 @@ typedef struct {
 
 /*
  * [in]        memref[0] : Encrypted Key (st_encrypted_rsa_2048_public_key_t)
- * [in]        memref[1] : Key Update Key (64byte)
- * [in/out]    memref[2] : Wrapped key (rsip_wrapped_key_t:308byte)
+ * [in/out]    memref[1] : Wrapped key (rsip_wrapped_key_t:308byte)
  */
 typedef struct {
     uint32_t unused[2];
@@ -196,8 +189,7 @@ typedef struct {
 
 /*
  * [in]        memref[0] : Encrypted Key (st_encrypted_rsa_2048_private_key_t)
- * [in]        memref[1] : Key Update Key (64byte)
- * [in/out]    memref[2] : Wrapped key (rsip_wrapped_key_t:548byte)
+ * [in/out]    memref[1] : Wrapped key (rsip_wrapped_key_t:548byte)
  */
 typedef struct {
     uint32_t unused[2];
@@ -209,8 +201,7 @@ typedef struct {
 
 /*
  * [in]        memref[0] : Encrypted Key (st_encrypted_rsa_3072_public_key_t)
- * [in]        memref[1] : Key Update Key (64byte)
- * [in/out]    memref[2] : Wrapped key (rsip_wrapped_key_t:436byte)
+ * [in/out]    memref[1] : Wrapped key (rsip_wrapped_key_t:436byte)
  */
 typedef struct {
     uint32_t unused[2];
@@ -222,8 +213,7 @@ typedef struct {
 
 /*
  * [in]        memref[0] : Encrypted Key (st_encrypted_rsa_3072_private_key_t)
- * [in]        memref[1] : Key Update Key (64byte)
- * [in/out]    memref[2] : Wrapped key (rsip_wrapped_key_t:804byte)
+ * [in/out]    memref[1] : Wrapped key (rsip_wrapped_key_t:804byte)
  */
 typedef struct {
     uint32_t unused[2];
@@ -235,8 +225,7 @@ typedef struct {
 
 /*
  * [in]        memref[0] : Encrypted Key (st_encrypted_rsa_4096_public_key_t)
- * [in]        memref[1] : Key Update Key (64byte)
- * [in/out]    memref[2] : Wrapped key (rsip_wrapped_key_t:564byte)
+ * [in/out]    memref[1] : Wrapped key (rsip_wrapped_key_t:564byte)
  */
 typedef struct {
     uint32_t unused[2];
@@ -248,8 +237,7 @@ typedef struct {
 
 /*
  * [in]        memref[0] : Encrypted Key (st_encrypted_rsa_4096_private_key_t)
- * [in]        memref[1] : Key Update Key (64byte)
- * [in/out]    memref[2] : Wrapped key (rsip_wrapped_key_t:1060byte)
+ * [in/out]    memref[1] : Wrapped key (rsip_wrapped_key_t:1060byte)
  */
 typedef struct {
     uint32_t unused[2];
@@ -261,8 +249,7 @@ typedef struct {
 
 /*
  * [in]        memref[0] : Encrypted Key (st_encrypted_ecc_secp192r1_public_key_t)
- * [in]        memref[1] : Key Update Key (64byte)
- * [in/out]    memref[2] : Wrapped key (rsip_wrapped_key_t:100byte)
+ * [in/out]    memref[1] : Wrapped key (rsip_wrapped_key_t:100byte)
  */
 typedef struct {
     uint32_t unused[2];
@@ -274,8 +261,7 @@ typedef struct {
 
 /*
  * [in]        memref[0] : Encrypted Key (st_encrypted_ecc_secp192r1_private_key_t)
- * [in]        memref[1] : Key Update Key (64byte)
- * [in/out]    memref[2] : Wrapped key (rsip_wrapped_key_t:68byte)
+ * [in/out]    memref[1] : Wrapped key (rsip_wrapped_key_t:68byte)
  */
 typedef struct {
     uint32_t unused[2];
@@ -287,8 +273,7 @@ typedef struct {
 
 /*
  * [in]        memref[0] : Encrypted Key (st_encrypted_ecc_secp224r1_public_key_t)
- * [in]        memref[1] : Key Update Key (64byte)
- * [in/out]    memref[2] : Wrapped key (rsip_wrapped_key_t:100byte)
+ * [in/out]    memref[1] : Wrapped key (rsip_wrapped_key_t:100byte)
  */
 typedef struct {
     uint32_t unused[2];
@@ -300,8 +285,7 @@ typedef struct {
 
 /*
  * [in]        memref[0] : Encrypted Key (st_encrypted_ecc_secp224r1_private_key_t)
- * [in]        memref[1] : Key Update Key (64byte)
- * [in/out]    memref[2] : Wrapped key (rsip_wrapped_key_t:68byte)
+ * [in/out]    memref[1] : Wrapped key (rsip_wrapped_key_t:68byte)
  */
 typedef struct {
     uint32_t unused[2];
@@ -313,8 +297,7 @@ typedef struct {
 
 /*
  * [in]        memref[0] : Encrypted Key (st_encrypted_ecc_secp256r1_public_key_t)
- * [in]        memref[1] : Key Update Key (64byte)
- * [in/out]    memref[2] : Wrapped key (rsip_wrapped_key_t:100byte)
+ * [in/out]    memref[1] : Wrapped key (rsip_wrapped_key_t:100byte)
  */
 typedef struct {
     uint32_t unused[2];
@@ -326,8 +309,7 @@ typedef struct {
 
 /*
  * [in]        memref[0] : Encrypted Key (st_encrypted_ecc_secp256r1_private_key_t)
- * [in]        memref[1] : Key Update Key (64byte)
- * [in/out]    memref[2] : Wrapped key (rsip_wrapped_key_t:68byte)
+ * [in/out]    memref[1] : Wrapped key (rsip_wrapped_key_t:68byte)
  */
 typedef struct {
     uint32_t unused[2];
@@ -339,8 +321,7 @@ typedef struct {
 
 /*
  * [in]        memref[0] : Encrypted Key (st_encrypted_ecc_brainpoolp256r1_public_key_t)
- * [in]        memref[1] : Key Update Key (64byte)
- * [in/out]    memref[2] : Wrapped key (rsip_wrapped_key_t:100byte)
+ * [in/out]    memref[1] : Wrapped key (rsip_wrapped_key_t:100byte)
  */
 typedef struct {
     uint32_t unused[2];
@@ -352,8 +333,7 @@ typedef struct {
 
 /*
  * [in]        memref[0] : Encrypted Key (st_encrypted_ecc_brainpoolp256r1_private_key_t)
- * [in]        memref[1] : Key Update Key (64byte)
- * [in/out]    memref[2] : Wrapped key (rsip_wrapped_key_t:68byte)
+ * [in/out]    memref[1] : Wrapped key (rsip_wrapped_key_t:68byte)
  */
 typedef struct {
     uint32_t unused[2];
@@ -365,8 +345,7 @@ typedef struct {
 
 /*
  * [in]        memref[0] : Encrypted Key (st_encrypted_hmac_sha1_key_t)
- * [in]        memref[1] : Key Update Key (64byte)
- * [in/out]    memref[2] : Wrapped key (rsip_wrapped_key_t:68byte)
+ * [in/out]    memref[1] : Wrapped key (rsip_wrapped_key_t:68byte)
  */
 typedef struct {
     uint32_t unused[2];
@@ -378,8 +357,7 @@ typedef struct {
 
 /*
  * [in]        memref[0] : Encrypted Key (48byte)
- * [in]        memref[1] : Key Update Key (64byte)
- * [in/out]    memref[2] : Wrapped key (rsip_wrapped_key_t:68byte)
+ * [in/out]    memref[1] : Wrapped key (rsip_wrapped_key_t:68byte)
  */
 typedef struct {
     uint32_t unused[2];
@@ -391,8 +369,7 @@ typedef struct {
 
 /*
  * [in]        memref[0] : Encrypted Key (st_encrypted_hmac_sha256_key_t)
- * [in]        memref[1] : Key Update Key (64byte)
- * [in/out]    memref[2] : Wrapped key (rsip_wrapped_key_t:68byte)
+ * [in/out]    memref[1] : Wrapped key (rsip_wrapped_key_t:68byte)
  */
 typedef struct {
     uint32_t unused[2];

@@ -12,7 +12,7 @@
 #include <r_sce.h>
 #include "platform_config.h"
 
-register_phys_mem_pgdir(MEM_AREA_IO_SEC, HW_SCE_BASE, HW_SCE_SIZE);
+register_phys_mem_pgdir(MEM_AREA_IO_SEC, SCE_REG_BASE, SCE_REG_SIZE);
 
 static sce_cfg_t sce_cfg;
 static sce_instance_ctrl_t sce_instance_ctrl;
@@ -23,7 +23,7 @@ static TEE_Result SCE_Init(void)
 
     int32_t retry_cnt = 3;
 
-    gp_sce = (uint32_t *) phys_to_virt_io(HW_SCE_BASE, HW_SCE_SIZE);
+    gp_sce = (uint32_t *) phys_to_virt_io(SCE_REG_BASE, SCE_REG_SIZE);
 
     while (0 < retry_cnt)
     {
@@ -44,7 +44,7 @@ static TEE_Result SCE_Init(void)
         EMSG("Failed to initialize SCE (0x%08x).", err);
         panic();
     }
-    
+
     return TEE_SUCCESS;
 }
 
