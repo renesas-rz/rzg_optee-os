@@ -75,7 +75,7 @@ typedef struct {
 typedef struct {
     uint32_t unused[2];
     uint8_t  initial_vector[16];
-    uint8_t  encrypted_user_key[48];
+    uint8_t  encrypted_user_key[64];
     uint8_t  crc[4];
 } st_encrypted_aes256_key_t;
 #define PTA_CMD_AES256_EncryptedKeyWrap                     (0x00015100)
