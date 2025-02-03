@@ -8,6 +8,7 @@
 #include <string.h>
 #include <io.h>
 #include <initcall.h>
+#include <kernel/panic.h>
 #include <mm/core_memprot.h>
 #include <platform_config.h>
 #include <cpg.h>
@@ -15,14 +16,30 @@
 #include <xspi.h>
 #include <xspi_regs.h>
 
-register_phys_mem_pgdir(MEM_AREA_IO_NSEC, SPI_FLASH_BASE, SPI_FLASH_SIZE);
+#if defined(SPI_FLASH_BASE)
+#define SPI_FLASH_BASE_0    (SPI_FLASH_BASE)
+#endif
 
-static vaddr_t sflash_base;
+register_phys_mem_pgdir(MEM_AREA_IO_NSEC, SPI_FLASH_BASE_0, SPI_FLASH_SIZE);
+#if defined(SPI_FLASH_BASE_1)
+register_phys_mem_pgdir(MEM_AREA_IO_NSEC, SPI_FLASH_BASE_1, SPI_FLASH_SIZE);
+#endif
+
+static vaddr_t sflash_base[2];
 static uint32_t sflash_work[SPI_SECTOR_SIZE / sizeof(uint32_t)];
+
+static uint8_t get_channel(uintptr_t addr)
+{
+#if defined(SPI_FLASH_BASE_1)
+	if ((SPI_FLASH_BASE_1 <= addr) && ((SPI_FLASH_BASE_1 + SPI_FLASH_SIZE) > addr))
+		return 1;
+#endif
+	return 0;
+}
 
 static vaddr_t sflash_phys_to_virt(uint32_t addr)
 {
-	return (vaddr_t)(sflash_base + (addr & 0x00FFFFFF));
+	return (vaddr_t)(sflash_base[get_channel(addr)] + (addr & 0x00FFFFFF));
 }
 
 void sflash_write_buffer(uintptr_t addr, uintptr_t buff, size_t len)
@@ -40,13 +57,11 @@ void sflash_write_buffer(uintptr_t addr, uintptr_t buff, size_t len)
 
 	if (write_offset != 0) {
 
-		vaddr_t virt_addr = sflash_phys_to_virt(base_sector_addr);
-
-		memcpy((void *)sflash_work_base, (void *)virt_addr, SPI_SECTOR_SIZE);
+		sflash_read(base_sector_addr, sflash_work_base, SPI_SECTOR_SIZE);
 
 		memcpy((void *)(sflash_work_base + write_offset), (void *)buff, write_length);
 
-		xspi_write(base_sector_addr, sflash_work_base, SPI_SECTOR_SIZE);
+		xspi_write(get_channel(addr), base_sector_addr, sflash_work_base, SPI_SECTOR_SIZE);
 
 		base_sector_addr += SPI_SECTOR_SIZE;
 
@@ -57,13 +72,11 @@ void sflash_write_buffer(uintptr_t addr, uintptr_t buff, size_t len)
 
 	if ((secotr_count > 0) && ((write_length % SPI_SECTOR_SIZE) > 0)) {
 
-		vaddr_t virt_addr = sflash_phys_to_virt(last_sector_addr);
-
-		memcpy((void *)sflash_work_base, (void *)virt_addr, SPI_SECTOR_SIZE);
+		sflash_read(last_sector_addr, sflash_work_base, SPI_SECTOR_SIZE);
 
 		memcpy((void *)sflash_work_base, (void *)((buff + len) - write_length), write_length);
 
-		xspi_write(last_sector_addr, sflash_work_base, SPI_SECTOR_SIZE);
+		xspi_write(get_channel(addr), last_sector_addr, sflash_work_base, SPI_SECTOR_SIZE);
 
 		secotr_count--;
 	}
@@ -72,7 +85,7 @@ void sflash_write_buffer(uintptr_t addr, uintptr_t buff, size_t len)
 
 	if(secotr_count > 0) {
 
-		xspi_write(base_sector_addr, buff + (base_sector_addr - addr), write_length);
+		xspi_write(get_channel(addr), base_sector_addr, buff + (base_sector_addr - addr), write_length);
 	}
 }
 
@@ -86,7 +99,11 @@ void sflash_open(void)
 {
 	cpg_xspi_start();
 
-	xspi_setup();
+	xspi_setup(0);
+
+#if defined(SPI_FLASH_BASE_1)
+	xspi_setup(1);
+#endif
 }
 
 void sflash_close(void)
@@ -96,7 +113,12 @@ void sflash_close(void)
 
 static TEE_Result sflash_init(void)
 {
-	sflash_base = (vaddr_t)phys_to_virt_io(SPI_FLASH_BASE, SPI_FLASH_SIZE);
+	memset(sflash_base, 0, sizeof(sflash_base));
+
+	sflash_base[0] = (vaddr_t)phys_to_virt_io(SPI_FLASH_BASE_0, SPI_FLASH_SIZE);
+#if defined(SPI_FLASH_BASE_1)
+	sflash_base[1] = (vaddr_t)phys_to_virt_io(SPI_FLASH_BASE_1, SPI_FLASH_SIZE);
+#endif
 
 	return TEE_SUCCESS;
 }

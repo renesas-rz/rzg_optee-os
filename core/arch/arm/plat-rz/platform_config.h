@@ -12,6 +12,8 @@
 #include "g3s/rzg3s_config.h"
 #elif defined(CFG_PLATFORM_GROUP_v2h)
 #include "v2h/rzv2h_config.h"
+#elif defined(CFG_PLATFORM_GROUP_t2h)
+#include "t2h/rzt2h_config.h"
 #endif
 
 #endif /*PLATFORM_CONFIG_H*/

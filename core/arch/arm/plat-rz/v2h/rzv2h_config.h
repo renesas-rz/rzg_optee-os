@@ -26,13 +26,11 @@
 #define SPI_FLASH_SIZE		0x10000000
 #define SPI_SECTOR_SIZE		0x10000
 
-#define XSPI_BASE			0x11030000U
+#define XSPI_REG_BASE		0x11030000U
 #define XSPI_REG_SIZE		0x10000
 
 #define SCE_REG_BASE		0x10440000
 #define SCE_REG_SIZE		0x10000
-
-#define SCE_KUK_BASE		0x20A00000
 
 #if defined(PLATFORM_FLAVOR_v2h_evk_1) || defined(PLATFORM_FLAVOR_v2n_evk)
 /* DDR 8Gbyte x1 */

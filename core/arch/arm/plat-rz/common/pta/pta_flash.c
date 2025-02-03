@@ -10,6 +10,7 @@
 #include <kernel/pseudo_ta.h>
 #include <mm/tee_pager.h>
 #include <mm/tee_mm.h>
+#include <platform_config.h>
 #include <sflash.h>
 #include <pta_flash.h>
 
@@ -34,6 +35,7 @@ static TEE_Result spi_write(uint32_t param_types, TEE_Param p[TEE_NUM_PARAMS])
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	if (0 < p[1].memref.size) {
+
 		sflash_open();
 
 		sflash_write_buffer(p[0].value.a, (uintptr_t)p[1].memref.buffer, p[1].memref.size);

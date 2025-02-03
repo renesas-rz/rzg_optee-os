@@ -381,7 +381,7 @@ static TEE_Result aes128_encryptedkeywrap(uint32_t types, TEE_Param params[TEE_N
         return TEE_ERROR_BAD_PARAMETERS;
     }
 
-    sflash_read(SCE_KUK_BASE, &key_update_key.value, sizeof(key_update_key.value));
+    sflash_read(CFG_KUK_BASE, &key_update_key.value, sizeof(key_update_key.value));
 
     err = g_sce_protected_on_sce.AES128_EncryptedKeyWrap(initial_vector, encrypted_key, &key_update_key, wrapped_key);
     switch (err)
@@ -428,7 +428,7 @@ static TEE_Result aes256_encryptedkeywrap(uint32_t types, TEE_Param params[TEE_N
         return TEE_ERROR_BAD_PARAMETERS;
     }
 
-    sflash_read(SCE_KUK_BASE, &key_update_key.value, sizeof(key_update_key.value));
+    sflash_read(CFG_KUK_BASE, &key_update_key.value, sizeof(key_update_key.value));
 
     err = g_sce_protected_on_sce.AES256_EncryptedKeyWrap(initial_vector, encrypted_key, &key_update_key, wrapped_key);
     switch (err)
@@ -475,7 +475,7 @@ static TEE_Result rsa1024_encryptedpublickeywrap(uint32_t types, TEE_Param param
         return TEE_ERROR_BAD_PARAMETERS;
     }
 
-    sflash_read(SCE_KUK_BASE, &key_update_key.value, sizeof(key_update_key.value));
+    sflash_read(CFG_KUK_BASE, &key_update_key.value, sizeof(key_update_key.value));
 
     err = g_sce_protected_on_sce.RSA1024_EncryptedPublicKeyWrap(initial_vector, encrypted_key, &key_update_key, wrapped_key);
     switch (err)
@@ -522,7 +522,7 @@ static TEE_Result rsa1024_encryptedprivatekeywrap(uint32_t types, TEE_Param para
         return TEE_ERROR_BAD_PARAMETERS;
     }
 
-    sflash_read(SCE_KUK_BASE, &key_update_key.value, sizeof(key_update_key.value));
+    sflash_read(CFG_KUK_BASE, &key_update_key.value, sizeof(key_update_key.value));
 
     err = g_sce_protected_on_sce.RSA1024_EncryptedPrivateKeyWrap(initial_vector, encrypted_key, &key_update_key, wrapped_key);
     switch (err)
@@ -569,7 +569,7 @@ static TEE_Result rsa2048_encryptedpublickeywrap(uint32_t types, TEE_Param param
         return TEE_ERROR_BAD_PARAMETERS;
     }
 
-    sflash_read(SCE_KUK_BASE, &key_update_key.value, sizeof(key_update_key.value));
+    sflash_read(CFG_KUK_BASE, &key_update_key.value, sizeof(key_update_key.value));
 
     err = g_sce_protected_on_sce.RSA2048_EncryptedPublicKeyWrap(initial_vector, encrypted_key, &key_update_key, wrapped_key);
     switch (err)
@@ -616,7 +616,7 @@ static TEE_Result rsa2048_encryptedprivatekeywrap(uint32_t types, TEE_Param para
         return TEE_ERROR_BAD_PARAMETERS;
     }
 
-    sflash_read(SCE_KUK_BASE, &key_update_key.value, sizeof(key_update_key.value));
+    sflash_read(CFG_KUK_BASE, &key_update_key.value, sizeof(key_update_key.value));
 
     err = g_sce_protected_on_sce.RSA2048_EncryptedPrivateKeyWrap(initial_vector, encrypted_key, &key_update_key, wrapped_key);
     switch (err)
@@ -663,7 +663,7 @@ static TEE_Result rsa4096_encryptedpublickeywrap(uint32_t types, TEE_Param param
         return TEE_ERROR_BAD_PARAMETERS;
     }
 
-    sflash_read(SCE_KUK_BASE, &key_update_key.value, sizeof(key_update_key.value));
+    sflash_read(CFG_KUK_BASE, &key_update_key.value, sizeof(key_update_key.value));
 
     err = g_sce_protected_on_sce.RSA4096_EncryptedPublicKeyWrap(initial_vector, encrypted_key, &key_update_key, wrapped_key);
     switch (err)
@@ -710,7 +710,7 @@ static TEE_Result ecc_secp192r1_encryptedpublickeywrap(uint32_t types, TEE_Param
         return TEE_ERROR_BAD_PARAMETERS;
     }
 
-    sflash_read(SCE_KUK_BASE, &key_update_key.value, sizeof(key_update_key.value));
+    sflash_read(CFG_KUK_BASE, &key_update_key.value, sizeof(key_update_key.value));
 
     err = g_sce_protected_on_sce.ECC_secp192r1_EncryptedPublicKeyWrap(initial_vector, encrypted_key, &key_update_key, wrapped_key);
     switch (err)
@@ -757,7 +757,7 @@ static TEE_Result ecc_secp192r1_encryptedprivatekeywrap(uint32_t types, TEE_Para
         return TEE_ERROR_BAD_PARAMETERS;
     }
 
-    sflash_read(SCE_KUK_BASE, &key_update_key.value, sizeof(key_update_key.value));
+    sflash_read(CFG_KUK_BASE, &key_update_key.value, sizeof(key_update_key.value));
 
     err = g_sce_protected_on_sce.ECC_secp192r1_EncryptedPrivateKeyWrap(initial_vector, encrypted_key, &key_update_key, wrapped_key);
     switch (err)
@@ -804,7 +804,7 @@ static TEE_Result ecc_secp224r1_encryptedpublickeywrap(uint32_t types, TEE_Param
         return TEE_ERROR_BAD_PARAMETERS;
     }
 
-    sflash_read(SCE_KUK_BASE, &key_update_key.value, sizeof(key_update_key.value));
+    sflash_read(CFG_KUK_BASE, &key_update_key.value, sizeof(key_update_key.value));
 
     err = g_sce_protected_on_sce.ECC_secp224r1_EncryptedPublicKeyWrap(initial_vector, encrypted_key, &key_update_key, wrapped_key);
     switch (err)
@@ -851,7 +851,7 @@ static TEE_Result ecc_secp224r1_encryptedprivatekeywrap(uint32_t types, TEE_Para
         return TEE_ERROR_BAD_PARAMETERS;
     }
 
-    sflash_read(SCE_KUK_BASE, &key_update_key.value, sizeof(key_update_key.value));
+    sflash_read(CFG_KUK_BASE, &key_update_key.value, sizeof(key_update_key.value));
 
     err = g_sce_protected_on_sce.ECC_secp224r1_EncryptedPrivateKeyWrap(initial_vector, encrypted_key, &key_update_key, wrapped_key);
     switch (err)
@@ -898,7 +898,7 @@ static TEE_Result ecc_secp256r1_encryptedpublickeywrap(uint32_t types, TEE_Param
         return TEE_ERROR_BAD_PARAMETERS;
     }
 
-    sflash_read(SCE_KUK_BASE, &key_update_key.value, sizeof(key_update_key.value));
+    sflash_read(CFG_KUK_BASE, &key_update_key.value, sizeof(key_update_key.value));
 
     err = g_sce_protected_on_sce.ECC_secp256r1_EncryptedPublicKeyWrap(initial_vector, encrypted_key, &key_update_key, wrapped_key);
     switch (err)
@@ -945,7 +945,7 @@ static TEE_Result ecc_secp256r1_encryptedprivatekeywrap(uint32_t types, TEE_Para
         return TEE_ERROR_BAD_PARAMETERS;
     }
 
-    sflash_read(SCE_KUK_BASE, &key_update_key.value, sizeof(key_update_key.value));
+    sflash_read(CFG_KUK_BASE, &key_update_key.value, sizeof(key_update_key.value));
 
     err = g_sce_protected_on_sce.ECC_secp256r1_EncryptedPrivateKeyWrap(initial_vector, encrypted_key, &key_update_key, wrapped_key);
     switch (err)
@@ -992,7 +992,7 @@ static TEE_Result ecc_brainpoolp512r1_encryptedpublickeywrap(uint32_t types, TEE
         return TEE_ERROR_BAD_PARAMETERS;
     }
 
-    sflash_read(SCE_KUK_BASE, &key_update_key.value, sizeof(key_update_key.value));
+    sflash_read(CFG_KUK_BASE, &key_update_key.value, sizeof(key_update_key.value));
 
     err = g_sce_protected_on_sce.ECC_BrainpoolP512r1_EncryptedPublicKeyWrap(initial_vector, encrypted_key, &key_update_key, wrapped_key);
     switch (err)
@@ -1039,7 +1039,7 @@ static TEE_Result ecc_brainpoolp512r1_encryptedprivatekeywrap(uint32_t types, TE
         return TEE_ERROR_BAD_PARAMETERS;
     }
 
-    sflash_read(SCE_KUK_BASE, &key_update_key.value, sizeof(key_update_key.value));
+    sflash_read(CFG_KUK_BASE, &key_update_key.value, sizeof(key_update_key.value));
 
     err = g_sce_protected_on_sce.ECC_BrainpoolP512r1_EncryptedPrivateKeyWrap(initial_vector, encrypted_key, &key_update_key, wrapped_key);
     switch (err)

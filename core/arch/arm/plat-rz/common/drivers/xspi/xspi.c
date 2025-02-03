@@ -1,20 +1,17 @@
 /*
- * Copyright (c) 2023, Renesas Electronics Corporation. All rights reserved.
+ * Copyright (c) 2023-2024, Renesas Electronics Corporation. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
 #include <stdint.h>
-#include <initcall.h>
 #include <io.h>
+#include <initcall.h>
+#include <kernel/panic.h>
 #include <mm/core_memprot.h>
 #include <util.h>
 #include <xspi_regs.h>
 #include <xspi.h>
-
-register_phys_mem_pgdir(MEM_AREA_IO_NSEC, XSPI_BASE, XSPI_REG_SIZE);
-
-vaddr_t xspi_base;
 
 #define XSPI_BMCFG_SET_VALUE		(0x00010001UL)
 #define XSPI_CMCFG0CS0_SET_VALUE	(0x00000008UL)
@@ -42,6 +39,16 @@ vaddr_t xspi_base;
 
 #define XSPI_COMMAND_TIMEOUT		(100000u)
 
+#if defined(XSPI_REG_BASE)
+#define XSPI_REG_BASE_0             (XSPI_REG_BASE)
+#endif
+
+register_phys_mem_pgdir(MEM_AREA_IO_NSEC, XSPI_REG_BASE_0, XSPI_REG_SIZE);
+#if defined(XSPI_REG_BASE_1)
+register_phys_mem_pgdir(MEM_AREA_IO_NSEC, XSPI_REG_BASE_1, XSPI_REG_SIZE);
+#endif
+
+vaddr_t xspi_base;
 
 typedef struct {
 	uint16_t instruction;
@@ -68,6 +75,8 @@ static const st_xspi_cmd_t cmds[] = {
 	{0x0500u,		XSPI_IN,	0u,			1u,			0u,			1u},	/* RDSTA */
 	{0x0200u,		XSPI_OUT,	0u,			4u,			3u,			1u},	/* WRITE */
 };
+
+static vaddr_t xspi_regs[2];
 
 static int xspi_single_command(const st_xspi_cmd_info_t * const p_cmd_info)
 {
@@ -159,7 +168,7 @@ static int xspi_read_status(void)
 	return status;
 }
 
-int xspi_erase(const uintptr_t addr, uint32_t byte_count)
+int xspi_erase(uint8_t ch, const uintptr_t addr, uint32_t byte_count)
 {
 	int ret = XSPI_SUCCESS;
 	uint32_t i;
@@ -170,6 +179,10 @@ int xspi_erase(const uintptr_t addr, uint32_t byte_count)
 	st_xspi_cmd_info_t cmd_erase = {ERASE, addr, 0};
 
 	volatile uint32_t status = 0xFFFFFFFF;
+
+	assert((ARRAY_SIZE(xspi_regs) > ch) && (0 != xspi_regs[ch]));
+
+	xspi_base = xspi_regs[ch];
 
 	for (i = 0; i < count; i++) {
 
@@ -195,7 +208,7 @@ int xspi_erase(const uintptr_t addr, uint32_t byte_count)
 	return ret;
 }
 
-int xspi_write(const uintptr_t addr, uintptr_t data, uint32_t byte_count)
+int xspi_write(uint8_t ch, const uintptr_t addr, uintptr_t data, uint32_t byte_count)
 {
 	int ret = XSPI_SUCCESS;
 	uint32_t i;
@@ -208,7 +221,11 @@ int xspi_write(const uintptr_t addr, uintptr_t data, uint32_t byte_count)
 
 	volatile uint32_t status = 0xFFFFFFFF;
 
-	ret = xspi_erase(addr, byte_count);
+	assert((ARRAY_SIZE(xspi_regs) > ch) && (0 != xspi_regs[ch]));
+
+	xspi_base = xspi_regs[ch];
+
+	ret = xspi_erase(ch, addr, byte_count);
 	if (ret != XSPI_SUCCESS)
 		return ret;
 
@@ -237,9 +254,24 @@ int xspi_write(const uintptr_t addr, uintptr_t data, uint32_t byte_count)
 	return ret;
 }
 
-int xspi_setup(void)
+int xspi_dummy_read(uint8_t ch)
+{
+	assert((ARRAY_SIZE(xspi_regs) > ch) && (0 != xspi_regs[ch]));
+
+	xspi_base = xspi_regs[ch];
+
+	xspi_io_read(XSPI_WRAPCFG);
+
+	return 0;
+}
+
+int xspi_setup(uint8_t ch)
 {
 	int ret;
+
+	assert((ARRAY_SIZE(xspi_regs) > ch) && (0 != xspi_regs[ch]));
+
+	xspi_base = xspi_regs[ch];
 
 	xspi_io_write(XSPI_BMCFG,		XSPI_BMCFG_SET_VALUE);
 	xspi_io_write(XSPI_CMCFG0CS0,	XSPI_CMCFG0CS0_SET_VALUE);
@@ -259,7 +291,10 @@ int xspi_setup(void)
 
 static TEE_Result xspi_init(void)
 {
-	xspi_base = (vaddr_t)phys_to_virt_io(XSPI_BASE, XSPI_REG_SIZE);
+	xspi_regs[0] = (vaddr_t)phys_to_virt_io(XSPI_REG_BASE_0, XSPI_REG_SIZE);
+#if defined(XSPI_REG_BASE_1)
+	xspi_regs[1] = (vaddr_t)phys_to_virt_io(XSPI_REG_BASE_1, XSPI_REG_SIZE);
+#endif
 
 	return TEE_SUCCESS;
 }

@@ -27,6 +27,7 @@ endif
 
 ifeq ($(CFG_RZ_SCE),y)
 CFG_RZ_RSIP ?= y
+CFG_KUK_BASE ?= 0x20A00000
 ldflags-external += $(CFG_RZ_SCE_LIB_DIR)/libr_secure_ip_3_0.a.1.0.0
 endif
 

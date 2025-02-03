@@ -30,8 +30,6 @@
 #define SCE_REG_BASE		0x11850000
 #define SCE_REG_SIZE		0x10000
 
-#define SCE_KUK_BASE		0x20A00000
-
 #if defined(PLATFORM_FLAVOR_g2l_dev13_1)
 /* DDR 512Mbyte x2 */
 #define NSEC_DDR_0_BASE		0x47E00000U
