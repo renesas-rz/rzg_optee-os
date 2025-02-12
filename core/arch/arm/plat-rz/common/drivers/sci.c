@@ -1,8 +1,8 @@
+/* SPDX-License-Identifier: BSD-3-Clause */
 /*
-* Copyright (c) 2024, Renesas Electronics Corporation. All rights reserved.
-*
-* SPDX-License-Identifier: BSD-3-Clause
-*/
+ * Copyright (c) 2024, Renesas Electronics Corporation
+ */
+
 #include <drivers/scif.h>
 #include <io.h>
 #include <keep.h>

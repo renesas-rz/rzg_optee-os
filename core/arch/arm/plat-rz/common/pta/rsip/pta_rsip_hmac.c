@@ -1,6 +1,6 @@
-// SPDX-License-Identifier: BSD-2-Clause
+/* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Copyright (c) 2024, Renesas Electronics
+ * Copyright (c) 2024, Renesas Electronics Corporation
  */
 
 #include <kernel/pseudo_ta.h>
@@ -60,7 +60,7 @@ static TEE_Result hmac_generateinit(uint32_t types, TEE_Param params[TEE_NUM_PAR
     }
 
     params[0].memref.size = sizeof(rsip_hmac_handle_t);
-    
+
     return TEE_SUCCESS;
 }
 
@@ -129,7 +129,7 @@ static TEE_Result hmac_generatefinal(uint32_t types, TEE_Param params[TEE_NUM_PA
                     TEE_PARAM_TYPE_NONE)) {
         return TEE_ERROR_BAD_PARAMETERS;
     }
-    
+
     handle = (rsip_hmac_handle_t *)params[0].memref.buffer;
     if (!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, rsip_hmac_handle_t)) {
         EMSG("handle err");
@@ -215,7 +215,7 @@ static TEE_Result hmac_verifyinit(uint32_t types, TEE_Param params[TEE_NUM_PARAM
     }
 
     params[0].memref.size = sizeof(rsip_hmac_handle_t);
-    
+
     return TEE_SUCCESS;
 }
 
@@ -285,7 +285,7 @@ static TEE_Result hmac_verifyfinal(uint32_t types, TEE_Param params[TEE_NUM_PARA
                     TEE_PARAM_TYPE_NONE)) {
         return TEE_ERROR_BAD_PARAMETERS;
     }
-    
+
     handle = (rsip_hmac_handle_t *)params[0].memref.buffer;
     if (!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t)) {
         EMSG("handle err");
@@ -365,7 +365,7 @@ static TEE_Result invoke_command(void *session __unused, uint32_t cmd,
         case PTA_CMD_HMAC_SHA224_VerifyUpdate :
         case PTA_CMD_HMAC_SHA256_VerifyUpdate :
             return hmac_verifyupdate(ptypes, params);
-            
+
         case PTA_CMD_HMAC_SHA1_VerifyFinal :
         case PTA_CMD_HMAC_SHA224_VerifyFinal :
         case PTA_CMD_HMAC_SHA256_VerifyFinal :

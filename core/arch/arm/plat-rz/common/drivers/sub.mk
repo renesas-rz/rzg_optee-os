@@ -6,8 +6,6 @@ srcs-$(CFG_RZ_SCI) += sci.c
 subdirs-$(CFG_RZ_SPI_MULTI) += spi_multi
 srcs-$(CFG_RZ_SPI_MULTI) += sflash_spi_multi.c
 
-subdirs-$(CFG_RZ_SYS) += sys
-
 subdirs-$(CFG_RZ_XSPI) += xspi
 srcs-$(CFG_RZ_XSPI) += sflash_xspi.c
 

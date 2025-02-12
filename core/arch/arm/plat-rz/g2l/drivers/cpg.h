@@ -1,8 +1,8 @@
+/* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Copyright (c) 2023, Renesas Electronics Corporation. All rights reserved.
- *
- * SPDX-License-Identifier: BSD-3-Clause
+ * Copyright (c) 2023, Renesas Electronics Corporation
  */
+
 #ifndef _CPG_H_
 #define _CPG_H_
 

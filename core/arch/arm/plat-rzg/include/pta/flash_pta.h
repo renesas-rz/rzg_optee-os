@@ -1,7 +1,6 @@
+/* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Copyright (c) 2021, Renesas Electronics Corporation. All rights reserved.
- *
- * SPDX-License-Identifier: BSD-3-Clause
+ * Copyright (c) 2021, Renesas Electronics Corporation
  */
 
 #ifndef FLASH_PTA_H_

@@ -1,7 +1,6 @@
+/* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Copyright (c) 2023-2024, Renesas Electronics Corporation. All rights reserved.
- *
- * SPDX-License-Identifier: BSD-3-Clause
+ * Copyright (c) 2023-2024, Renesas Electronics Corporation
  */
 
 #ifndef __SYS_H__
@@ -24,6 +23,5 @@ extern void sys_base_unlock(uint32_t unlock_mask);
 extern void sys_base_lock(uint32_t lock_mask);
 extern void sys_safetybase_unlock(uint32_t unlock_mask);
 extern void sys_safetybase_lock(uint32_t lock_mask);
-extern uint32_t sys_get_flash_base(void);
 
 #endif	/* __SYS_H__ */

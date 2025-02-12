@@ -1,15 +1,14 @@
+/* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Copyright (c) 2020, Renesas Electronics Corporation. All rights reserved.
- *
- * SPDX-License-Identifier: BSD-3-Clause
+ * Copyright (c) 2020, Renesas Electronics Corporation
  */
 
 /*! *****************************************************************************
     @file    TSIP_Core_Proc_API.H
     @brief   TSIP Core Layer Procedure API Headder
-    
+
     @par    History
-    @subsection sub_history 
+    @subsection sub_history
       - Initial version\n
  ********************************************************************************/
 
@@ -47,7 +46,7 @@ uint32_t TSIP_Core_Prc_p15(const uint32_t *InData_Prog, uint32_t InData_Prog_Byt
 uint32_t TSIP_Core_Prc_p16(const uint32_t *InData_Header);
 uint32_t TSIP_Core_Prc_p17(const uint32_t *InData_Prog, uint32_t InData_Prog_ByteSize, uint32_t *InData_HeapArea, uint32_t *OutData_Prog);
 
-    
+
 uint32_t TSIP_Core_Prc_p40(void);
 uint32_t TSIP_Core_Prc_p43(const uint32_t *InData_KeyRingOperationCode);
 uint32_t TSIP_Core_Prc_p45(      uint32_t InData_ProgNo,

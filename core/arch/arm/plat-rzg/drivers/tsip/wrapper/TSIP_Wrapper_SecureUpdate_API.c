@@ -1,15 +1,14 @@
+/* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Copyright (c) 2020, Renesas Electronics Corporation. All rights reserved.
- *
- * SPDX-License-Identifier: BSD-3-Clause
+ * Copyright (c) 2020, Renesas Electronics Corporation
  */
 
 /*! *****************************************************************************
     @file    TSIP_Wrapper_SecureUpdate_API.c
     @brief   Secure Firmware update
-    
+
     @par    History
-    @subsection sub_history 
+    @subsection sub_history
       - Initial version\n
  ********************************************************************************/
 
@@ -36,16 +35,16 @@
 /*! *****************************************************************************
     @fn       unsigned long R_TSIP_SU_Activate(void)
     @brief    Initialization for Secure firmware update
-    
+
 
     @retval    R_PASS                   success
     @retval    R_SEQUENCE_FAIL          cannot perform in current state
     @retval    R_FALSIFICATION_ERROR    tampering detection error
     @retval    R_RESOURCE_CONFLICT_FAIL resource for this process already used in other process
-    
+
     @par    Details
     It performs initilization for Secure firmware update \n
-    
+
     @par    Processing flow
     -# check initialization state in TSIP_Wrapper layer
         - Is_TSIP_Wrapper_Init()
@@ -71,7 +70,7 @@ unsigned long R_TSIP_SU_Activate(void)
 /*! *****************************************************************************
     @fn       unsigned long unsigned long R_TSIP_UpdateBootData(TSIP_UPDATE_BOOT_DATA *tsip_update_bootdata)
     @brief    convert Boot data for update
-    
+
     @param     [in/out]        *tsip_update_bootdata            BootData structure
 
     @retval    R_PASS                       success
@@ -80,10 +79,10 @@ unsigned long R_TSIP_SU_Activate(void)
     @retval    R_VERIFICATION_FAIL          verification failed
     @retval    R_FALSIFICATION_ERROR        tampering detection error
     @retval    R_RESOURCE_CONFLICT_FAIL     resource for this process already used in other process
-    
+
     @par    Details
     It decrypts encrypted Boot data(max 16 data) and re-encrypts by TSIP key after verification \n
-    
+
     @par    Processing flow
     -# check initialization state in TSIP_Wrapper layer
         - Is_TSIP_Wrapper_Init()
@@ -129,7 +128,7 @@ unsigned long R_TSIP_UpdateBootData(TSIP_UPDATE_BOOT_DATA *tsip_update_bootdata)
 /*! *****************************************************************************
     @fn       unsigned long R_TSIP_SU_Key(unsigned char *InData_KeyRingOperationCode)
     @brief    Keyring decryption and re-encryption
-    
+
     @param     [in]        *InData_KeyRingOperationCode        Pointer of Keyring(size:1840Byte)
 
     @retval    R_PASS                   success
@@ -138,10 +137,10 @@ unsigned long R_TSIP_UpdateBootData(TSIP_UPDATE_BOOT_DATA *tsip_update_bootdata)
     @retval    R_VERIFICATION_FAIL      verification failed
     @retval    R_FALSIFICATION_ERROR    tampering detection error
     @retval    R_RESOURCE_CONFLICT_FAIL resource for this process already used in other process
-    
+
     @par    Details
     It decrypts encrypted Keyring and re-encrypts by TSIP key \n
-    
+
     @par    Processing flow
     -# check initialization state in TSIP_Wrapper layer
         - Is_TSIP_Wrapper_Init()

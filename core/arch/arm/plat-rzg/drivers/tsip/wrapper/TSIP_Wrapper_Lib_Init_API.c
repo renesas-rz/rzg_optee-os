@@ -1,15 +1,14 @@
+/* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Copyright (c) 2020, Renesas Electronics Corporation. All rights reserved.
- *
- * SPDX-License-Identifier: BSD-3-Clause
+ * Copyright (c) 2020, Renesas Electronics Corporation
  */
 
 /*! *****************************************************************************
     @file    TSIP_Wrapper_Lib_Init_API.c
     @brief   Library initialization
-    
+
     @par    History
-    @subsection sub_history 
+    @subsection sub_history
       - Initial version\n
  ********************************************************************************/
 
@@ -34,24 +33,24 @@
 /*------------------------------------------------------------------------------*/
 /*! *****************************************************************************
     @fn       unsigned long R_TSIP_Lib_Init(unsigned char *S_RAMData,
-                                            unsigned char *S_INSTData, 
-                                            unsigned char *TSIP_BaseAddress, 
+                                            unsigned char *S_INSTData,
+                                            unsigned char *TSIP_BaseAddress,
                                             unsigned char *MSTP_BaseAddress)
     @brief    Library initiaization
-    
+
     @param     [in]        *S_RAMData          Pointer of S_RAM data(it needs 432Byte area)
     @param     [in]        *S_INSTData         Pointer of S_INST data(it needs 1296Byte area)
     @param     [in]        *TSIP_BaseAddress   Logical pointer of TSIP Base Address
     @param     [in]        *MSTP_BaseAddress   Logical pointer of MSTP Base Address
-    
+
     @retval    R_PASS                   success
     @retval    R_SEQUENCE_FAIL          cannot perform in current state
     @retval    R_PARAMETER_FAIL         invalid input parameter
     @retval    R_MMAP_FAIL              error occur of mmap()
-    
+
     @par    Details
     It performs initialization of TSIP library and self-checking of TSIP \n
-    
+
     @par    Processing flow
     -# check initialization state in TSIP_Wrapper layer
         - Is_TSIP_Wrapper_Init()

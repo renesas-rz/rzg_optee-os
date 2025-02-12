@@ -1,15 +1,14 @@
+/* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Copyright (c) 2020, Renesas Electronics Corporation. All rights reserved.
- *
- * SPDX-License-Identifier: BSD-3-Clause
+ * Copyright (c) 2020, Renesas Electronics Corporation
  */
 
 /*! *****************************************************************************
     @file    TSIP_Core_API.h
     @brief   TSIP Core API
-    
+
     @par    History
-    @subsection sub_history 
+    @subsection sub_history
       - Initial version\n
  ********************************************************************************/
 
@@ -106,4 +105,3 @@ uint32_t TSIP_BCF_GenerateRandom(
 #endif /* _TSIP_SB */
 
 #endif  /* TSIP_CORE_API_H_ */
-

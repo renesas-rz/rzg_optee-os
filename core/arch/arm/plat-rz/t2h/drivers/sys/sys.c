@@ -1,7 +1,6 @@
+/* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Copyright (c) 2023-2024, Renesas Electronics Corporation. All rights reserved.
- *
- * SPDX-License-Identifier: BSD-3-Clause
+ * Copyright (c) 2023-2024, Renesas Electronics Corporation
  */
 
 #include <sys.h>
@@ -86,13 +85,6 @@ void sys_safetybase_lock(uint32_t lock_mask)
 	/* Lock PRCRS bit(s) in given mask */
 	prcrs = io_read32(sys_safety_base + PRCRS) & 0x0000000FU & (~lock_mask);
 	io_write32(sys_safety_base + PRCRS, (prcrs | 0x0000A500U));
-}
-
-uint32_t sys_get_flash_base(void)
-{
-	return (vaddr_t)phys_to_virt_io(
-		(SYS_BOOT_MODE_XSPI1_x1 == sys_get_boot_mode()) ? SPI_FLASH_BASE_1 : SPI_FLASH_BASE_0,
-		SPI_FLASH_SIZE);
 }
 
 static TEE_Result sys_init(void)

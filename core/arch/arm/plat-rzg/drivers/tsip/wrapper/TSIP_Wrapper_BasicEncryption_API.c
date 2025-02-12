@@ -1,15 +1,14 @@
+/* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Copyright (c) 2020, Renesas Electronics Corporation. All rights reserved.
- *
- * SPDX-License-Identifier: BSD-3-Clause
+ * Copyright (c) 2020, Renesas Electronics Corporation
  */
 
 /*! *****************************************************************************
     @file    TSIP_Wrapper_BasicEncryption_API.c
     @brief   Basic encryption
-    
+
     @par    History
-    @subsection sub_history 
+    @subsection sub_history
       - Initial version\n
  ********************************************************************************/
 
@@ -35,14 +34,14 @@
 
 /*! *****************************************************************************
     @fn       unsigned long R_TSIP_BCF_GenerateRandom(unsigned long InData_GenByteSize,
-                                                      unsigned long InData_UseCASE, 
+                                                      unsigned long InData_UseCASE,
                                                       unsigned char *OutData)
     @brief    Random number generation
-    
+
     @param     [in]        InData_GenByteSize         Bytes number of generated random
     @param     [in]        InData_UseCASE             Use case of random (set only 0)
     @param     [out]       *OutData                   Pointer of random
-    
+
     @retval    R_PASS                   success
     @retval    R_PARAMETER_FAIL         invalid input parameter
     @retval    R_SEQUENCE_FAIL          cannot perform in current state
@@ -50,7 +49,7 @@
 
     @par    Details
     It generates random number \n
-    
+
     @par    Processing flow
     -# check initialization state in TSIP_Wrapper layer
         - Is_TSIP_Wrapper_Init()
@@ -75,5 +74,3 @@ unsigned long R_TSIP_BCF_GenerateRandom(
 
     return RetCode;
 }
-
-

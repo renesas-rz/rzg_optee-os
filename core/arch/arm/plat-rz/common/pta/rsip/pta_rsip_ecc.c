@@ -1,6 +1,6 @@
-// SPDX-License-Identifier: BSD-2-Clause
+/* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Copyright (c) 2024, Renesas Electronics
+ * Copyright (c) 2024, Renesas Electronics Corporation
  */
 
 #include <kernel/pseudo_ta.h>
@@ -77,7 +77,7 @@ static TEE_Result ecdsa_secp192r1_sign(uint32_t types, TEE_Param params[TEE_NUM_
         EMSG("signature err");
         return TEE_ERROR_BAD_PARAMETERS;
     }
-    
+
     wrapped_key = (rsip_wrapped_key_t *)params[2].memref.buffer;
     if (!IS_ALIGNED_WITH_TYPE(params[2].memref.buffer, uint32_t) || (key_size > params[2].memref.size)) {
         EMSG("key err");
@@ -158,7 +158,7 @@ static TEE_Result ecdsa_secp224r1_sign(uint32_t types, TEE_Param params[TEE_NUM_
         EMSG("signature err");
         return TEE_ERROR_BAD_PARAMETERS;
     }
-    
+
     wrapped_key = (rsip_wrapped_key_t *)params[2].memref.buffer;
     if (!IS_ALIGNED_WITH_TYPE(params[2].memref.buffer, uint32_t) || (key_size > params[2].memref.size)) {
         EMSG("key err");
@@ -237,7 +237,7 @@ static TEE_Result ecdsa_secp256r1_sign(uint32_t types, TEE_Param params[TEE_NUM_
         EMSG("signature err");
         return TEE_ERROR_BAD_PARAMETERS;
     }
-    
+
     wrapped_key = (rsip_wrapped_key_t *)params[2].memref.buffer;
     if (!IS_ALIGNED_WITH_TYPE(params[2].memref.buffer, uint32_t) || (key_size > params[2].memref.size)) {
         EMSG("key err");
@@ -314,7 +314,7 @@ static TEE_Result ecdsa_brainpoolp256r1_sign(uint32_t types, TEE_Param params[TE
         EMSG("signature err");
         return TEE_ERROR_BAD_PARAMETERS;
     }
-    
+
     wrapped_key = (rsip_wrapped_key_t *)params[2].memref.buffer;
     if (!IS_ALIGNED_WITH_TYPE(params[2].memref.buffer, uint32_t) || (key_size > params[2].memref.size)) {
         EMSG("key err");
@@ -393,7 +393,7 @@ static TEE_Result ecdsa_secp192r1_verify(uint32_t types, TEE_Param params[TEE_NU
         EMSG("message err");
         return TEE_ERROR_BAD_PARAMETERS;
     }
-    
+
     wrapped_key = (rsip_wrapped_key_t *)params[2].memref.buffer;
     if (!IS_ALIGNED_WITH_TYPE(params[2].memref.buffer, uint32_t) || (key_size > params[2].memref.size)) {
         EMSG("key err");
@@ -472,7 +472,7 @@ static TEE_Result ecdsa_secp224r1_verify(uint32_t types, TEE_Param params[TEE_NU
         EMSG("message err");
         return TEE_ERROR_BAD_PARAMETERS;
     }
-    
+
     wrapped_key = (rsip_wrapped_key_t *)params[2].memref.buffer;
     if (!IS_ALIGNED_WITH_TYPE(params[2].memref.buffer, uint32_t) || (key_size > params[2].memref.size)) {
         EMSG("key err");
@@ -549,7 +549,7 @@ static TEE_Result ecdsa_secp256r1_verify(uint32_t types, TEE_Param params[TEE_NU
         EMSG("message err");
         return TEE_ERROR_BAD_PARAMETERS;
     }
-    
+
     wrapped_key = (rsip_wrapped_key_t *)params[2].memref.buffer;
     if (!IS_ALIGNED_WITH_TYPE(params[2].memref.buffer, uint32_t) || (key_size > params[2].memref.size)) {
         EMSG("key err");
@@ -624,7 +624,7 @@ static TEE_Result ecdsa_brainpoolp256r1_verify(uint32_t types, TEE_Param params[
         EMSG("message err");
         return TEE_ERROR_BAD_PARAMETERS;
     }
-    
+
     wrapped_key = (rsip_wrapped_key_t *)params[2].memref.buffer;
     if (!IS_ALIGNED_WITH_TYPE(params[2].memref.buffer, uint32_t) || (key_size > params[2].memref.size)) {
         EMSG("key err");

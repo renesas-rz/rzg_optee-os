@@ -1,21 +1,8 @@
-/**********************************************************************************************************************
- * DISCLAIMER
- * This software is supplied by Renesas Electronics Corporation and is only intended for use with Renesas products. No
- * other uses are authorized. This software is owned by Renesas Electronics Corporation and is protected under all
- * applicable laws, including copyright laws.
- * THIS SOFTWARE IS PROVIDED "AS IS" AND RENESAS MAKES NO WARRANTIES REGARDING
- * THIS SOFTWARE, WHETHER EXPRESS, IMPLIED OR STATUTORY, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. ALL SUCH WARRANTIES ARE EXPRESSLY DISCLAIMED. TO THE MAXIMUM
- * EXTENT PERMITTED NOT PROHIBITED BY LAW, NEITHER RENESAS ELECTRONICS CORPORATION NOR ANY OF ITS AFFILIATED COMPANIES
- * SHALL BE LIABLE FOR ANY DIRECT, INDIRECT, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES FOR ANY REASON RELATED TO
- * THIS SOFTWARE, EVEN IF RENESAS OR ITS AFFILIATES HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
- * Renesas reserves the right, without notice, to make changes to this software and to discontinue the availability of
- * this software. By using this software, you agree to the additional terms and conditions found by accessing the
- * following link:
- * http://www.renesas.com/disclaimer
- *
- * Copyright (C) 2022 Renesas Electronics Corporation. All rights reserved.
- *********************************************************************************************************************/
+/* SPDX-License-Identifier: BSD-3-Clause */
+/*
+ * Copyright (c) 2022, Renesas Electronics Corporation
+ */
+
 /**********************************************************************************************************************
  * File Name    : r_sce_rsa.c
  * Version      : 1.0
@@ -124,7 +111,7 @@ static uint8_t gs_rsa_sig_sha256_prefix[] =
  * hash_type, must be input to message_hash->pdata.
  *
  * @param[in]     message_hash Message or hash value to which to attach signature
- *                             @arg message_hash->pdata       : Specifies pointer to array storing the message or 
+ *                             @arg message_hash->pdata       : Specifies pointer to array storing the message or
  *                                                              hash value
  *                             @arg message_hash->data_length : Specifies effective data length of the array
  *                                                              (Specify only when Message is selected)
@@ -188,7 +175,7 @@ fsp_err_t R_SCE_RSASSA_PKCS1024_SignatureGenerate (sce_rsa_byte_data_t          
  *                         @arg signature->pdata       : Specifies pointer to array storing the signature text
  *                         @arg signature->data_length : Specifies effective data length of the array
  * @param[in] message_hash Message text or hash value to verify
- *                         @arg message_hash->pdata       : Specifies pointer to array storing the message or 
+ *                         @arg message_hash->pdata       : Specifies pointer to array storing the message or
  *                                                          hash value
  *                         @arg message_hash->data_length : Specifies effective data length of the array
  *                                                          (Specify only when Message is selected)
@@ -260,7 +247,7 @@ fsp_err_t R_SCE_RSASSA_PKCS1024_SignatureVerify (sce_rsa_byte_data_t            
  * @param[in,out] cipher      ciphertext
  *                            @arg cipher->pdata       : Specifies pointer to array containing ciphertext.
  *                            @arg cipher->data_length : Inputs ciphertext buffer size.
- *                                                       Outputs valid data length after encryption 
+ *                                                       Outputs valid data length after encryption
  *                                                       (public key n size).
  * @param[in]     wrapped_key Inputs the 1024-bit RSA public wrapped key.
  *
@@ -341,14 +328,14 @@ fsp_err_t R_SCE_RSAES_PKCS1024_Encrypt (sce_rsa_byte_data_t              * plain
  * @param[in]     cipher      ciphertext
  *                            @arg cipher->pdata       : Specifies pointer to array containing ciphertext.
  *                            @arg cipher->data_length : Inputs ciphertext buffer size.
- *                                                       Outputs valid data length after encryption 
+ *                                                       Outputs valid data length after encryption
  *                                                       (public key n size).
  * @param[in,out] plain       plaintext
  *                            @arg plain->pdata       : Specifies pointer to array containing plaintext.
  *                            @arg plain->data_length : Inputs plaintext buffer size.
  *                                                      The following size is required.
  *                                                      Plaintext buffer size >= public key n size -11.
- *                                                      Outputs valid data length after decryption 
+ *                                                      Outputs valid data length after decryption
  *                                                      (public key n size).
  * @param[in]     wrapped_key Inputs the 1024-bit RSA private wrapped key.
  *
@@ -464,7 +451,7 @@ fsp_err_t R_SCE_RSAES_PKCS1024_Decrypt (sce_rsa_byte_data_t               * ciph
  * hash_type, must be input to message_hash->pdata.
  *
  * @param[in]     message_hash Message or hash value to which to attach signature
- *                             @arg message_hash->pdata       : Specifies pointer to array storing the message or 
+ *                             @arg message_hash->pdata       : Specifies pointer to array storing the message or
  *                                                              hash value
  *                             @arg message_hash->data_length : Specifies effective data length of the array
  *                                                              (Specify only when Message is selected)
@@ -528,7 +515,7 @@ fsp_err_t R_SCE_RSASSA_PKCS2048_SignatureGenerate (sce_rsa_byte_data_t          
  *                         @arg signature->pdata       : Specifies pointer to array storing the signature text
  *                         @arg signature->data_length : Specifies effective data length of the array
  * @param[in] message_hash Message text or hash value to verify
- *                         @arg message_hash->pdata       : Specifies pointer to array storing the message or 
+ *                         @arg message_hash->pdata       : Specifies pointer to array storing the message or
  *                                                          hash value
  *                         @arg message_hash->data_length : Specifies effective data length of the array
  *                                                          (Specify only when Message is selected)
@@ -603,7 +590,7 @@ fsp_err_t R_SCE_RSASSA_PKCS2048_SignatureVerify (sce_rsa_byte_data_t            
  *                         @arg signature->pdata       : Specifies pointer to array storing the signature text
  *                         @arg signature->data_length : Specifies effective data length of the array
  * @param[in] message_hash Message text or hash value to verify
- *                         @arg message_hash->pdata       : Specifies pointer to array storing the message or 
+ *                         @arg message_hash->pdata       : Specifies pointer to array storing the message or
  *                                                          hash value
  *                         @arg message_hash->data_length : Specifies effective data length of the array
  *                                                          (Specify only when Message is selected)
@@ -675,7 +662,7 @@ fsp_err_t R_SCE_RSASSA_PKCS4096_SignatureVerify (sce_rsa_byte_data_t            
  * @param[in,out] cipher      ciphertext
  *                            @arg cipher->pdata       : Specifies pointer to array containing ciphertext.
  *                            @arg cipher->data_length : Inputs ciphertext buffer size.
- *                                                       Outputs valid data length after encryption 
+ *                                                       Outputs valid data length after encryption
  *                                                       (public key n size).
  * @param[in]     wrapped_key Inputs the 2048-bit RSA public wrapped key.
  *
@@ -756,14 +743,14 @@ fsp_err_t R_SCE_RSAES_PKCS2048_Encrypt (sce_rsa_byte_data_t              * plain
  * @param[in]     cipher      ciphertext
  *                            @arg cipher->pdata       : Specifies pointer to array containing ciphertext.
  *                            @arg cipher->data_length : Inputs ciphertext buffer size.
- *                                                       Outputs valid data length after encryption 
+ *                                                       Outputs valid data length after encryption
  *                                                       (public key n size).
  * @param[in,out] plain       plaintext
  *                            @arg plain->pdata       : Specifies pointer to array containing plaintext.
  *                            @arg plain->data_length : Inputs plaintext buffer size.
  *                                                      The following size is required.
  *                                                      Plaintext buffer size >= public key n size -11.
- *                                                      Outputs valid data length after decryption 
+ *                                                      Outputs valid data length after decryption
  *                                                      (public key n size).
  * @param[in]     wrapped_key Inputs the 2048-bit RSA private wrapped key.
  *
@@ -880,7 +867,7 @@ fsp_err_t R_SCE_RSAES_PKCS2048_Decrypt (sce_rsa_byte_data_t               * ciph
  * @param[in,out] cipher      ciphertext
  *                            @arg cipher->pdata       : Specifies pointer to array containing ciphertext.
  *                            @arg cipher->data_length : Inputs ciphertext buffer size.
- *                                                       Outputs valid data length after encryption 
+ *                                                       Outputs valid data length after encryption
  *                                                       (public key n size).
  * @param[in]     wrapped_key Inputs the 4096-bit RSA public wrapped key.
  *

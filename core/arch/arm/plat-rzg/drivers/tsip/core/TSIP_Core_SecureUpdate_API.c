@@ -1,15 +1,14 @@
+/* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Copyright (c) 2020, Renesas Electronics Corporation. All rights reserved.
- *
- * SPDX-License-Identifier: BSD-3-Clause
+ * Copyright (c) 2020, Renesas Electronics Corporation
  */
 
 /*! *****************************************************************************
     @file    TSIP_Core_SecureUpdate_API.c
     @brief   Secure Firmware update
-    
+
     @par    History
-    @subsection sub_history 
+    @subsection sub_history
       - Initial version\n
  ********************************************************************************/
 
@@ -39,16 +38,16 @@ static uint32_t Get_UpdateBootData_Num(UPDATE_BOOT_DATA *update_bootdata);
 /*! *****************************************************************************
     @fn       static uint32_t Get_UpdateBootData_Num(UPDATE_BOOT_DATA *update_bootdata)
     @brief    get number of valid Boot data
-    
+
     @param     [in]    *update_bootdata     BootData structure
     @param     [in]    *DataNum             number of valid Boot data
 
     @retval    0                            no valid data
     @retval    1 - 16                       number of valid data
-    
+
     @par    Details
     It gets number of valid Boot data from BootData structure \n
-    
+
     @par    Processing flow
     -# check parameter
     -# get number of valid Boot data
@@ -74,7 +73,7 @@ static uint32_t Get_UpdateBootData_Num(UPDATE_BOOT_DATA *update_bootdata)
             if ((bootdata->InData_BootData_UpdateFlag != 1)
             || (bootdata->InData_BootData == NULL)
             || (bootdata->OutData_BootData == NULL)
-            || (bootdata->InData_BootData_ByteSize < Minimum) 
+            || (bootdata->InData_BootData_ByteSize < Minimum)
             || (bootdata->InData_BootData_ByteSize > Maximum)
             || ((bootdata->InData_BootData_ByteSize%16) != 0)) {
                 DataNum = 0;
@@ -92,15 +91,15 @@ static uint32_t Get_UpdateBootData_Num(UPDATE_BOOT_DATA *update_bootdata)
 /*! *****************************************************************************
     @fn       uint32_t TSIP_SU_Activate(void)
     @brief    Initialization for Secure firmware update
-    
+
     @retval    R_PASS                   success
     @retval    R_SEQUENCE_FAIL          cannot perform in current state
     @retval    R_FALSIFICATION_ERROR    tampering detection error
     @retval    R_RESOURCE_CONFLICT_FAIL resource for this process already used in other process
-    
+
     @par    Details
     It performs initilization for Secure firmware update \n
-    
+
     @par    Processing flow
     -# check initialization state in TSIP_Core layer
         - Is_TSIP_Core_Init()
@@ -133,7 +132,7 @@ uint32_t TSIP_SU_Activate(void)
 /*! *****************************************************************************
     @fn       uint32_t uint32_t TSIP_UpdateBootData(UPDATE_BOOT_DATA *update_bootdata)
     @brief    convert Boot data for update
-    
+
     @param     [in/out]    *update_bootdata Pointer of Boot data
 
     @retval    R_PASS                       success
@@ -142,10 +141,10 @@ uint32_t TSIP_SU_Activate(void)
     @retval    R_VERIFICATION_FAIL          verification failed
     @retval    R_FALSIFICATION_ERROR        tampering detection error
     @retval    R_RESOURCE_CONFLICT_FAIL     resource for this process already used in other process
-    
+
     @par    Details
     It decrypts encrypted Boot data and re-encrypts by TSIP key
-    
+
     @par    Processing flow
     -# check initialization state in TSIP_Core layer
         - Is_TSIP_Core_Init()
@@ -195,19 +194,19 @@ uint32_t TSIP_UpdateBootData(UPDATE_BOOT_DATA *update_bootdata)
 /*! *****************************************************************************
     @fn       uint32_t TSIP_SU_Key(uint8_t *InData_KeyRingOperationCode)
     @brief    Keyring decryption and re-encryption
-    
+
     @param     [in]        *InData_KeyRingOperationCode       Pointer of Keyring(size:688Byte)
-   
+
     @retval    R_PASS                   success
     @retval    R_PARAMETER_FAIL         invalid input parameter
     @retval    R_SEQUENCE_FAIL          cannot perform in current state
     @retval    R_VERIFICATION_FAIL      verification failed
     @retval    R_FALSIFICATION_ERROR    tampering detection error
     @retval    R_RESOURCE_CONFLICT_FAIL resource for this process already used in other process
-    
+
     @par    Details
     It decrypts encrypted Keyring and re-encrypts by TSIP key \n
-    
+
     @par    Processing flow
     -# check initialization state in TSIP_Core layer
         - Is_TSIP_Core_Init()
@@ -238,4 +237,3 @@ uint32_t TSIP_SU_Key(uint8_t *InData_KeyRingOperationCode)
 
     return RetCode;
 }
-

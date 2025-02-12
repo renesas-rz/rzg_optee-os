@@ -1,8 +1,8 @@
+/* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Copyright (c) 2021, Renesas Electronics Corporation. All rights reserved.
- *
- * SPDX-License-Identifier: BSD-3-Clause
+ * Copyright (c) 2021, Renesas Electronics Corporation
  */
+
 /* Dialog AT25QL128A */
 #ifndef _SPI_MULTI_REG_VALUES_H_
 #define _SPI_MULTI_REG_VALUES_H_

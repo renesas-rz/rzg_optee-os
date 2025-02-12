@@ -1,6 +1,6 @@
-// SPDX-License-Identifier: BSD-2-Clause
+/* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Copyright (c) 2022, Renesas Electronics
+ * Copyright (c) 2022, Renesas Electronics Corporation
  */
 
 #include <kernel/pseudo_ta.h>
@@ -85,7 +85,7 @@ static TEE_Result rsassa_pkcs1024_signatureverify(uint32_t types, TEE_Param para
     if ((NULL == signature.pdata) || (HW_SCE_RSA_1024_DATA_BYTE_SIZE != signature.data_length)) {
         return TEE_ERROR_BAD_PARAMETERS;
     }
-    
+
     message_hash.pdata = (uint8_t *)params[1].memref.buffer;
     message_hash.data_length = params[1].memref.size;
     message_hash.data_type = 0;
@@ -193,7 +193,7 @@ static TEE_Result rsassa_pkcs2048_signatureverify(uint32_t types, TEE_Param para
     if ((NULL == signature.pdata) || (HW_SCE_RSA_2048_DATA_BYTE_SIZE != signature.data_length)) {
         return TEE_ERROR_BAD_PARAMETERS;
     }
-    
+
     message_hash.pdata = (uint8_t *)params[1].memref.buffer;
     message_hash.data_length = params[1].memref.size;
     message_hash.data_type = 0;
@@ -247,7 +247,7 @@ static TEE_Result rsassa_pkcs4096_signatureverify(uint32_t types, TEE_Param para
     if ((NULL == signature.pdata) || (HW_SCE_RSA_4096_DATA_BYTE_SIZE != signature.data_length)) {
         return TEE_ERROR_BAD_PARAMETERS;
     }
-    
+
     message_hash.pdata = (uint8_t *)params[1].memref.buffer;
     message_hash.data_length = params[1].memref.size;
     message_hash.data_type = 0;
@@ -353,7 +353,7 @@ static TEE_Result rsaes_pkcs1024_decrypt(uint32_t types, TEE_Param params[TEE_NU
     if (NULL == cipher.pdata) {
         return TEE_ERROR_BAD_PARAMETERS;
     }
-    
+
     plain.pdata = (uint8_t *)params[1].memref.buffer;
     plain.data_length = params[1].memref.size;
     plain.data_type = 0;
@@ -456,7 +456,7 @@ static TEE_Result rsaes_pkcs2048_decrypt(uint32_t types, TEE_Param params[TEE_NU
     if (NULL == cipher.pdata) {
         return TEE_ERROR_BAD_PARAMETERS;
     }
-    
+
     plain.pdata = (uint8_t *)params[1].memref.buffer;
     plain.data_length = params[1].memref.size;
     plain.data_type = 0;

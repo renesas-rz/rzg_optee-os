@@ -1,6 +1,6 @@
-// SPDX-License-Identifier: BSD-2-Clause
+/* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Copyright (c) 2024, Renesas Electronics
+ * Copyright (c) 2024, Renesas Electronics Corporation
  */
 
 #include <kernel/pseudo_ta.h>
@@ -39,7 +39,7 @@ static TEE_Result aes_cipher_encryptinit(uint32_t types, TEE_Param params[TEE_NU
                         TEE_PARAM_TYPE_NONE)) {
             return TEE_ERROR_BAD_PARAMETERS;
         }
-    }    
+    }
 
     wrapped_key = (rsip_wrapped_key_t *)params[0].memref.buffer;
     if ((!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t)) || (key_size > params[0].memref.size)) {
@@ -199,7 +199,7 @@ static TEE_Result aes_cipher_decryptinit(uint32_t types, TEE_Param params[TEE_NU
                         TEE_PARAM_TYPE_NONE)) {
             return TEE_ERROR_BAD_PARAMETERS;
         }
-    }    
+    }
 
     wrapped_key = (rsip_wrapped_key_t *)params[0].memref.buffer;
     if ((!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t)) || (key_size > params[0].memref.size)) {

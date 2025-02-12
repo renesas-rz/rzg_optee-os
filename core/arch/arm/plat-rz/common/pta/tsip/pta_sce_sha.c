@@ -1,6 +1,6 @@
-// SPDX-License-Identifier: BSD-2-Clause
+/* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Copyright (c) 2022, Renesas Electronics
+ * Copyright (c) 2022, Renesas Electronics Corporation
  */
 
 #include <kernel/pseudo_ta.h>
@@ -38,7 +38,7 @@ static TEE_Result sha224_init(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
     }
 
     params[0].memref.size = sizeof(sce_sha_md5_handle_t);
-    
+
     return TEE_SUCCESS;
 }
 
@@ -95,7 +95,7 @@ static TEE_Result sha224_final(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
                     TEE_PARAM_TYPE_NONE)) {
         return TEE_ERROR_BAD_PARAMETERS;
     }
-    
+
     handle = (sce_sha_md5_handle_t *)params[0].memref.buffer;
     if ((NULL == handle) || (sizeof(sce_sha_md5_handle_t) != params[0].memref.size)) {
         return TEE_ERROR_BAD_PARAMETERS;
@@ -153,7 +153,7 @@ static TEE_Result sha256_init(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
     }
 
     params[0].memref.size = sizeof(sce_sha_md5_handle_t);
-    
+
     return TEE_SUCCESS;
 }
 
@@ -210,7 +210,7 @@ static TEE_Result sha256_final(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
                     TEE_PARAM_TYPE_NONE)) {
         return TEE_ERROR_BAD_PARAMETERS;
     }
-    
+
     handle = (sce_sha_md5_handle_t *)params[0].memref.buffer;
     if ((NULL == handle) || (sizeof(sce_sha_md5_handle_t) != params[0].memref.size)) {
         return TEE_ERROR_BAD_PARAMETERS;
@@ -257,7 +257,7 @@ static TEE_Result invoke_command(void *session __unused, uint32_t cmd,
             return sha256_init(ptypes, params);
         case PTA_CMD_SHA256_Update :
             return sha256_update(ptypes, params);
-        case PTA_CMD_SHA256_Final :            
+        case PTA_CMD_SHA256_Final :
             return sha256_final(ptypes, params);
         default:
             return TEE_ERROR_NOT_SUPPORTED;
