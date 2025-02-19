@@ -231,7 +231,7 @@ static TEE_Result keyimportwithkuk(uint32_t types, TEE_Param params[TEE_NUM_PARA
         return TEE_ERROR_BAD_PARAMETERS;
     }
 
-    sflash_read(key_update_key, CFG_KUK_BASE, sizeof(key_update_key));
+    sflash_read(CFG_KUK_BASE, key_update_key, sizeof(key_update_key));
 
     err = R_RSIP_KeyImportWithKUK(&rsip_instance_ctrl, key_update_key, initial_vector, key_type, encrypted_key, wrapped_key);
     switch ((uint32_t)err)
