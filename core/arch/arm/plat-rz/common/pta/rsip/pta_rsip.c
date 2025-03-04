@@ -207,9 +207,10 @@ static TEE_Result keyimportwithkuk(uint32_t types, TEE_Param params[TEE_NUM_PARA
 
     uint8_t * initial_vector;
     uint8_t * encrypted_key;
+    rsip_wrapped_key_t * key_update_key;
     rsip_wrapped_key_t * wrapped_key;
 
-    uint32_t key_update_key[RSIP_BYTE_SIZE_WRAPPED_KEY_VALUE_KEY_UPDATE_KEY / sizeof(uint32_t)];
+    uint32_t key_update_key_buf[RSIP_BYTE_SIZE_WRAPPED_KEY_KEY_UPDATE_KEY / sizeof(uint32_t)];
 
     if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
                     TEE_PARAM_TYPE_MEMREF_INOUT,
@@ -231,7 +232,9 @@ static TEE_Result keyimportwithkuk(uint32_t types, TEE_Param params[TEE_NUM_PARA
         return TEE_ERROR_BAD_PARAMETERS;
     }
 
-    sflash_read(CFG_KUK_BASE, key_update_key, sizeof(key_update_key));
+    sflash_read(CFG_KUK_BASE, key_update_key_buf, sizeof(key_update_key_buf));
+
+    key_update_key = (rsip_wrapped_key_t *)&key_update_key_buf[0];
 
     err = R_RSIP_KeyImportWithKUK(&rsip_instance_ctrl, key_update_key, initial_vector, key_type, encrypted_key, wrapped_key);
     switch ((uint32_t)err)
