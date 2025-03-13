@@ -13,6 +13,8 @@
 
 #define PTA_NAME "sce.pta"
 
+static sce_key_update_key_t key_update_key;
+
 static uint32_t crc32calc(const uint8_t *data, uint32_t len)
 {
     uint32_t crc = 0xFFFFFFFF;
@@ -358,7 +360,6 @@ static TEE_Result aes128_encryptedkeywrap(uint32_t types, TEE_Param params[TEE_N
 
     uint8_t * initial_vector;
     uint8_t * encrypted_key;
-    sce_key_update_key_t key_update_key;
     sce_aes_wrapped_key_t * wrapped_key;
 
     if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
@@ -380,8 +381,6 @@ static TEE_Result aes128_encryptedkeywrap(uint32_t types, TEE_Param params[TEE_N
     if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) || (sizeof(sce_aes_wrapped_key_t) > params[1].memref.size)) {
         return TEE_ERROR_BAD_PARAMETERS;
     }
-
-    sflash_read(CFG_KUK_BASE, &key_update_key, sizeof(key_update_key));
 
     err = g_sce_protected_on_sce.AES128_EncryptedKeyWrap(initial_vector, encrypted_key, &key_update_key, wrapped_key);
     switch (err)
@@ -405,7 +404,6 @@ static TEE_Result aes256_encryptedkeywrap(uint32_t types, TEE_Param params[TEE_N
 
     uint8_t * initial_vector;
     uint8_t * encrypted_key;
-    sce_key_update_key_t key_update_key;
     sce_aes_wrapped_key_t * wrapped_key;
 
     if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
@@ -427,8 +425,6 @@ static TEE_Result aes256_encryptedkeywrap(uint32_t types, TEE_Param params[TEE_N
     if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) || (sizeof(sce_aes_wrapped_key_t) > params[1].memref.size)) {
         return TEE_ERROR_BAD_PARAMETERS;
     }
-
-    sflash_read(CFG_KUK_BASE, &key_update_key, sizeof(key_update_key));
 
     err = g_sce_protected_on_sce.AES256_EncryptedKeyWrap(initial_vector, encrypted_key, &key_update_key, wrapped_key);
     switch (err)
@@ -452,7 +448,6 @@ static TEE_Result rsa1024_encryptedpublickeywrap(uint32_t types, TEE_Param param
 
     uint8_t * initial_vector;
     uint8_t * encrypted_key;
-    sce_key_update_key_t key_update_key;
     sce_rsa1024_public_wrapped_key_t * wrapped_key;
 
     if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
@@ -474,8 +469,6 @@ static TEE_Result rsa1024_encryptedpublickeywrap(uint32_t types, TEE_Param param
     if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) || (sizeof(sce_rsa1024_public_wrapped_key_t) > params[1].memref.size)) {
         return TEE_ERROR_BAD_PARAMETERS;
     }
-
-    sflash_read(CFG_KUK_BASE, &key_update_key, sizeof(key_update_key));
 
     err = g_sce_protected_on_sce.RSA1024_EncryptedPublicKeyWrap(initial_vector, encrypted_key, &key_update_key, wrapped_key);
     switch (err)
@@ -499,7 +492,6 @@ static TEE_Result rsa1024_encryptedprivatekeywrap(uint32_t types, TEE_Param para
 
     uint8_t * initial_vector;
     uint8_t * encrypted_key;
-    sce_key_update_key_t key_update_key;
     sce_rsa1024_private_wrapped_key_t * wrapped_key;
 
     if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
@@ -521,8 +513,6 @@ static TEE_Result rsa1024_encryptedprivatekeywrap(uint32_t types, TEE_Param para
     if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) || (sizeof(sce_rsa1024_private_wrapped_key_t) > params[1].memref.size)) {
         return TEE_ERROR_BAD_PARAMETERS;
     }
-
-    sflash_read(CFG_KUK_BASE, &key_update_key, sizeof(key_update_key));
 
     err = g_sce_protected_on_sce.RSA1024_EncryptedPrivateKeyWrap(initial_vector, encrypted_key, &key_update_key, wrapped_key);
     switch (err)
@@ -546,7 +536,6 @@ static TEE_Result rsa2048_encryptedpublickeywrap(uint32_t types, TEE_Param param
 
     uint8_t * initial_vector;
     uint8_t * encrypted_key;
-    sce_key_update_key_t key_update_key;
     sce_rsa2048_public_wrapped_key_t * wrapped_key;
 
     if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
@@ -568,8 +557,6 @@ static TEE_Result rsa2048_encryptedpublickeywrap(uint32_t types, TEE_Param param
     if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) || (sizeof(sce_rsa2048_public_wrapped_key_t) > params[1].memref.size)) {
         return TEE_ERROR_BAD_PARAMETERS;
     }
-
-    sflash_read(CFG_KUK_BASE, &key_update_key, sizeof(key_update_key));
 
     err = g_sce_protected_on_sce.RSA2048_EncryptedPublicKeyWrap(initial_vector, encrypted_key, &key_update_key, wrapped_key);
     switch (err)
@@ -593,7 +580,6 @@ static TEE_Result rsa2048_encryptedprivatekeywrap(uint32_t types, TEE_Param para
 
     uint8_t * initial_vector;
     uint8_t * encrypted_key;
-    sce_key_update_key_t key_update_key;
     sce_rsa2048_private_wrapped_key_t * wrapped_key;
 
     if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
@@ -615,8 +601,6 @@ static TEE_Result rsa2048_encryptedprivatekeywrap(uint32_t types, TEE_Param para
     if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) || (sizeof(sce_rsa2048_private_wrapped_key_t) > params[1].memref.size)) {
         return TEE_ERROR_BAD_PARAMETERS;
     }
-
-    sflash_read(CFG_KUK_BASE, &key_update_key, sizeof(key_update_key));
 
     err = g_sce_protected_on_sce.RSA2048_EncryptedPrivateKeyWrap(initial_vector, encrypted_key, &key_update_key, wrapped_key);
     switch (err)
@@ -640,7 +624,6 @@ static TEE_Result rsa4096_encryptedpublickeywrap(uint32_t types, TEE_Param param
 
     uint8_t * initial_vector;
     uint8_t * encrypted_key;
-    sce_key_update_key_t key_update_key;
     sce_rsa4096_public_wrapped_key_t * wrapped_key;
 
     if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
@@ -662,8 +645,6 @@ static TEE_Result rsa4096_encryptedpublickeywrap(uint32_t types, TEE_Param param
     if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) || (sizeof(sce_rsa4096_public_wrapped_key_t) > params[1].memref.size)) {
         return TEE_ERROR_BAD_PARAMETERS;
     }
-
-    sflash_read(CFG_KUK_BASE, &key_update_key, sizeof(key_update_key));
 
     err = g_sce_protected_on_sce.RSA4096_EncryptedPublicKeyWrap(initial_vector, encrypted_key, &key_update_key, wrapped_key);
     switch (err)
@@ -687,7 +668,6 @@ static TEE_Result ecc_secp192r1_encryptedpublickeywrap(uint32_t types, TEE_Param
 
     uint8_t * initial_vector;
     uint8_t * encrypted_key;
-    sce_key_update_key_t key_update_key;
     sce_ecc_public_wrapped_key_t * wrapped_key;
 
     if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
@@ -709,8 +689,6 @@ static TEE_Result ecc_secp192r1_encryptedpublickeywrap(uint32_t types, TEE_Param
     if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) || (sizeof(sce_ecc_public_wrapped_key_t) > params[1].memref.size)) {
         return TEE_ERROR_BAD_PARAMETERS;
     }
-
-    sflash_read(CFG_KUK_BASE, &key_update_key, sizeof(key_update_key));
 
     err = g_sce_protected_on_sce.ECC_secp192r1_EncryptedPublicKeyWrap(initial_vector, encrypted_key, &key_update_key, wrapped_key);
     switch (err)
@@ -734,7 +712,6 @@ static TEE_Result ecc_secp192r1_encryptedprivatekeywrap(uint32_t types, TEE_Para
 
     uint8_t * initial_vector;
     uint8_t * encrypted_key;
-    sce_key_update_key_t key_update_key;
     sce_ecc_private_wrapped_key_t * wrapped_key;
 
     if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
@@ -756,8 +733,6 @@ static TEE_Result ecc_secp192r1_encryptedprivatekeywrap(uint32_t types, TEE_Para
     if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) || (sizeof(sce_ecc_private_wrapped_key_t) > params[1].memref.size)) {
         return TEE_ERROR_BAD_PARAMETERS;
     }
-
-    sflash_read(CFG_KUK_BASE, &key_update_key, sizeof(key_update_key));
 
     err = g_sce_protected_on_sce.ECC_secp192r1_EncryptedPrivateKeyWrap(initial_vector, encrypted_key, &key_update_key, wrapped_key);
     switch (err)
@@ -781,7 +756,6 @@ static TEE_Result ecc_secp224r1_encryptedpublickeywrap(uint32_t types, TEE_Param
 
     uint8_t * initial_vector;
     uint8_t * encrypted_key;
-    sce_key_update_key_t key_update_key;
     sce_ecc_public_wrapped_key_t * wrapped_key;
 
     if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
@@ -803,8 +777,6 @@ static TEE_Result ecc_secp224r1_encryptedpublickeywrap(uint32_t types, TEE_Param
     if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) || (sizeof(sce_ecc_public_wrapped_key_t) > params[1].memref.size)) {
         return TEE_ERROR_BAD_PARAMETERS;
     }
-
-    sflash_read(CFG_KUK_BASE, &key_update_key, sizeof(key_update_key));
 
     err = g_sce_protected_on_sce.ECC_secp224r1_EncryptedPublicKeyWrap(initial_vector, encrypted_key, &key_update_key, wrapped_key);
     switch (err)
@@ -828,7 +800,6 @@ static TEE_Result ecc_secp224r1_encryptedprivatekeywrap(uint32_t types, TEE_Para
 
     uint8_t * initial_vector;
     uint8_t * encrypted_key;
-    sce_key_update_key_t key_update_key;
     sce_ecc_private_wrapped_key_t * wrapped_key;
 
     if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
@@ -850,8 +821,6 @@ static TEE_Result ecc_secp224r1_encryptedprivatekeywrap(uint32_t types, TEE_Para
     if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) || (sizeof(sce_ecc_private_wrapped_key_t) > params[1].memref.size)) {
         return TEE_ERROR_BAD_PARAMETERS;
     }
-
-    sflash_read(CFG_KUK_BASE, &key_update_key, sizeof(key_update_key));
 
     err = g_sce_protected_on_sce.ECC_secp224r1_EncryptedPrivateKeyWrap(initial_vector, encrypted_key, &key_update_key, wrapped_key);
     switch (err)
@@ -875,7 +844,6 @@ static TEE_Result ecc_secp256r1_encryptedpublickeywrap(uint32_t types, TEE_Param
 
     uint8_t * initial_vector;
     uint8_t * encrypted_key;
-    sce_key_update_key_t key_update_key;
     sce_ecc_public_wrapped_key_t * wrapped_key;
 
     if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
@@ -897,8 +865,6 @@ static TEE_Result ecc_secp256r1_encryptedpublickeywrap(uint32_t types, TEE_Param
     if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) || (sizeof(sce_ecc_public_wrapped_key_t) > params[1].memref.size)) {
         return TEE_ERROR_BAD_PARAMETERS;
     }
-
-    sflash_read(CFG_KUK_BASE, &key_update_key, sizeof(key_update_key));
 
     err = g_sce_protected_on_sce.ECC_secp256r1_EncryptedPublicKeyWrap(initial_vector, encrypted_key, &key_update_key, wrapped_key);
     switch (err)
@@ -922,7 +888,6 @@ static TEE_Result ecc_secp256r1_encryptedprivatekeywrap(uint32_t types, TEE_Para
 
     uint8_t * initial_vector;
     uint8_t * encrypted_key;
-    sce_key_update_key_t key_update_key;
     sce_ecc_private_wrapped_key_t * wrapped_key;
 
     if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
@@ -944,8 +909,6 @@ static TEE_Result ecc_secp256r1_encryptedprivatekeywrap(uint32_t types, TEE_Para
     if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) || (sizeof(sce_ecc_private_wrapped_key_t) > params[1].memref.size)) {
         return TEE_ERROR_BAD_PARAMETERS;
     }
-
-    sflash_read(CFG_KUK_BASE, &key_update_key, sizeof(key_update_key));
 
     err = g_sce_protected_on_sce.ECC_secp256r1_EncryptedPrivateKeyWrap(initial_vector, encrypted_key, &key_update_key, wrapped_key);
     switch (err)
@@ -969,7 +932,6 @@ static TEE_Result ecc_brainpoolp512r1_encryptedpublickeywrap(uint32_t types, TEE
 
     uint8_t * initial_vector;
     uint8_t * encrypted_key;
-    sce_key_update_key_t key_update_key;
     sce_ecc_public_wrapped_key_t * wrapped_key;
 
     if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
@@ -991,8 +953,6 @@ static TEE_Result ecc_brainpoolp512r1_encryptedpublickeywrap(uint32_t types, TEE
     if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) || (sizeof(sce_ecc_public_wrapped_key_t) > params[1].memref.size)) {
         return TEE_ERROR_BAD_PARAMETERS;
     }
-
-    sflash_read(CFG_KUK_BASE, &key_update_key, sizeof(key_update_key));
 
     err = g_sce_protected_on_sce.ECC_BrainpoolP512r1_EncryptedPublicKeyWrap(initial_vector, encrypted_key, &key_update_key, wrapped_key);
     switch (err)
@@ -1016,7 +976,6 @@ static TEE_Result ecc_brainpoolp512r1_encryptedprivatekeywrap(uint32_t types, TE
 
     uint8_t * initial_vector;
     uint8_t * encrypted_key;
-    sce_key_update_key_t key_update_key;
     sce_ecc_private_wrapped_key_t * wrapped_key;
 
     if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
@@ -1038,8 +997,6 @@ static TEE_Result ecc_brainpoolp512r1_encryptedprivatekeywrap(uint32_t types, TE
     if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) || (sizeof(sce_ecc_private_wrapped_key_t) > params[1].memref.size)) {
         return TEE_ERROR_BAD_PARAMETERS;
     }
-
-    sflash_read(CFG_KUK_BASE, &key_update_key, sizeof(key_update_key));
 
     err = g_sce_protected_on_sce.ECC_BrainpoolP512r1_EncryptedPrivateKeyWrap(initial_vector, encrypted_key, &key_update_key, wrapped_key);
     switch (err)
@@ -1063,13 +1020,14 @@ static TEE_Result open_session(uint32_t nParamTypes __unused,
 {
 	DMSG("open entry point for pseudo ta \"%s\"", PTA_NAME);
 	sflash_open();
+	sflash_read(CFG_KUK_BASE, &key_update_key, sizeof(key_update_key));
+	sflash_close();
 	return TEE_SUCCESS;
 }
 
 static void close_session(void *pSessionContext __unused)
 {
 	DMSG("close entry point for pseudo ta \"%s\"", PTA_NAME);
-	sflash_close();
 }
 
 static TEE_Result invoke_command(void *session __unused, uint32_t cmd,

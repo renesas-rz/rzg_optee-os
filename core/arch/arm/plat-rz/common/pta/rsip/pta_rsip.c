@@ -16,6 +16,8 @@
 
 extern rsip_instance_ctrl_t rsip_instance_ctrl;
 
+static uint32_t key_update_key[RSIP_BYTE_SIZE_WRAPPED_KEY_KEY_UPDATE_KEY / sizeof(uint32_t)];
+
 static uint32_t crc32calc(const uint8_t *data, uint32_t len)
 {
     uint32_t crc = 0xFFFFFFFF;
@@ -207,10 +209,7 @@ static TEE_Result keyimportwithkuk(uint32_t types, TEE_Param params[TEE_NUM_PARA
 
     uint8_t * initial_vector;
     uint8_t * encrypted_key;
-    rsip_wrapped_key_t * key_update_key;
     rsip_wrapped_key_t * wrapped_key;
-
-    uint32_t key_update_key_buf[RSIP_BYTE_SIZE_WRAPPED_KEY_KEY_UPDATE_KEY / sizeof(uint32_t)];
 
     if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
                     TEE_PARAM_TYPE_MEMREF_INOUT,
@@ -231,10 +230,6 @@ static TEE_Result keyimportwithkuk(uint32_t types, TEE_Param params[TEE_NUM_PARA
     if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) || (wrap_key_size > params[1].memref.size)) {
         return TEE_ERROR_BAD_PARAMETERS;
     }
-
-    sflash_read(CFG_KUK_BASE, key_update_key_buf, sizeof(key_update_key_buf));
-
-    key_update_key = (rsip_wrapped_key_t *)&key_update_key_buf[0];
 
     err = R_RSIP_KeyImportWithKUK(&rsip_instance_ctrl, key_update_key, initial_vector, key_type, encrypted_key, wrapped_key);
     switch ((uint32_t)err)
@@ -631,13 +626,14 @@ static TEE_Result open_session(uint32_t nParamTypes __unused,
 {
 	DMSG("open entry point for pseudo ta \"%s\"", PTA_NAME);
 	sflash_open();
+	sflash_read(CFG_KUK_BASE, key_update_key, sizeof(key_update_key));
+	sflash_close();
 	return TEE_SUCCESS;
 }
 
 static void close_session(void *pSessionContext __unused)
 {
 	DMSG("close entry point for pseudo ta \"%s\"", PTA_NAME);
-	sflash_close();
 }
 
 static TEE_Result invoke_command(void *session __unused, uint32_t cmd,
