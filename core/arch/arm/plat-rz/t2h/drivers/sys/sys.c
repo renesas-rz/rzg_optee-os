@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Copyright (c) 2023-2024, Renesas Electronics Corporation
+ * Copyright (c) 2023-2025, Renesas Electronics Corporation
  */
 
 #include <sys.h>
@@ -87,11 +87,21 @@ void sys_safetybase_lock(uint32_t lock_mask)
 	io_write32(sys_safety_base + PRCRS, (prcrs | 0x0000A500U));
 }
 
+void sys_set_end_address(void)
+{
+	sys_base_unlock(PRCRx_SYS_CTRL);
+	io_write32(sys_base + XSPI0CS0_END_ADD, (0x47FFFFFFU));
+	io_write32(sys_base + XSPI1CS1_END_ADD, (0x57FFFFFFU));
+	sys_base_lock(PRCRx_SYS_CTRL);
+}
+
 static TEE_Result sys_init(void)
 {
 	sys_base = (vaddr_t)phys_to_virt_io(SYS_BASE, SYS_SIZE);
 	sys_ns_base = (vaddr_t)phys_to_virt_io(SYS_NS_BASE, SYS_NS_SIZE);
 	sys_safety_base = (vaddr_t)phys_to_virt_io(SYS_SAFETY_BASE, SYS_SAFETY_SIZE);
+
+	sys_set_end_address();
 
 	return TEE_SUCCESS;
 }

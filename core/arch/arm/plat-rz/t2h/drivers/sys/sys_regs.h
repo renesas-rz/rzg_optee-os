@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Copyright (c) 2023-2024, Renesas Electronics Corporation
+ * Copyright (c) 2023-2025, Renesas Electronics Corporation
  */
 
 #ifndef __SYS_REGS_H__
@@ -17,6 +17,9 @@
 #define SSTPCR6						    	(0x00000208)
 
 #define PRCRS								(0x00006000)
+
+#define XSPI0CS0_END_ADD 					(0x00013004)
+#define XSPI1CS1_END_ADD 					(0x00013104)
 
 /* xSPI0 */
 #define MRCTLA_MRCTLA04						UL(4)
