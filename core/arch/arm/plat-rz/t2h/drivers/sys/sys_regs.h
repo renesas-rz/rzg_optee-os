@@ -26,18 +26,6 @@
 /* xSPI1 */
 #define MRCTLA_MRCTLA05						UL(5)
 
-/* Boot Mode */
-#define MD_MON_MD0MON_BIT					UL(12)
-#define MD_MON_MDxMON_MSK					UL(7)					/* 3 bits wide - MD0MON, MD1MON and MD2MON */
-#define MD_MON_MODE_XSPI0_x1				UL(0)
-#define MD_MON_MODE_XSPI0_x8				UL(1)
-#define MD_MON_MODE_XSPI1_x1				UL(2)
-#define MD_MON_MODE_ESD						UL(3)
-#define MD_MON_MODE_EMMC					UL(4)
-#define MD_MON_MODE_SCIF					UL(5)
-#define MD_MON_MODE_USB						UL(6)
-#define MD_MON_MODE_COUNT					UL(7)
-
 #define PRCRx_CLOCK_GEN						UL(1)
 #define PRCRx_LOW_POWER						UL(2)
 #define PRCRx_GPIO							UL(4)

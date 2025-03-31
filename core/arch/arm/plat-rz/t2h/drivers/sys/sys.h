@@ -18,7 +18,6 @@ typedef enum {
 } boot_mode_t;
 
 
-extern boot_mode_t sys_get_boot_mode(void);
 extern void sys_base_unlock(uint32_t unlock_mask);
 extern void sys_base_lock(uint32_t lock_mask);
 extern void sys_safetybase_unlock(uint32_t unlock_mask);

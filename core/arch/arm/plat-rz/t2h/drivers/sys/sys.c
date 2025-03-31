@@ -17,39 +17,6 @@ vaddr_t sys_base;
 vaddr_t sys_ns_base;
 vaddr_t sys_safety_base;
 
-boot_mode_t sys_get_boot_mode(void)
-{
-	uint8_t boot_dev  = (io_read32(sys_ns_base + MD_MON) >> MD_MON_MD0MON_BIT) & MD_MON_MDxMON_MSK;
-	boot_mode_t boot_mode;
-
-	switch (boot_dev) {
-	case (MD_MON_MODE_ESD):
-		boot_mode = SYS_BOOT_MODE_ESD;
-		break;
-
-	case (MD_MON_MODE_EMMC):
-		boot_mode = SYS_BOOT_MODE_EMMC;
-		break;
-
-	case (MD_MON_MODE_XSPI0_x1):
-		boot_mode = SYS_BOOT_MODE_XSPI0_x1;
-		break;
-
-	case (MD_MON_MODE_XSPI0_x8):
-		boot_mode = SYS_BOOT_MODE_XSPI0_x8;
-		break;
-
-	case (MD_MON_MODE_XSPI1_x1):
-		boot_mode = SYS_BOOT_MODE_XSPI1_x1;
-		break;
-
-	default:
-		panic();
-	}
-
-	return boot_mode;
-}
-
 void sys_base_unlock(uint32_t unlock_mask)
 {
 	uint32_t prcrn;
