@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /*
- * Copyright (c) 2024, Renesas Electronics Corporation
+ * Copyright (c) 2025, Renesas Electronics Corporation
  */
 
 #include <stdint.h>

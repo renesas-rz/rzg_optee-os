@@ -28,23 +28,19 @@
 #define XSPI_REG_BASE		0x11030000U
 #define XSPI_REG_SIZE		0x00010000
 
-#define SCE_REG_BASE		0x10440000
+#define SCE_REG_BASE		0x104B0000
 #define SCE_REG_SIZE		0x00010000
 
-#if defined(PLATFORM_FLAVOR_v2h_evk_1) || defined(PLATFORM_FLAVOR_v2n_evk)
+#if defined(PLATFORM_FLAVOR_g3e_smarc)
 /* DDR 8Gbyte x1 */
 #define NSEC_DDR_0_BASE		0x47E00000U
 #define NSEC_DDR_0_SIZE		0x1F8200000U
-
-/* DDR 8Gbyte x1 */
-#define NSEC_DDR_1_BASE		0x240000000U
-#define NSEC_DDR_1_SIZE		0x200000000U
 
 #else
 #error "Unknown platform flavor"
 #endif
 
 #define TEE_SHMEM_START		(TZDRAM_BASE + TZDRAM_SIZE)
-#define TEE_SHMEM_SIZE		0x00100000
+#define TEE_SHMEM_SIZE		0x100000
 
-#endif /*RZV2H_CONFIG_H*/
+#endif /*RZG3E_CONFIG_H*/
