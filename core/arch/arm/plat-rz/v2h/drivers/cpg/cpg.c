@@ -173,6 +173,9 @@ void cpg_xspi_stop(void)
 
 	cpg_io_write(CPG_BUS_4_MSTOP, 0x00200020);
 	cpg_io_write(CPG_BUS_5_MSTOP, 0x00200020);
+
+	cpg_io_write(CPG_CSDIV, 0x10000000);
+	cpg_io_write(CPG_SSEL1, 0x10000000);
 }
 
 static TEE_Result cpg_init(void)
