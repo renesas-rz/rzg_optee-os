@@ -160,7 +160,7 @@ void cpg_xspi_start(void)
 	cpg_io_write(CPG_BUS_4_MSTOP, 0x00200000);
 	cpg_io_write(CPG_BUS_5_MSTOP, 0x00200000);
 
-	cpg_io_write(CPG_CSDIV, 0x10002000);
+	cpg_io_write(CPG_CSDIV0, 0x10002000);
 	cpg_io_write(CPG_SSEL1, 0x10001000);
 }
 
@@ -174,7 +174,7 @@ void cpg_xspi_stop(void)
 	cpg_io_write(CPG_BUS_4_MSTOP, 0x00200020);
 	cpg_io_write(CPG_BUS_5_MSTOP, 0x00200020);
 
-	cpg_io_write(CPG_CSDIV, 0x10000000);
+	cpg_io_write(CPG_CSDIV0, 0x10000000);
 	cpg_io_write(CPG_SSEL1, 0x10000000);
 }
 
