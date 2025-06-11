@@ -6,7 +6,7 @@
 #ifndef __CPG_REGS_H__
 #define __CPG_REGS_H__
 
-#define CPG_SSEL1								(0x0304)	/* Stati Mux Control Register   */
+#define CPG_SSEL1								(0x0304)	/* Static Mux Control Register   */
 #define CPG_CSDIV0								(0x0500)	/* Static Gear Control Register */
 
 #define CPG_CLKON_9								(0x0624)	/* CGC Control Register xSPI */

@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Copyright (c) 2021-2024, Renesas Electronics Corporation
+ * Copyright (c) 2021-2025, Renesas Electronics Corporation
  */
 
 #ifndef RZV2H_CONFIG_H
@@ -23,10 +23,10 @@
 
 #define SPI_FLASH_BASE		0x20000000U
 #define SPI_FLASH_SIZE		0x10000000
-#define SPI_SECTOR_SIZE		0x10000
+#define SPI_SECTOR_SIZE		0x00010000
 
 #define XSPI_REG_BASE		0x11030000U
-#define XSPI_REG_SIZE		0x10000
+#define XSPI_REG_SIZE		0x00010000
 
 #define SCE_REG_BASE		0x104B0000
 #define SCE_REG_SIZE		0x00010000
@@ -43,4 +43,4 @@
 #define TEE_SHMEM_START		(TZDRAM_BASE + TZDRAM_SIZE)
 #define TEE_SHMEM_SIZE		0x100000
 
-#endif /*RZV2H_CONFIG_H*/
+#endif /*RZG3E_CONFIG_H*/

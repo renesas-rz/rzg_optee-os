@@ -2,6 +2,7 @@
 /*
  * Copyright (c) 2024, Renesas Electronics Corporation
  */
+
 #ifndef _CPG_H_
 #define _CPG_H_
 
