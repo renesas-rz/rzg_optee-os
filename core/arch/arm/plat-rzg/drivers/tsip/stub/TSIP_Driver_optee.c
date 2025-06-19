@@ -1,15 +1,14 @@
+// SPDX-License-Identifier: BSD-3-Clause
 /*
- * Copyright (c) 2020, Renesas Electronics Corporation. All rights reserved.
- *
- * SPDX-License-Identifier: BSD-3-Clause
+ * Copyright (c) 2020, Renesas Electronics Corporation
  */
 
 /*! *****************************************************************************
     @file    TSIP_Driver_optee.c
     @brief   TSIP Driver API for OP-TEE
-    
+
     @par    History
-    @subsection sub_history 
+    @subsection sub_history
       - Initial version\n
  ********************************************************************************/
 
@@ -42,8 +41,8 @@
 /*!
     @var      gpTSIP
     @brief    TSIP register
-    
-    @par    
+
+    @par
     - TSIP_Driver.c
         - TSIPDrv_Initialize()
         - TSIPDrv_Finalize()
@@ -56,24 +55,24 @@
 /*! *****************************************************************************
     @fn       uint8_t TSIPDrv_Initialize(void)
     @brief    TSIP Driver initialization
-    
+
     @param     [in]        *TSIP_BaseAddress   TSIP Base Address
     @param     [in]        *MSTP_BaseAddress   MSTP Base Address
 
     @retval    DRIVER_OK        success
     @retval    DRIVER_ERROR     error
-    
+
     @par    Global veriables
     <table class="params">
     <tr><td class="paramdir"> [out] </td><td> @ref gpTSIP   </td></tr>
     </table>
-    
+
     @post
     - call TSIPDrv_Finalize()
-    
+
     @par    Details
     It initializes TSIP driver. \n
-    
+
     @par    Processing flow
     -# Map the registry
  ********************************************************************************/
@@ -98,18 +97,18 @@ uint8_t TSIPDrv_Initialize(uint8_t *TSIP_BaseAddress, uint8_t *MSTP_BaseAddress)
 /*! *****************************************************************************
     @fn       void TSIPDrv_Finalize(void)
     @brief    TSIP Driver finalization
-    
+
     @par    Global veriables
     <table class="params">
     <tr><td class="paramdir"> [in,out] </td><td> @ref gpTSIP   </td></tr>
     </table>
-    
+
     @pre
     - call TSIPDrv_Initialize() \n
-    
+
     @par    Details
     It finish TSIP driver \n
-    
+
     @par    Processing flow
     -# Unmap the registry
  ********************************************************************************/
@@ -121,5 +120,3 @@ void TSIPDrv_Finalize(void) {
 
     return;
 }
-
-

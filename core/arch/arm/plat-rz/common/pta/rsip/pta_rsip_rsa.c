@@ -1,6 +1,6 @@
-// SPDX-License-Identifier: BSD-2-Clause
+// SPDX-License-Identifier: BSD-3-Clause
 /*
- * Copyright (c) 2024, Renesas Electronics
+ * Copyright (c) 2024, Renesas Electronics Corporation
  */
 
 #include <kernel/pseudo_ta.h>
@@ -12,17 +12,12 @@
 
 extern rsip_instance_ctrl_t rsip_instance_ctrl;
 
-static const rsip_hash_type_t hash_type = RSIP_HASH_TYPE_SHA256;
-static const rsip_mgf_type_t mgf_type = RSIP_MGF_TYPE_MGF1_SHA256;
-static const int32_t salt_length = RSIP_RSA_SALT_LENGTH_HASH;
-
 static TEE_Result generate_hash(uint8_t const *const message, uint32_t const message_length,
-    rsip_hash_type_t *hash_type, uint8_t *digest)
+    rsip_hash_type_t hash_type, uint8_t *digest)
 {
     fsp_err_t err;
-    *hash_type = RSIP_HASH_TYPE_SHA256;
 
-    err = R_RSIP_SHA_Compute(&rsip_instance_ctrl, *hash_type, message, message_length, digest);
+    err = R_RSIP_SHA_Compute(&rsip_instance_ctrl, hash_type, message, message_length, digest);
     switch ((uint32_t)err)
     {
         case FSP_SUCCESS:
@@ -54,7 +49,6 @@ static TEE_Result rsassa_pkcs1_v1_5_sign(uint32_t types, TEE_Param params[TEE_NU
     uint32_t message_length;
     uint8_t *signature;
     uint8_t digest[32];
-    rsip_hash_type_t hash_type;
     rsip_wrapped_key_t * wrapped_key;
 
     if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
@@ -83,12 +77,12 @@ static TEE_Result rsassa_pkcs1_v1_5_sign(uint32_t types, TEE_Param params[TEE_NU
         return TEE_ERROR_BAD_PARAMETERS;
     }
 
-    result = generate_hash(message, message_length, &hash_type, digest);
+    result = generate_hash(message, message_length, RSIP_HASH_TYPE_SHA256, digest);
     if (TEE_SUCCESS != result) {
         return result;
     }
 
-    err = R_RSIP_RSASSA_PKCS1_V1_5_Sign(&rsip_instance_ctrl, wrapped_key, hash_type, digest, signature);
+    err = R_RSIP_RSASSA_PKCS1_V1_5_Sign(&rsip_instance_ctrl, wrapped_key, RSIP_HASH_TYPE_SHA256, digest, signature);
     switch ((uint32_t)err)
     {
         case FSP_SUCCESS:
@@ -133,7 +127,6 @@ static TEE_Result rsassa_pkcs1_v1_5_verify(uint32_t types, TEE_Param params[TEE_
     uint32_t message_length;
     uint8_t *signature;
     uint8_t digest[32];
-    rsip_hash_type_t hash_type;
     rsip_wrapped_key_t * wrapped_key;
 
     if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
@@ -162,12 +155,12 @@ static TEE_Result rsassa_pkcs1_v1_5_verify(uint32_t types, TEE_Param params[TEE_
         return TEE_ERROR_BAD_PARAMETERS;
     }
 
-    result = generate_hash(message, message_length, &hash_type, digest);
+    result = generate_hash(message, message_length, RSIP_HASH_TYPE_SHA256, digest);
     if (TEE_SUCCESS != result) {
         return result;
     }
 
-    err = R_RSIP_RSASSA_PKCS1_V1_5_Verify(&rsip_instance_ctrl, wrapped_key, hash_type, digest, signature);
+    err = R_RSIP_RSASSA_PKCS1_V1_5_Verify(&rsip_instance_ctrl, wrapped_key, RSIP_HASH_TYPE_SHA256, digest, signature);
     switch ((uint32_t)err)
     {
         case FSP_SUCCESS:
@@ -209,7 +202,6 @@ static TEE_Result rsassa_pss_sign(uint32_t types, TEE_Param params[TEE_NUM_PARAM
     uint32_t message_length;
     uint8_t *signature;
     uint8_t digest[32];
-    rsip_hash_type_t hash_type;
     rsip_wrapped_key_t * wrapped_key;
 
     if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
@@ -238,13 +230,13 @@ static TEE_Result rsassa_pss_sign(uint32_t types, TEE_Param params[TEE_NUM_PARAM
         return TEE_ERROR_BAD_PARAMETERS;
     }
 
-    result = generate_hash(message, message_length, &hash_type, digest);
+    result = generate_hash(message, message_length, RSIP_HASH_TYPE_SHA256, digest);
     if (TEE_SUCCESS != result) {
         return result;
     }
 
-    err = R_RSIP_RSASSA_PSS_Sign(&rsip_instance_ctrl, wrapped_key, hash_type, mgf_type,
-        salt_length, digest, signature);
+    err = R_RSIP_RSASSA_PSS_Sign(&rsip_instance_ctrl, wrapped_key, RSIP_HASH_TYPE_SHA256, RSIP_MGF_TYPE_MGF1_SHA256,
+        RSIP_RSA_SALT_LENGTH_HASH, digest, signature);
     switch ((uint32_t)err)
     {
         case FSP_SUCCESS:
@@ -288,7 +280,6 @@ static TEE_Result rsassa_pss_verify(uint32_t types, TEE_Param params[TEE_NUM_PAR
     uint8_t *message;
     uint32_t message_length;
     uint8_t digest[32];
-    rsip_hash_type_t hash_type;
     rsip_wrapped_key_t * wrapped_key;
 
     if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
@@ -317,13 +308,13 @@ static TEE_Result rsassa_pss_verify(uint32_t types, TEE_Param params[TEE_NUM_PAR
         return TEE_ERROR_BAD_PARAMETERS;
     }
 
-    result = generate_hash(message, message_length, &hash_type, digest);
+    result = generate_hash(message, message_length, RSIP_HASH_TYPE_SHA256, digest);
     if (TEE_SUCCESS != result) {
         return result;
     }
 
-    err = R_RSIP_RSASSA_PSS_Verify(&rsip_instance_ctrl, wrapped_key, hash_type, mgf_type,
-        salt_length, digest, signature);
+    err = R_RSIP_RSASSA_PSS_Verify(&rsip_instance_ctrl, wrapped_key, RSIP_HASH_TYPE_SHA256, RSIP_MGF_TYPE_MGF1_SHA256,
+        RSIP_RSA_SALT_LENGTH_HASH, digest, signature);
     switch ((uint32_t)err)
     {
         case FSP_SUCCESS:
@@ -356,7 +347,7 @@ static TEE_Result rsassa_pss_verify(uint32_t types, TEE_Param params[TEE_NUM_PAR
 }
 
 
-static TEE_Result rsa_encrypt(uint32_t types, TEE_Param params[TEE_NUM_PARAMS], 
+static TEE_Result rsa_encrypt(uint32_t types, TEE_Param params[TEE_NUM_PARAMS],
     uint32_t cipher_size, rsip_byte_size_wrapped_key_t key_size)
 {
     fsp_err_t err;
@@ -560,7 +551,7 @@ static TEE_Result rsaes_pkcs1_v1_5_encrypt(uint32_t types, TEE_Param params[TEE_
 }
 
 
-static TEE_Result rsaes_pkcs1_v1_5_decrypt(uint32_t types, TEE_Param params[TEE_NUM_PARAMS], 
+static TEE_Result rsaes_pkcs1_v1_5_decrypt(uint32_t types, TEE_Param params[TEE_NUM_PARAMS],
     rsip_byte_size_wrapped_key_t key_size)
 {
     fsp_err_t err;
@@ -584,7 +575,7 @@ static TEE_Result rsaes_pkcs1_v1_5_decrypt(uint32_t types, TEE_Param params[TEE_
     if (!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t)) {
         return TEE_ERROR_BAD_PARAMETERS;
     }
-    
+
     plain = (uint8_t *)params[1].memref.buffer;
     plain_length = (uint32_t)params[1].memref.size;
     if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) || (plain_length < cipher_length)) {
@@ -679,7 +670,7 @@ static TEE_Result rsaes_oaep_encrypt(uint32_t types, TEE_Param params[TEE_NUM_PA
         return TEE_ERROR_BAD_PARAMETERS;
     }
 
-    err = R_RSIP_RSAES_OAEP_Encrypt(&rsip_instance_ctrl, wrapped_key, hash_type, mgf_type,
+    err = R_RSIP_RSAES_OAEP_Encrypt(&rsip_instance_ctrl, wrapped_key, RSIP_HASH_TYPE_SHA256, RSIP_MGF_TYPE_MGF1_SHA256,
         label, label_length, plain, plain_length, cipher);
     switch ((uint32_t)err)
     {
@@ -762,7 +753,7 @@ static TEE_Result rsaes_oaep_decrypt(uint32_t types, TEE_Param params[TEE_NUM_PA
         return TEE_ERROR_BAD_PARAMETERS;
     }
 
-    err = R_RSIP_RSAES_OAEP_Decrypt(&rsip_instance_ctrl, wrapped_key, hash_type, mgf_type,
+    err = R_RSIP_RSAES_OAEP_Decrypt(&rsip_instance_ctrl, wrapped_key, RSIP_HASH_TYPE_SHA256, RSIP_MGF_TYPE_MGF1_SHA256,
         label, label_length, cipher, plain, &plain_length, plain_buffer_length);
     switch ((uint32_t)err)
     {
@@ -940,26 +931,22 @@ static TEE_Result rsaes_pkcs4096_encrypt(uint32_t types, TEE_Param params[TEE_NU
 }
 
 
-static TEE_Result rsaes_pkcs1024_decrypt(uint32_t types, TEE_Param params[TEE_NUM_PARAMS]
-)
+static TEE_Result rsaes_pkcs1024_decrypt(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
 {
     return rsaes_pkcs1_v1_5_decrypt(types, params, RSIP_BYTE_SIZE_WRAPPED_KEY_RSA_1024_PRIVATE_ENHANCED);
 }
 
-static TEE_Result rsaes_pkcs2048_decrypt(uint32_t types, TEE_Param params[TEE_NUM_PARAMS]
-)
+static TEE_Result rsaes_pkcs2048_decrypt(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
 {
     return rsaes_pkcs1_v1_5_decrypt(types, params, RSIP_BYTE_SIZE_WRAPPED_KEY_RSA_2048_PRIVATE_ENHANCED);
 }
 
-static TEE_Result rsaes_pkcs3072_decrypt(uint32_t types, TEE_Param params[TEE_NUM_PARAMS]
-)
+static TEE_Result rsaes_pkcs3072_decrypt(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
 {
     return rsaes_pkcs1_v1_5_decrypt(types, params, RSIP_BYTE_SIZE_WRAPPED_KEY_RSA_3072_PRIVATE);
 }
 
-static TEE_Result rsaes_pkcs4096_decrypt(uint32_t types, TEE_Param params[TEE_NUM_PARAMS]
-)
+static TEE_Result rsaes_pkcs4096_decrypt(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
 {
     return rsaes_pkcs1_v1_5_decrypt(types, params, RSIP_BYTE_SIZE_WRAPPED_KEY_RSA_4096_PRIVATE);
 }
@@ -1048,7 +1035,6 @@ static TEE_Result invoke_command(void *session __unused, uint32_t cmd,
             return rsassa_pss3072_verify(ptypes, params);
         case PTA_CMD_RSASSA_PSS4096_SignatureVerify  :
             return rsassa_pss4096_verify(ptypes, params);
-
 
         case PTA_CMD_RSA_1024_Encrypt :
             return rsa_1024_encrypt(ptypes, params);

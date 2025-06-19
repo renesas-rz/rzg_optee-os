@@ -1,15 +1,14 @@
+/* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Copyright (c) 2020, Renesas Electronics Corporation. All rights reserved.
- *
- * SPDX-License-Identifier: BSD-3-Clause
+ * Copyright (c) 2020, Renesas Electronics Corporation
  */
 
 /*! *****************************************************************************
     @file    TSIP_Stub_API.h
     @brief   TSIP Stub Layer API
-    
+
     @par    History
-    @subsection sub_history 
+    @subsection sub_history
       - Initial version\n
  ********************************************************************************/
 
@@ -33,4 +32,3 @@ void *TSIP_Memcpy(void *Buf1, const void *Buf2, size_t Num);
 void *TSIP_Memset(void *Buf, int Ch, size_t Num);
 
 #endif  /* TSIP_STUB_API_H_ */
-

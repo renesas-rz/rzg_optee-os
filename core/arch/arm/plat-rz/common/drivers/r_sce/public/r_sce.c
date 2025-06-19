@@ -1,22 +1,9 @@
-/**********************************************************************************************************************
- * DISCLAIMER
- * This software is supplied by Renesas Electronics Corporation and is only intended for use with Renesas products. No
- * other uses are authorized. This software is owned by Renesas Electronics Corporation and is protected under all
- * applicable laws, including copyright laws.
- * THIS SOFTWARE IS PROVIDED "AS IS" AND RENESAS MAKES NO WARRANTIES REGARDING
- * THIS SOFTWARE, WHETHER EXPRESS, IMPLIED OR STATUTORY, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. ALL SUCH WARRANTIES ARE EXPRESSLY DISCLAIMED. TO THE MAXIMUM
- * EXTENT PERMITTED NOT PROHIBITED BY LAW, NEITHER RENESAS ELECTRONICS CORPORATION NOR ANY OF ITS AFFILIATED COMPANIES
- * SHALL BE LIABLE FOR ANY DIRECT, INDIRECT, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES FOR ANY REASON RELATED TO
- * THIS SOFTWARE, EVEN IF RENESAS OR ITS AFFILIATES HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
- * Renesas reserves the right, without notice, to make changes to this software and to discontinue the availability of
- * this software. By using this software, you agree to the additional terms and conditions found by accessing the
- * following link:
- * http://www.renesas.com/disclaimer
- *
- * Copyright (C) 2022 Renesas Electronics Corporation. All rights reserved.
- *********************************************************************************************************************/
-/**********************************************************************************************************************
+// SPDX-License-Identifier: BSD-3-Clause
+/*
+ * Copyright (c) 2022, Renesas Electronics Corporation
+ */
+
+ /**********************************************************************************************************************
  * File Name    : r_sce.c
  * Version      : 1.0
  * Description  : SCE Common Public API source file
@@ -905,7 +892,7 @@ fsp_err_t R_SCE_ECC_secp256r1_WrappedKeyPairGenerate (sce_ecc_wrapped_pair_key_t
 }
 
 /*******************************************************************************************************************//**
- * This is an API for outputting a wrapped key pair for BrainpoolP512r1 public key and private key pair. 
+ * This is an API for outputting a wrapped key pair for BrainpoolP512r1 public key and private key pair.
  * These keys are generated from a random number value internally within the SCE.
  * There is therefore no need to input user keys. It is possible to prevent dead copying of data by using the
  * wrapped key output by this API to encrypt the data. The public key index is generated in wrapped_pair_key->pub_key,

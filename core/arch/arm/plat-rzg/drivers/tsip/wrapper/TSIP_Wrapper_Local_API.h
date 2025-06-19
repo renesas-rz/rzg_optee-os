@@ -1,15 +1,14 @@
+/* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Copyright (c) 2020, Renesas Electronics Corporation. All rights reserved.
- *
- * SPDX-License-Identifier: BSD-3-Clause
+ * Copyright (c) 2020, Renesas Electronics Corporation
  */
 
 /*! *****************************************************************************
     @file    TSIP_Wrapper_Local_API.h
     @brief   Wrapper Layer Local API
-    
+
     @par    History
-    @subsection sub_history 
+    @subsection sub_history
       - Initial version\n
  ********************************************************************************/
 
@@ -26,4 +25,3 @@ uint32_t TSIP_Wrapper_Init(void);
 uint8_t  Is_TSIP_Wrapper_Init(void);
 
 #endif  /* TSIP_WRAPPER_LOCAL_API_H */
-

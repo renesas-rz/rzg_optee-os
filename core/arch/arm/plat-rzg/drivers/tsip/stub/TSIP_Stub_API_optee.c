@@ -1,7 +1,6 @@
+// SPDX-License-Identifier: BSD-3-Clause
 /*
- * Copyright (c) 2020, Renesas Electronics Corporation. All rights reserved.
- *
- * SPDX-License-Identifier: BSD-3-Clause
+ * Copyright (c) 2020, Renesas Electronics Corporation
  */
 
 /*! *****************************************************************************
@@ -143,4 +142,3 @@ void *TSIP_Memset(void *Buf, int Ch, size_t Num)
 {
     return memset(Buf, Ch, Num);
 }
-

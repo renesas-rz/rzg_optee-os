@@ -1,7 +1,8 @@
-// SPDX-License-Identifier: BSD-2-Clause
+/* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Copyright (c) 2024, Renesas Electronics
+ * Copyright (c) 2024, Renesas Electronics Corporation
  */
+
 #ifndef __PTA_RSIP_RSA_H
 #define __PTA_RSIP_RSA_H
 
@@ -24,7 +25,7 @@
 
 /*
  * Signs message with RSASSA-PKCS1-v1_5.
- * 
+ *
  * Hash function : SHA-256
  */
 
@@ -36,7 +37,8 @@
 #define PTA_CMD_RSASSA_PKCS1024_SignatureGenerate   (0x00040000)
 /*
  * [in]      memref[0] : Signature (128byte)
- * [in]      memref[1] : Wrapped key (rsip_wrapped_key_t:180byte)
+ * [in]      memref[1] : Message
+ * [in]      memref[2] : Wrapped key (rsip_wrapped_key_t:180byte)
  */
 #define PTA_CMD_RSASSA_PKCS1024_SignatureVerify     (0x00040010)
 /*
@@ -47,7 +49,8 @@
 #define PTA_CMD_RSASSA_PKCS2048_SignatureGenerate   (0x00040100)
 /*
  * [in]      memref[0] : Signature (256byte)
- * [in]      memref[1] : Wrapped key (rsip_wrapped_key_t:308byte)
+ * [in]      memref[1] : Message
+ * [in]      memref[2] : Wrapped key (rsip_wrapped_key_t:308byte)
  */
 #define PTA_CMD_RSASSA_PKCS2048_SignatureVerify     (0x00040110)
 /*
@@ -58,7 +61,8 @@
 #define PTA_CMD_RSASSA_PKCS3072_SignatureGenerate   (0x00040300)
 /*
  * [in]      memref[0] : Signature (384byte)
- * [in]      memref[1] : Wrapped key (rsip_wrapped_key_t:436byte)
+ * [in]      memref[1] : Message
+ * [in]      memref[2] : Wrapped key (rsip_wrapped_key_t:436byte)
  */
 #define PTA_CMD_RSASSA_PKCS3072_SignatureVerify     (0x00040310)
 /*
@@ -69,16 +73,17 @@
 #define PTA_CMD_RSASSA_PKCS4096_SignatureGenerate   (0x00040200)
 /*
  * [in]      memref[0] : Signature (512byte)
- * [in]      memref[1] : Wrapped key (rsip_wrapped_key_t:564byte)
+ * [in]      memref[1] : Message
+ * [in]      memref[2] : Wrapped key (rsip_wrapped_key_t:564byte)
  */
 #define PTA_CMD_RSASSA_PKCS4096_SignatureVerify     (0x00040210)
 
 
 /*
  * Encrypts plaintext with RSAES-PKCS1-v1_5.
- * 
+ *
  * mLen (plain_length) and k (RSA key length) must meet the following condition.
- * 
+ *
  * mlen <= k - 11
  */
 
@@ -134,7 +139,7 @@
 
 /*
  * Signs message with RSASSA-PSS.
- * 
+ *
  * Hash function : SHA-256
  * Mask generation function : MGF1 with SHA-256
  * Salt length : 32byte (hash length of SHA-256)
@@ -237,13 +242,13 @@
 
 /*
  * Encrypts plaintext with RSAES-OAEP.
- * 
+ *
  * Hash function : SHA-256
  * Mask generation function : MGF1 with SHA-256
- * 
+ *
  * mLen (plain_length), hLen (output length of hash_function), and k (RSA key length)
  * must meet the following condition.
- * 
+ *
  * mLen <= k - 2 hLen - 2
  */
 

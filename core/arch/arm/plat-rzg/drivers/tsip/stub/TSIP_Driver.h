@@ -1,15 +1,14 @@
+/* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Copyright (c) 2020, Renesas Electronics Corporation. All rights reserved.
- *
- * SPDX-License-Identifier: BSD-3-Clause
+ * Copyright (c) 2020, Renesas Electronics Corporation
  */
 
 /*! *****************************************************************************
     @file    TSIP_Driver.h
     @brief   TSIP Driver API
-    
+
     @par    History
-    @subsection sub_history 
+    @subsection sub_history
       - Initial version\n
  ********************************************************************************/
 
@@ -48,7 +47,7 @@ void TSIPDrv_Finalize(void);
 #define TSIPDrv_Read(regNumber) \
      *((gpTSIP) + regNumber)
 
-/*! 
+/*!
 	@def    TSIPDrv_Write(regNumber, value)
     @brief     TSIP Driver write macro
  */
@@ -56,5 +55,3 @@ void TSIPDrv_Finalize(void);
     *((gpTSIP) + regNumber) = value
 
 #endif  /* R__TSIP_DRIVER_H__ */
-
-

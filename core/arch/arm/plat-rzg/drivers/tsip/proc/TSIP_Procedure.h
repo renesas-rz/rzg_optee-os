@@ -1,15 +1,14 @@
+/* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Copyright (c) 2020, Renesas Electronics Corporation. All rights reserved.
- *
- * SPDX-License-Identifier: BSD-3-Clause
+ * Copyright (c) 2020, Renesas Electronics Corporation
  */
 
 /*! *****************************************************************************
     @file    TSIP_Procedure.h
     @brief   TSIP Procedure
-    
+
     @par    History
-    @subsection sub_history 
+    @subsection sub_history
     - Initial version\n
  ********************************************************************************/
 
@@ -409,4 +408,3 @@ extern uint8_t TSIPPrc_subprc71(void);
 extern uint8_t TSIPPrc_subprc72(void);
 
 #endif  /* TSIP_PROCEDURE_H */
-

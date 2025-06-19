@@ -1,15 +1,14 @@
+// SPDX-License-Identifier: BSD-3-Clause
 /*
- * Copyright (c) 2020, Renesas Electronics Corporation. All rights reserved.
- *
- * SPDX-License-Identifier: BSD-3-Clause
+ * Copyright (c) 2020, Renesas Electronics Corporation
  */
 
 /*! *****************************************************************************
     @file    TSIP_Core_Lib_Init_API.c
     @brief   Library initialization
-    
+
     @par    History
-    @subsection sub_history 
+    @subsection sub_history
       - Initial version\n
  ********************************************************************************/
 
@@ -40,16 +39,16 @@ static uint32_t get_TSIP_Core_TSIPStatus(void);
 /*! *****************************************************************************
     @fn       static uint32_t get_TSIP_Core_TSIPStatus(void)
     @brief    get TSIP library state
-    
+
     @param     nothing
-    
+
     @retval    R_PASS                  success
     @retval    R_SEQUENCE_FAIL         cannot perform in current state
     @retval    R_FALSIFICATION_ERROR   tampering detection error
-    
+
     @par    Details
     It get library state by checking TSIP state(FSM1,FSM2) and tampering detection flag(REG18H)
-    
+
     @par    Processing flow
     -# get tampering detection flag of TSIP REG18H
         - TSIPDrv_Read()
@@ -87,21 +86,21 @@ static uint32_t get_TSIP_Core_TSIPStatus(void)
                                      uint8_t *TSIP_BaseAddress,
                                      uint8_t *MSTP_BaseAddress)
     @brief    Library initiaization
-    
+
     @param     [in]        *S_RAMData          Pointer of S_RAM data(it needs 480Byte area)
     @param     [in]        *S_INSTData         Pointer of S_INST data(it needs 1296Byte area)
     @param     [in]        *TSIP_BaseAddress   Logical pointer of TSIP Base Address
     @param     [in]        *MSTP_BaseAddress   Logical pointer of MSTP Base Address
-    
+
     @retval    R_PASS                   success
     @retval    R_PARAMETER_FAIL         invalid input parameter
     @retval    R_SEQUENCE_FAIL          cannot perform in current state
     @retval    R_MMAP_FAIL              error occur of mmap()
     @retval    R_FALSIFICATION_ERROR    tampering detection error
-    
+
     @par    Details
     It performs initialization of TSIP library and self-checking of TSIP \n
-    
+
     @par    Processing flow
     -# check initialization state of TSIP_Core layer
         - Is_TSIP_Core_Init()

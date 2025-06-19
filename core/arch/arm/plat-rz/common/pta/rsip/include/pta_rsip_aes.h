@@ -1,7 +1,8 @@
-// SPDX-License-Identifier: BSD-2-Clause
+/* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Copyright (c) 2024, Renesas Electronics
+ * Copyright (c) 2024, Renesas Electronics Corporation
  */
+
 #ifndef __PTA_RSIP_AES_H
 #define __PTA_RSIP_AES_H
 
@@ -24,7 +25,7 @@
  */
 #define PTA_CMD_AES128ECB_EncryptUpdate     (0x00020002)
 /*
- * [in/out] memref[0] : Cipher (32byte)
+ * [in/out] memref[0] : Cipher
  */
 #define PTA_CMD_AES128ECB_EncryptFinal      (0x00020003)
 /*
@@ -37,7 +38,7 @@
  */
 #define PTA_CMD_AES128ECB_DecryptUpdate     (0x00020012)
 /*
- * [in/out] memref[0] : Plain (32byte)
+ * [in/out] memref[0] : Plain (No outputs)
  */
 #define PTA_CMD_AES128ECB_DecryptFinal      (0x00020013)
 
@@ -51,7 +52,7 @@
  */
 #define PTA_CMD_AES256ECB_EncryptUpdate     (0x00020102)
 /*
- * [in/out] memref[0] : Cipher (32byte)
+ * [in/out] memref[0] : Cipher
  */
 #define PTA_CMD_AES256ECB_EncryptFinal      (0x00020103)
 /*
@@ -64,7 +65,7 @@
  */
 #define PTA_CMD_AES256ECB_DecryptUpdate     (0x00020112)
 /*
- * [in/out] memref[0] : Plain (32byte)
+ * [in/out] memref[0] : Plain (No outputs)
  */
 #define PTA_CMD_AES256ECB_DecryptFinal      (0x00020113)
 
@@ -79,7 +80,7 @@
  */
 #define PTA_CMD_AES128CBC_EncryptUpdate     (0x00021002)
 /*
- * [in/out] memref[0] : Cipher (32byte)
+ * [in/out] memref[0] : Cipher
  */
 #define PTA_CMD_AES128CBC_EncryptFinal      (0x00021003)
 /*
@@ -93,7 +94,7 @@
  */
 #define PTA_CMD_AES128CBC_DecryptUpdate     (0x00021012)
 /*
- * [in/out] memref[0] : Plain (32byte)
+ * [in/out] memref[0] : Plain (No outputs)
  */
 #define PTA_CMD_AES128CBC_DecryptFinal      (0x00021013)
 
@@ -108,7 +109,7 @@
  */
 #define PTA_CMD_AES256CBC_EncryptUpdate     (0x00021102)
 /*
- * [in/out] memref[0] : Cipher (32byte)
+ * [in/out] memref[0] : Cipher
  */
 #define PTA_CMD_AES256CBC_EncryptFinal      (0x00021103)
 /*
@@ -122,7 +123,7 @@
  */
 #define PTA_CMD_AES256CBC_DecryptUpdate     (0x00021112)
 /*
- * [in/out] memref[0] : Plain (32byte)
+ * [in/out] memref[0] : Plain (No outputs)
  */
 #define PTA_CMD_AES256CBC_DecryptFinal      (0x00021113)
 
@@ -137,7 +138,7 @@
  */
 #define PTA_CMD_AES128CTR_EncryptUpdate     (0x00022002)
 /*
- * [in/out] memref[0] : Cipher (32byte)
+ * [in/out] memref[0] : Cipher
  */
 #define PTA_CMD_AES128CTR_EncryptFinal      (0x00022003)
 /*
@@ -151,7 +152,7 @@
  */
 #define PTA_CMD_AES128CTR_DecryptUpdate     (0x00022012)
 /*
- * [in/out] memref[0] : Plain (32byte)
+ * [in/out] memref[0] : Plain (No outputs)
  */
 #define PTA_CMD_AES128CTR_DecryptFinal      (0x00022013)
 
@@ -166,7 +167,7 @@
  */
 #define PTA_CMD_AES256CTR_EncryptUpdate     (0x00022102)
 /*
- * [in/out] memref[0] : Cipher (32byte)
+ * [in/out] memref[0] : Cipher
  */
 #define PTA_CMD_AES256CTR_EncryptFinal      (0x00022103)
 /*
@@ -180,7 +181,7 @@
  */
 #define PTA_CMD_AES256CTR_DecryptUpdate     (0x00022112)
 /*
- * [in/out] memref[0] : Plain (32byte)
+ * [in/out] memref[0] : Plain (No outputs)
  */
 #define PTA_CMD_AES256CTR_DecryptFinal      (0x00022113)
 
@@ -240,12 +241,12 @@
  */
 #define PTA_CMD_AES128XTS_EncryptInit       (0x00024001)
 /*
- * [in]     memref[0] : Plain 
+ * [in]     memref[0] : Plain
  * [in/out] memref[1] : Cipher
  */
 #define PTA_CMD_AES128XTS_EncryptUpdate     (0x00024002)
 /*
- * [in/out] memref[0] : Cipher (32byte)
+ * [in/out] memref[0] : Cipher
  */
 #define PTA_CMD_AES128XTS_EncryptFinal      (0x00024003)
 /*
@@ -259,7 +260,7 @@
  */
 #define PTA_CMD_AES128XTS_DecryptUpdate     (0x00024012)
 /*
- * [in/out] memref[0] : Plain (32byte)
+ * [in/out] memref[0] : Plain
  */
 #define PTA_CMD_AES128XTS_DecryptFinal      (0x00024013)
 
@@ -269,12 +270,12 @@
  */
 #define PTA_CMD_AES256XTS_EncryptInit       (0x00024101)
 /*
- * [in]     memref[0] : Plain 
+ * [in]     memref[0] : Plain
  * [in/out] memref[1] : Cipher
  */
 #define PTA_CMD_AES256XTS_EncryptUpdate     (0x00024102)
 /*
- * [in/out] memref[0] : Cipher (32byte)
+ * [in/out] memref[0] : Cipher
  */
 #define PTA_CMD_AES256XTS_EncryptFinal      (0x00024103)
 /*
@@ -288,7 +289,7 @@
  */
 #define PTA_CMD_AES256XTS_DecryptUpdate     (0x00024112)
 /*
- * [in/out] memref[0] : Plain (32byte)
+ * [in/out] memref[0] : Plain
  */
 #define PTA_CMD_AES256XTS_DecryptFinal      (0x00024113)
 
@@ -300,7 +301,7 @@
 /*
  * [in]     memref[0] : Plain
  * [in/out] memref[1] : Cipher
- * [in]     memref[2] : AAD 
+ * [in]     memref[2] : AAD
  */
 #define PTA_CMD_AES128GCM_EncryptUpdate     (0x00025002)
 /*
@@ -316,7 +317,7 @@
 /*
  * [in]     memref[0] : Cipher
  * [in/out] memref[1] : Plain
- * [in]     memref[2] : AAD 
+ * [in]     memref[2] : AAD
  */
 #define PTA_CMD_AES128GCM_DecryptUpdate     (0x00025012)
 /*
@@ -333,7 +334,7 @@
 /*
  * [in]     memref[0] : Plain
  * [in/out] memref[1] : Cipher
- * [in]     memref[2] : AAD 
+ * [in]     memref[2] : AAD
  */
 #define PTA_CMD_AES256GCM_EncryptUpdate     (0x00025102)
 /*
@@ -349,7 +350,7 @@
 /*
  * [in]     memref[0] : Cipher
  * [in/out] memref[1] : Plain
- * [in]     memref[2] : AAD 
+ * [in]     memref[2] : AAD
  */
 #define PTA_CMD_AES256GCM_DecryptUpdate     (0x00025112)
 /*

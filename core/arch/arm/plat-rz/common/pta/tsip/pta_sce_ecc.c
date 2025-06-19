@@ -1,6 +1,6 @@
-// SPDX-License-Identifier: BSD-2-Clause
+// SPDX-License-Identifier: BSD-3-Clause
 /*
- * Copyright (c) 2022, Renesas Electronics
+ * Copyright (c) 2022, Renesas Electronics Corporation
  */
 
 #include <kernel/pseudo_ta.h>
@@ -41,7 +41,7 @@ static TEE_Result ecdsa_secp192r1_signaturegenerate(uint32_t types, TEE_Param pa
     if ((NULL == signature.pdata) || (HW_SCE_ECDSA_DATA_BYTE_SIZE > signature.data_length)) {
         return TEE_ERROR_BAD_PARAMETERS;
     }
-    
+
     wrapped_key = (sce_ecc_private_wrapped_key_t *)params[2].memref.buffer;
     if ((NULL == wrapped_key) || (sizeof(sce_ecc_private_wrapped_key_t) != params[2].memref.size)) {
         return TEE_ERROR_BAD_PARAMETERS;
@@ -95,7 +95,7 @@ static TEE_Result ecdsa_secp192r1_signatureverify(uint32_t types, TEE_Param para
     if ((NULL == message_hash.pdata) && (0 < message_hash.data_length)) {
         return TEE_ERROR_BAD_PARAMETERS;
     }
-    
+
     wrapped_key = (sce_ecc_public_wrapped_key_t *)params[2].memref.buffer;
     if ((NULL == wrapped_key) || (sizeof(sce_ecc_public_wrapped_key_t) != params[2].memref.size)) {
         return TEE_ERROR_BAD_PARAMETERS;
@@ -149,7 +149,7 @@ static TEE_Result ecdsa_secp224r1_signaturegenerate(uint32_t types, TEE_Param pa
     if ((NULL == signature.pdata) || (HW_SCE_ECDSA_DATA_BYTE_SIZE > signature.data_length)) {
         return TEE_ERROR_BAD_PARAMETERS;
     }
-    
+
     wrapped_key = (sce_ecc_private_wrapped_key_t *)params[2].memref.buffer;
     if ((NULL == wrapped_key) || (sizeof(sce_ecc_private_wrapped_key_t) != params[2].memref.size)) {
         return TEE_ERROR_BAD_PARAMETERS;
@@ -203,7 +203,7 @@ static TEE_Result ecdsa_secp224r1_signatureverify(uint32_t types, TEE_Param para
     if ((NULL == message_hash.pdata) && (0 < message_hash.data_length)) {
         return TEE_ERROR_BAD_PARAMETERS;
     }
-    
+
     wrapped_key = (sce_ecc_public_wrapped_key_t *)params[2].memref.buffer;
     if ((NULL == wrapped_key) || (sizeof(sce_ecc_public_wrapped_key_t) != params[2].memref.size)) {
         return TEE_ERROR_BAD_PARAMETERS;
@@ -257,7 +257,7 @@ static TEE_Result ecdsa_secp256r1_signaturegenerate(uint32_t types, TEE_Param pa
     if ((NULL == signature.pdata) || (HW_SCE_ECDSA_DATA_BYTE_SIZE > signature.data_length)) {
         return TEE_ERROR_BAD_PARAMETERS;
     }
-    
+
     wrapped_key = (sce_ecc_private_wrapped_key_t *)params[2].memref.buffer;
     if ((NULL == wrapped_key) || (sizeof(sce_ecc_private_wrapped_key_t) != params[2].memref.size)) {
         return TEE_ERROR_BAD_PARAMETERS;
@@ -311,7 +311,7 @@ static TEE_Result ecdsa_secp256r1_signatureverify(uint32_t types, TEE_Param para
     if ((NULL == message_hash.pdata) && (0 < message_hash.data_length)) {
         return TEE_ERROR_BAD_PARAMETERS;
     }
-    
+
     wrapped_key = (sce_ecc_public_wrapped_key_t *)params[2].memref.buffer;
     if ((NULL == wrapped_key) || (sizeof(sce_ecc_public_wrapped_key_t) != params[2].memref.size)) {
         return TEE_ERROR_BAD_PARAMETERS;
@@ -355,19 +355,19 @@ static TEE_Result ecdsa_brainpoolp512r1_signaturegenerate(uint32_t types, TEE_Pa
     message_hash.pdata = (uint8_t *)sha512_hash;
     message_hash.data_length = HW_SCE_SHA512_HASH_LENGTH_BYTE_SIZE;
     message_hash.data_type = 1;
-    err = tee_hash_createdigest(TEE_ALG_SHA512, params[0].memref.buffer, params[0].memref.size, 
+    err = tee_hash_createdigest(TEE_ALG_SHA512, params[0].memref.buffer, params[0].memref.size,
         message_hash.pdata, message_hash.data_length);
     if (err) {
         return err;
     }
-    
+
     signature.pdata = (uint8_t *)params[1].memref.buffer;
     signature.data_length = params[1].memref.size;
     signature.data_type = 0;
     if ((NULL == signature.pdata) || (HW_SCE_ECDSA_P512_DATA_BYTE_SIZE > signature.data_length)) {
         return TEE_ERROR_BAD_PARAMETERS;
     }
-    
+
     wrapped_key = (sce_ecc_private_wrapped_key_t *)params[2].memref.buffer;
     if ((NULL == wrapped_key) || (sizeof(sce_ecc_private_wrapped_key_t) != params[2].memref.size)) {
         return TEE_ERROR_BAD_PARAMETERS;
@@ -418,12 +418,12 @@ static TEE_Result ecdsa_brainpoolp512r1_signatureverify(uint32_t types, TEE_Para
     message_hash.pdata = (uint8_t *)sha512_hash;
     message_hash.data_length = HW_SCE_SHA512_HASH_LENGTH_BYTE_SIZE;
     message_hash.data_type = 1;
-    err = tee_hash_createdigest(TEE_ALG_SHA512, params[1].memref.buffer, params[1].memref.size, 
+    err = tee_hash_createdigest(TEE_ALG_SHA512, params[1].memref.buffer, params[1].memref.size,
         message_hash.pdata, message_hash.data_length);
     if (err) {
         return err;
     }
-    
+
     wrapped_key = (sce_ecc_public_wrapped_key_t *)params[2].memref.buffer;
     if ((NULL == wrapped_key) || (sizeof(sce_ecc_public_wrapped_key_t) != params[2].memref.size)) {
         return TEE_ERROR_BAD_PARAMETERS;

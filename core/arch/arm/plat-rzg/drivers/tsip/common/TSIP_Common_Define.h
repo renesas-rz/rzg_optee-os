@@ -1,15 +1,14 @@
+/* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Copyright (c) 2020, Renesas Electronics Corporation. All rights reserved.
- *
- * SPDX-License-Identifier: BSD-3-Clause
+ * Copyright (c) 2020, Renesas Electronics Corporation
  */
 
 /*! *****************************************************************************
     @file    TSIP_Common_Define.h
     @brief   TSIP Common Define
-    
+
     @par    History
-    @subsection sub_history 
+    @subsection sub_history
       - Initial version
  ********************************************************************************/
 
@@ -57,7 +56,7 @@
     @name Procedure Return Code
  */
 /* @{ */
-#define RETURN_OK               ((uint8_t)0x00)    /*!< command success */ 
+#define RETURN_OK               ((uint8_t)0x00)    /*!< command success */
 #define ILLEGAL_PARAMETER       ((uint8_t)0x11)    /*!< command parameter error */
 #define SELFTEST_FAIL           ((uint8_t)0x51)    /*!< selftest failure */
 #define FALSIFICATION_ERROR     ((uint8_t)0x60)    /*!< tamper detection error */
@@ -193,4 +192,3 @@
 #define  TSIP_JUDG_FLAG_NG      (0x00008000U)
 
 #endif  /* TSIP_COMMON_DEFINE_H_ */
-

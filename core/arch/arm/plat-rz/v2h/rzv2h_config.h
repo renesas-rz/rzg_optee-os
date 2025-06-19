@@ -1,7 +1,6 @@
-/* SPDX-License-Identifier: BSD-2-Clause */
+/* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Copyright (c) 2016, GlobalLogic
- * Copyright (c) 2021-2024, Renesas Electronics
+ * Copyright (c) 2021-2025, Renesas Electronics Corporation
  */
 
 #ifndef RZV2H_CONFIG_H
@@ -24,12 +23,13 @@
 
 #define SPI_FLASH_BASE		0x20000000U
 #define SPI_FLASH_SIZE		0x10000000
-#define SPI_SECTOR_SIZE		0x10000
+#define SPI_SECTOR_SIZE		0x00010000
 
-#define XSPI_BASE			0x11030000U
-#define XSPI_REG_SIZE		0x10000
+#define XSPI_REG_BASE		0x11030000U
+#define XSPI_REG_SIZE		0x00010000
 
-#define HW_SCE_BASE			0x10440000
+#define SCE_REG_BASE		0x10440000
+#define SCE_REG_SIZE		0x00010000
 
 #if defined(PLATFORM_FLAVOR_v2h_evk_1) || defined(PLATFORM_FLAVOR_v2n_evk)
 /* DDR 8Gbyte x1 */
@@ -45,6 +45,6 @@
 #endif
 
 #define TEE_SHMEM_START		(TZDRAM_BASE + TZDRAM_SIZE)
-#define TEE_SHMEM_SIZE		0x100000
+#define TEE_SHMEM_SIZE		0x00100000
 
 #endif /*RZV2H_CONFIG_H*/

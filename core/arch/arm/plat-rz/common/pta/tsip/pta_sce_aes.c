@@ -1,6 +1,6 @@
-// SPDX-License-Identifier: BSD-2-Clause
+// SPDX-License-Identifier: BSD-3-Clause
 /*
- * Copyright (c) 2022, Renesas Electronics
+ * Copyright (c) 2022, Renesas Electronics Corporation
  */
 
 #include <kernel/pseudo_ta.h>
@@ -2008,7 +2008,7 @@ static TEE_Result aes256cmac_generatefinal(uint32_t types, TEE_Param params[TEE_
     }
 
     params[1].memref.size = HW_SCE_AES_BLOCK_BYTE_SIZE;
-    
+
     return TEE_SUCCESS;
 }
 

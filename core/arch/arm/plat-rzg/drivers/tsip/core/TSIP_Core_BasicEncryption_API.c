@@ -1,15 +1,14 @@
+// SPDX-License-Identifier: BSD-3-Clause
 /*
- * Copyright (c) 2020, Renesas Electronics Corporation. All rights reserved.
- *
- * SPDX-License-Identifier: BSD-3-Clause
+ * Copyright (c) 2020, Renesas Electronics Corporation
  */
 
 /*! *****************************************************************************
     @file    TSIP_Core_BasicEncryption_API.c
     @brief   Basic encryption
-    
+
     @par    History
-    @subsection sub_history 
+    @subsection sub_history
       - Initial version\n
  ********************************************************************************/
 
@@ -36,7 +35,7 @@
 /*! *****************************************************************************
     @fn       uint32_t TSIP_BCF_GenerateRandom(uint32_t InData_GenByteSize, uint32_t InData_UseCASE, uint8_t *OutData)
     @brief    Random number generation
-    
+
     @param     [in]        InData_GenByteSize         Bytes number of generated random
     @param     [in]        InData_UseCASE             Use case of random (set only 0)
     @param     [out]       *OutData                   Pointer of random
@@ -45,10 +44,10 @@
     @retval    R_PARAMETER_FAIL         invalid input parameter
     @retval    R_SEQUENCE_FAIL          cannot perform in current state
     @retval    R_RESOURCE_CONFLICT_FAIL resource for this process already used in other process
-    
+
     @par    Details
     It generates random number \n
-    
+
     @par    Processing flow
     -# check initialization state in TSIP_Core layer
         - Is_TSIP_Core_Init()
@@ -86,5 +85,3 @@ uint32_t TSIP_BCF_GenerateRandom(
 
     return RetCode;
 }
-
-

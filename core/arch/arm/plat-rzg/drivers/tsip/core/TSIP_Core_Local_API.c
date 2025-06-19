@@ -1,15 +1,14 @@
+// SPDX-License-Identifier: BSD-3-Clause
 /*
- * Copyright (c) 2020, Renesas Electronics Corporation. All rights reserved.
- *
- * SPDX-License-Identifier: BSD-3-Clause
+ * Copyright (c) 2020, Renesas Electronics Corporation
  */
 
 /*! *****************************************************************************
     @file    TSIP_Core_Local_API.c
     @brief   TSIP Core Layer Local API
-    
+
     @par    History
-    @subsection sub_history 
+    @subsection sub_history
       - Initial version\n
  ********************************************************************************/
 
@@ -87,7 +86,7 @@ const uint16_t RequireState_TBL[TSIP_STATE_TAG_MAX][TSIP_CORE_STATE_MAX_ARRAY] =
     @param     [in]        SetValue         transition state
 
     @retval    void
-    
+
     @par    Details
     It set initialization flag of TSIP Core layer
 
@@ -112,7 +111,7 @@ void TSIP_Core_Set_Init(uint8_t SetValue)
 
     @retval    R_PASS                  success
     @retval    R_PARAMETER_FAIL        invalid input parameter
-    
+
     @par    Details
     It set transition state of TSIP Core layer
 
@@ -132,7 +131,7 @@ void TSIP_Core_Set_State(uint32_t State)
     @param     [in]        S_INSTData        Pointer of S_INST area
 
     @retval    R_PASS                  success
-    
+
     @par    Details
     It perform initialization of TSIP Core
 
@@ -152,10 +151,10 @@ uint32_t TSIP_Core_Init(unsigned char *S_RAMData, unsigned char *S_INSTData)
 /*! *****************************************************************************
     @fn       uint8_t Is_TSIP_Core_Init(void)
     @brief    check initialization of TSIP Core Layer
-    
+
     @retval    TSIP_TRUE                  initialized
     @retval    TSIP_FALSE                 not initialized
-    
+
     @par    Details
     It check if it has been initialized in TSIP Core Layer
 
@@ -176,7 +175,7 @@ uint8_t Is_TSIP_Core_Init(void)
 
     @retval    R_PASS                  success
     @retval    R_SEQUENCE_FAIL         cannot perform in current state
-    
+
     @par    Details
     It checks transition state that API can perform
 
@@ -208,7 +207,7 @@ uint32_t TSIP_Core_Check_State(uint32_t Tag)
     @param     [in]        Data         64bit data
 
     @retval    endian swapped data
-    
+
     @par    Details
     It perform endian swapping for 64bit data.
 

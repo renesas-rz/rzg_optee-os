@@ -1,6 +1,5 @@
-// SPDX-License-Identifier: BSD-2-Clause
+// SPDX-License-Identifier: BSD-3-Clause
 /*
- * Copyright (c) 2014, STMicroelectronics International N.V.
  * Copyright (c) 2019-2023, Renesas Electronics Corporation
  */
 

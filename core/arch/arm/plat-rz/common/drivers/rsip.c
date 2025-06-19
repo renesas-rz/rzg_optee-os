@@ -1,7 +1,8 @@
-// SPDX-License-Identifier: BSD-2-Clause
+// SPDX-License-Identifier: BSD-3-Clause
 /*
- * Copyright (c) 2024, Renesas Electronics
+ * Copyright (c) 2024, Renesas Electronics Corporation
  */
+
 #include <string.h>
 #include <assert.h>
 #include <initcall.h>
@@ -12,7 +13,7 @@
 #include <r_rsip.h>
 #include <r_rsip_addr.h>
 
-register_phys_mem_pgdir(MEM_AREA_IO_SEC, RSIP_BASE, RSIP_SIZE);
+register_phys_mem_pgdir(MEM_AREA_IO_SEC, SCE_REG_BASE, SCE_REG_SIZE);
 
 rsip_cfg_t rsip_cfg;
 rsip_instance_ctrl_t rsip_instance_ctrl;
@@ -23,7 +24,7 @@ static TEE_Result RSIP_Init(void)
 {
     fsp_err_t err;
 
-    gp_sce = (uint32_t *) phys_to_virt_io(RSIP_BASE, RSIP_SIZE);
+    gp_sce = (uint32_t *) phys_to_virt_io(SCE_REG_BASE, SCE_REG_SIZE);
 
     err = R_RSIP_Open(&rsip_instance_ctrl, &rsip_cfg);
     if (FSP_SUCCESS != err)

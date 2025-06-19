@@ -1,8 +1,8 @@
+// SPDX-License-Identifier: BSD-3-Clause
 /*
- * Copyright (c) 2023, Renesas Electronics Corporation. All rights reserved.
- *
- * SPDX-License-Identifier: BSD-3-Clause
+ * Copyright (c) 2023, Renesas Electronics Corporation
  */
+
 #include <stdint.h>
 #include <stddef.h>
 #include <string.h>
@@ -42,7 +42,7 @@ static void sflash_sector_erase(uint32_t addr, size_t len)
 	spi_multi_setup();
 }
 
-void sflash_write_buffer(uint32_t addr, uintptr_t buff, size_t len)
+void sflash_write_buffer(uintptr_t addr, uintptr_t buff, size_t len)
 {
 	uintptr_t sflash_work_base = (uintptr_t)&sflash_work[0];
 	uintptr_t base_sector_addr = ROUNDDOWN(addr, SPI_SECTOR_SIZE);
@@ -97,6 +97,12 @@ void sflash_write_buffer(uint32_t addr, uintptr_t buff, size_t len)
 
 		sflash_page_program(base_sector_addr, buff + (base_sector_addr - addr), write_length);
 	}
+}
+
+void sflash_read(uintptr_t addr, uintptr_t buff, size_t len)
+{
+	vaddr_t virt_addr = sflash_phys_to_virt(addr);
+	memcpy((void *)buff, (void *)virt_addr, len);
 }
 
 void sflash_open(void)

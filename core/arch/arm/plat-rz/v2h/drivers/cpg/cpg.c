@@ -1,8 +1,8 @@
+// SPDX-License-Identifier: BSD-3-Clause
 /*
- * Copyright (c) 2024, Renesas Electronics Corporation. All rights reserved.
- *
- * SPDX-License-Identifier: BSD-3-Clause
+ * Copyright (c) 2024, Renesas Electronics Corporation
  */
+
 #include <stdint.h>
 #include <stddef.h>
 #include <assert.h>
@@ -110,7 +110,7 @@ static void cpg_clkon_rst(CPG_SETUP_DATA const *array, uint32_t num)
 
 		mask = array->mon.val;
 		cmp  = mask;
-		
+
 		if (array->type == CPG_T_RST)
 			cmp = ~cmp;
 
@@ -131,18 +131,18 @@ static void cpg_clkoff_rst(CPG_SETUP_DATA const *array, uint32_t num)
 		 */
 		uint32_t val = (array->reg.val & 0xFFFF) | ((array->reg.val & 0xFFFF) << 16);
 
-		
+
 		if ((array->type == CPG_T_CLK) || (array->type == CPG_T_RST))
 			val = val & 0xffff0000;
-		
+
 		cpg_io_write(array->reg.addr, val);
 
 		mask = array->mon.val;
 		cmp  = mask;
-		
+
 		if (array->type == CPG_T_CLK)
 			cmp = ~cmp;
-		
+
 		while ((cpg_io_read(array->mon.addr) & mask) != (cmp & mask))
 			;
 	}
@@ -154,13 +154,14 @@ void cpg_xspi_start(void)
 {
 	DMSG("cpg_xspi_start is called.");
 
-
 	cpg_clkon_rst(&cpg_clk_on_tbl[0], ARRAY_SIZE(cpg_clk_on_tbl));
 	cpg_clkon_rst(&cpg_reset_tbl[0], ARRAY_SIZE(cpg_reset_tbl));
-	
+
 	cpg_io_write(CPG_BUS_4_MSTOP, 0x00200000);
 	cpg_io_write(CPG_BUS_5_MSTOP, 0x00200000);
 
+	cpg_io_write(CPG_CSDIV0, 0x10002000);
+	cpg_io_write(CPG_SSEL1, 0x10001000);
 }
 
 void cpg_xspi_stop(void)
@@ -169,9 +170,12 @@ void cpg_xspi_stop(void)
 
 	cpg_clkoff_rst(&cpg_clk_on_tbl[0], ARRAY_SIZE(cpg_clk_on_tbl));
 	cpg_clkoff_rst(&cpg_reset_tbl[0], ARRAY_SIZE(cpg_reset_tbl));
-	
+
 	cpg_io_write(CPG_BUS_4_MSTOP, 0x00200020);
 	cpg_io_write(CPG_BUS_5_MSTOP, 0x00200020);
+
+	cpg_io_write(CPG_CSDIV0, 0x10000000);
+	cpg_io_write(CPG_SSEL1, 0x10000000);
 }
 
 static TEE_Result cpg_init(void)

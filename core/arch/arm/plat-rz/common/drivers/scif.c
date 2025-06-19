@@ -2,7 +2,7 @@
 /*
  * Copyright (c) 2016, GlobalLogic
  * Copyright (c) 2017, Linaro Limited
- * Copyright (c) 2021, Renesas Electronics
+ * Copyright (c) 2021, Renesas Electronics Corporation
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without

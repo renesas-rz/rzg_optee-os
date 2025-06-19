@@ -1,15 +1,14 @@
+/* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Copyright (c) 2020, Renesas Electronics Corporation. All rights reserved.
- *
- * SPDX-License-Identifier: BSD-3-Clause
+ * Copyright (c) 2020, Renesas Electronics Corporation
  */
 
 /*! *****************************************************************************
     @file    TSIP_Wrapper_Lib_Init_API.h
     @brief   Library initialization
-    
+
     @par    History
-    @subsection sub_history 
+    @subsection sub_history
       - Initial version\n
  ********************************************************************************/
 
@@ -26,4 +25,3 @@ unsigned long R_TSIP_Lib_Init(unsigned char *S_RAMData, unsigned char *S_INSTDat
                               unsigned char *TSIP_BaseAddress, unsigned char *MSTP_BaseAddress);
 
 #endif  /* TSIP_WRAPPER_LIB_INIT_API_H */
-

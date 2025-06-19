@@ -8,8 +8,3 @@ global-incdirs-y += private/inc
 global-incdirs-y += inc/api
 global-incdirs-y += inc/instances
 
-ifeq ($(CFG_PLATFORM_GROUP_g2l),y)
-ldflags-external += $(CFG_RZ_SCE_LIB_DIR)/libr_secure_ip_1_0.a.1.0.0
-else ifeq ($(CFG_PLATFORM_GROUP_v2h),y)
-ldflags-external += $(CFG_RZ_SCE_LIB_DIR)/libr_secure_ip_2_0.a.1.0.0
-endif

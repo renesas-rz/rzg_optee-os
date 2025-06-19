@@ -1,15 +1,14 @@
+// SPDX-License-Identifier: BSD-3-Clause
 /*
- * Copyright (c) 2020, Renesas Electronics Corporation. All rights reserved.
- *
- * SPDX-License-Identifier: BSD-3-Clause
+ * Copyright (c) 2020, Renesas Electronics Corporation
  */
 
 /*! *****************************************************************************
     @file    TSIP_Wrapper_Local_API.c
     @brief   TSIP Wrapper Local API
-    
+
     @par    History
-    @subsection sub_history 
+    @subsection sub_history
       - Initial version\n
  ********************************************************************************/
 
@@ -29,9 +28,9 @@ static uint8_t TSIP_Wrapper_Init_Flag = TSIP_FALSE;
 /*! *****************************************************************************
     @fn       void TSIP_Wrapper_Set_Init(uint8_t BoolFg)
     @brief    Initialization flag setting
-    
+
     @retval    void
-    
+
     @par    Details
     It set the initialization flag in TSIP Wrapper Layer.
 
@@ -46,9 +45,9 @@ void TSIP_Wrapper_Set_Init(uint8_t BoolFg)
 /*! *****************************************************************************
     @fn       uint32_t TSIP_Wrapper_Init(void)
     @brief    Initialization of TSIP Wrapper Layer
-    
+
     @retval    R_PASS           success
-    
+
     @par    Details
     It performs the initialization in TSIP Wrapper Layer.
 
@@ -65,10 +64,10 @@ uint32_t TSIP_Wrapper_Init(void)
 /*! *****************************************************************************
     @fn       uint8_t Is_TSIP_Wrapper_Init(void)
     @brief    Initialization checking
-    
+
     @retval    TSIP_TRUE           initialized
     @retval    TSIP_FALSE          not initialized
-    
+
     @par    Details
     It check if it has been initialized in TSIP Wrapper Layer.
 
@@ -79,5 +78,3 @@ uint8_t Is_TSIP_Wrapper_Init(void)
 {
     return(TSIP_Wrapper_Init_Flag);
 }
-
-
