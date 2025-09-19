@@ -27,15 +27,13 @@ static TEE_Result random_number_generator(uint32_t *rand, size_t size)
 
 	assert(0 == (size % rand_sz));
 
-	for (n = 0; n < size; n += rand_sz)
-	{
+	for (n = 0; n < size; n += rand_sz) {
 		err = g_sce_protected_on_sce.randomNumberGenerate(&rand[n]);
-		switch (err)
-		{
-			case FSP_SUCCESS:
-				break;
-			default: /* FSP_ERR_CRYPTO_SCE_RESOURCE_CONFLICT */
-				return TEE_ERROR_BUSY;
+		switch (err) {
+		case FSP_SUCCESS:
+			break;
+		default: /* FSP_ERR_CRYPTO_SCE_RESOURCE_CONFLICT */
+			return TEE_ERROR_BUSY;
 		}
 	}
 
@@ -46,12 +44,11 @@ TEE_Result hw_get_random_bytes(void *buf, size_t len)
 {
 	TEE_Result ret = TEE_SUCCESS;
 
-	for(size_t i = 0; i < len; i += sizeof(buffer))
-	{
-		if (TEE_SUCCESS != (ret = random_number_generator(buffer, ARRAY_SIZE(buffer))))
-		{
+	for (size_t i = 0; i < len; i += sizeof(buffer)) {
+		ret = random_number_generator(buffer, ARRAY_SIZE(buffer));
+		if (TEE_SUCCESS != ret)
 			return ret;
-		}
+
 		memcpy((uintptr_t)buf + i, buffer, MIN(sizeof(buffer), len - i));
 	}
 

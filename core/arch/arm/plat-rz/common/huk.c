@@ -26,6 +26,7 @@ static void read_chipid(uint8_t *chipid)
 
 	for (i = 0U; i < read_num; i++) {
 		uint32_t read_data = io_read32(addr_va);
+
 		read_data = TEE_U32_TO_BIG_ENDIAN(read_data);
 		(void)memcpy(&chipid[i * REGISTER_SIZE], &read_data, REGISTER_SIZE);
 		addr_va += REGISTER_SIZE;
@@ -36,7 +37,7 @@ static TEE_Result huk_kdf(uint8_t *huk, size_t huk_length)
 {
 	uint8_t password[CHIPID_SIZE];
 
-	uint8_t salt[] = {0x76,0x6A,0xEF,0x5C,0x39,0xEF,0x6C,0x26,0x41,0x6C,0x46,0x68,0x05,0x43,0x06,0xC0};
+	uint8_t salt[] = {0x76, 0x6A, 0xEF, 0x5C, 0x39, 0xEF, 0x6C, 0x26, 0x41, 0x6C, 0x46, 0x68, 0x05, 0x43, 0x06, 0xC0};
 
 	uint32_t iteration_count = 1000;
 

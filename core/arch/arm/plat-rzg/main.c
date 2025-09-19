@@ -44,7 +44,7 @@ register_dynamic_shm(NSEC_DDR_3_BASE, NSEC_DDR_3_SIZE);
 
 #if defined(PLATFORM_FLAVOR_hihope_rzg2n)
 #if (PMIC_ROHM_BD9571)
-static uint32_t suspend_to_ram_save_flag = 0U;
+static uint32_t suspend_to_ram_save_flag;
 static uint32_t main_cpu_lock = (uint32_t)SPINLOCK_UNLOCK;
 
 unsigned long thread_cpu_suspend_handler(unsigned long a0,
@@ -72,7 +72,7 @@ unsigned long thread_cpu_suspend_handler(unsigned long a0,
 }
 
 unsigned long thread_cpu_resume_handler(unsigned long a0 __unused,
-                                unsigned long a1 __unused)
+					unsigned long a1 __unused)
 {
 	uint32_t exceptions;
 

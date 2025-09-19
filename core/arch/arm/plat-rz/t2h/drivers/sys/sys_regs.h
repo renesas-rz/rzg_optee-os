@@ -6,20 +6,20 @@
 #ifndef __SYS_REGS_H__
 #define __SYS_REGS_H__
 
-#include <rzt2h_config.h>						/* Get the System base address */
+#include <rzt2h_config.h>				/* Get the System base address */
 
-#define MRCTLA					    		(0x00000240)
-#define MSTPCRA 							(0x00000300)
+#define MRCTLA							(0x00000240)
+#define MSTPCRA							(0x00000300)
 
-#define MD_MON				    			(0x00004100)
-#define PRCRN								(0x00004200)
+#define MD_MON							(0x00004100)
+#define PRCRN							(0x00004200)
 
-#define SSTPCR6						    	(0x00000208)
+#define SSTPCR6							(0x00000208)
 
-#define PRCRS								(0x00006000)
+#define PRCRS							(0x00006000)
 
-#define XSPI0CS0_END_ADD 					(0x00013004)
-#define XSPI1CS1_END_ADD 					(0x00013104)
+#define XSPI0CS0_END_ADD					(0x00013004)
+#define XSPI1CS1_END_ADD					(0x00013104)
 
 /* xSPI0 */
 #define MRCTLA_MRCTLA04						UL(4)
@@ -28,7 +28,7 @@
 
 #define PRCRx_CLOCK_GEN						UL(1)
 #define PRCRx_LOW_POWER						UL(2)
-#define PRCRx_GPIO							UL(4)
+#define PRCRx_GPIO						UL(4)
 #define PRCRx_SYS_CTRL						UL(8)
 
 /* xSPI0 */

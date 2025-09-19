@@ -98,11 +98,11 @@ void spi_multi_cmd_write(uint8_t command, uint8_t size, uint32_t data)
 	spi_io_write(SPIM_SMDRENR, SPIM_SMDRENR_SET_VALUE);
 
 	/* Set the data transfer enable & data write enable  */
-	if (size == SPI_MANUAL_COMMAND_SIZE_0) {
+	if (size == SPI_MANUAL_COMMAND_SIZE_0)
 		val = SMCR_SPIE;
-	} else {
+	else
 		val = SMCR_SPIE | SMCR_SPIWE;
-	}
+
 	spi_io_write(SPIM_SMCR, val);
 
 	/* Wait until the transfer is complete */
@@ -122,7 +122,7 @@ void spi_multi_page_program(uint32_t addr, uintptr_t buff)
 	spi_io_write(SPIM_DRCR, SPIM_DRCR_SET_VALUE);
 
 	/* SDR mode serial flash settings & WBUF enable */
-	val = spi_io_read(SPIM_PHYCNT) | PHYCNT_CAL_PERFOMED | PHYCNT_WBUF2_USED | PHYCNT_WBUF_USED;
+	val = spi_io_read(SPIM_PHYCNT) | PHYCNT_CAL_PERFORMED | PHYCNT_WBUF2_USED | PHYCNT_WBUF_USED;
 	spi_io_write(SPIM_PHYCNT, val);
 
 	/* Set the QSPIn_SSL setting value & Manual Mode  */
@@ -171,7 +171,7 @@ void spi_multi_erase_sector(uint32_t addr)
 	spi_io_write(SPIM_DRCR, SPIM_DRCR_SET_VALUE);
 
 	/* SDR mode serial flash settings */
-	val = spi_io_read(SPIM_PHYCNT) | PHYCNT_CAL_PERFOMED;
+	val = spi_io_read(SPIM_PHYCNT) | PHYCNT_CAL_PERFORMED;
 	spi_io_write(SPIM_PHYCNT, val);
 
 	/* Set the QSPIn_SSL setting value & Manual Mode  */
@@ -237,7 +237,7 @@ int spi_multi_setup(void)
 	spi_io_write(SPIM_DREAR, SPIM_DREAR_SET_VALUE);
 
 	/* Set the bit width of command and address output to 1 bit and	*/
-	/* the address size to 3 byte									*/
+	/* the address size to 3 byte					*/
 	spi_io_write(SPIM_DRENR, SPIM_DRENR_SET_VALUE);
 
 	/* Dummy cycle setting */

@@ -29,13 +29,13 @@
 #define RPC_WRBUF		(0x8000U)
 
 #define CPG_CPGWPR		(0x0900U)
-#define CPG_RPCCKCR 	(0x0238U)
+#define CPG_RPCCKCR		(0x0238U)
 
 //MSTPRST register offset
 #define	CPG_SRCR9		(0x0924U)
-#define	CPG_SRSTCLR9	(0x0964U)
+#define	CPG_SRSTCLR9		(0x0964U)
 #define	CPG_MSTPSR9		(0x09A4U)
-#define CPG_SMSTPCR9	(0x0994U)
+#define CPG_SMSTPCR9		(0x0994U)
 
 #define BIT0			(0x00000001)
 #define BIT1			(0x00000002)

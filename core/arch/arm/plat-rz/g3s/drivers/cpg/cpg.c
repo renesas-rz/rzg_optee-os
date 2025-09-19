@@ -16,28 +16,28 @@
 #define CPG_T_CLK						(0)
 #define CPG_T_RST						(1)
 
-typedef struct {
+struct st_cpg_clkrst_t {
 	uintptr_t reg;
 	uintptr_t mon;
 	uint32_t  val;
 	uint32_t  type;
-} st_cpg_clkrst_t;
+};
 
 register_phys_mem_pgdir(MEM_AREA_IO_NSEC, CPG_REG_BASE, CPG_REG_SIZE);
 
 static vaddr_t cpg_base;
 
-inline static void cpg_io_write(uint32_t reg, uint32_t data)
+static inline void cpg_io_write(uint32_t reg, uint32_t data)
 {
 	io_write32(cpg_base + reg, data);
 }
 
-inline static uint32_t cpg_io_read(uint32_t reg)
+static inline uint32_t cpg_io_read(uint32_t reg)
 {
 	return io_read32(cpg_base + reg);
 }
 
-static const st_cpg_clkrst_t cpg_xspi[] = {
+static const struct st_cpg_clkrst_t cpg_xspi[] = {
 	{		/* SPI */
 		(uintptr_t)CPG_CLKON_SPI,
 		(uintptr_t)CPG_CLKMON_SPI,
@@ -52,7 +52,7 @@ static const st_cpg_clkrst_t cpg_xspi[] = {
 	},
 };
 
-static void cpg_clkrst_start(const st_cpg_clkrst_t *tbl, const uint32_t size)
+static void cpg_clkrst_start(const struct st_cpg_clkrst_t *tbl, const uint32_t size)
 {
 	uint32_t cnt;
 	uint32_t mask;
@@ -63,15 +63,15 @@ static void cpg_clkrst_start(const st_cpg_clkrst_t *tbl, const uint32_t size)
 
 		mask = (tbl->val >> 16) & 0xFFFF;
 		cmp = tbl->val & 0xFFFF;
-		if (tbl->type == CPG_T_RST) {
+		if (tbl->type == CPG_T_RST)
 			cmp = ~(cmp);
-		}
+
 		while ((cpg_io_read(tbl->mon) & mask) != (cmp & mask))
 			;
 	}
 }
 
-static void cpg_clkrst_stop(const st_cpg_clkrst_t *tbl, const uint32_t size)
+static void cpg_clkrst_stop(const struct st_cpg_clkrst_t *tbl, const uint32_t size)
 {
 	uint32_t cnt;
 	uint32_t mask;
@@ -82,9 +82,9 @@ static void cpg_clkrst_stop(const st_cpg_clkrst_t *tbl, const uint32_t size)
 
 		mask = (tbl->val >> 16) & 0xFFFF;
 		cmp = 0;
-		if (tbl->type == CPG_T_RST) {
+		if (tbl->type == CPG_T_RST)
 			cmp = ~(cmp);
-		}
+
 		while ((cpg_io_read(tbl->mon) & mask) != (cmp & mask))
 			;
 	}

@@ -248,7 +248,7 @@ SECTIONS
 		. = ALIGN(8);
 	}
 
-	/* unintialized data */
+	/* uninitialized data */
 	.bss : {
 		__data_end = .;
 		__bss_start = .;

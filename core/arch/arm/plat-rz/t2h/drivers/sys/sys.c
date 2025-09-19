@@ -33,7 +33,6 @@ void sys_base_lock(uint32_t lock_mask)
 	/* Lock PRCRN bit(s) in given mask */
 	prcrn = io_read32(sys_ns_base + PRCRN) & 0x0000000FU & (~lock_mask);
 	io_write32(sys_ns_base + PRCRN, (prcrn | 0x0000A500U));
-
 }
 
 void sys_safetybase_unlock(uint32_t unlock_mask)

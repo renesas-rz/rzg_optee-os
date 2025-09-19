@@ -30,14 +30,15 @@ static void scif_uart_flush(struct serial_chip *chip)
 	vaddr_t base = chip_to_base(chip);
 
 	/* Wait until there is space in the FIFO */
-	while ((io_read16(base + SCIF_SCFTSR)) >= SCIF_TX_FIFO_SIZE);
+	while ((io_read16(base + SCIF_SCFTSR)) >= SCIF_TX_FIFO_SIZE)
+		;
 }
 
 static void scif_uart_putc(struct serial_chip *chip, int ch)
 {
 	vaddr_t base = chip_to_base(chip);
 
-	/* Workarround:Set CCR0 register. Enable TE and TEIE bits. */
+	/* Workaround:Set CCR0 register. Enable TE and TEIE bits. */
 	io_setbits32(base + SCIF_SCCCR0, SCCCR0_TE | SCCCR0_TEIE);
 
 	scif_uart_flush(chip);

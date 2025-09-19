@@ -6,7 +6,7 @@
 #ifndef _CPG_H_
 #define _CPG_H_
 
-extern void cpg_spi_multi_start(void);
-extern void cpg_spi_multi_stop(void);
+void cpg_spi_multi_start(void);
+void cpg_spi_multi_stop(void);
 
 #endif /* _CPG_H_ */

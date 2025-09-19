@@ -14,22 +14,22 @@
 
 TEE_Result hw_get_random_bytes(void *buf, size_t blen)
 {
-    uint32_t err;
+	uint32_t err;
 
-    if(!buf){
-        EMSG("Invalid buffer");
-        return TEE_ERROR_BAD_PARAMETERS;
-    }
+	if (!buf) {
+		EMSG("Invalid buffer");
+		return TEE_ERROR_BAD_PARAMETERS;
+	}
 
-    memset(buf, 0, blen);
+	memset(buf, 0, blen);
 
-    if (0 < blen) {
-        err = R_TSIP_BCF_GenerateRandom(blen, 0, buf);
-        if (R_PASS != err) {
-            EMSG("Failed to generate a random number (0x%08x).", err);
-            return TEE_ERROR_GENERIC;
-        }
-    }
+	if (0 < blen) {
+		err = R_TSIP_BCF_GenerateRandom(blen, 0, buf);
+		if (R_PASS != err) {
+			EMSG("Failed to generate a random number (0x%08x).", err);
+			return TEE_ERROR_GENERIC;
+		}
+	}
 
-    return TEE_SUCCESS;
+	return TEE_SUCCESS;
 }

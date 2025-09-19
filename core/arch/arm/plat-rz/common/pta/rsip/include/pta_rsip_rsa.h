@@ -9,8 +9,8 @@
 #include <r_rsip_api.h>
 
 #define PTA_RSIP_RSA_UUID \
-    { 0x38225144, 0xb347, 0x467e, \
-        { 0x93, 0x7e, 0x1e, 0xf8, 0xff, 0x7e, 0x5a, 0xe1 } }
+	{ 0x38225144, 0xb347, 0x467e, \
+		{ 0x93, 0x7e, 0x1e, 0xf8, 0xff, 0x7e, 0x5a, 0xe1 } }
 
 #define SIGNATURE_BYTE_SIZE_RSA_1024        (128U)
 #define SIGNATURE_BYTE_SIZE_RSA_2048        (256U)
@@ -21,7 +21,6 @@
 #define CIPHER_BYTE_SIZE_RSA_2048           (256U)
 #define CIPHER_BYTE_SIZE_RSA_3072           (384U)
 #define CIPHER_BYTE_SIZE_RSA_4096           (512U)
-
 
 /*
  * Signs message with RSASSA-PKCS1-v1_5.
@@ -77,7 +76,6 @@
  * [in]      memref[2] : Wrapped key (rsip_wrapped_key_t:564byte)
  */
 #define PTA_CMD_RSASSA_PKCS4096_SignatureVerify     (0x00040210)
-
 
 /*
  * Encrypts plaintext with RSAES-PKCS1-v1_5.
@@ -135,7 +133,6 @@
  * [in]      memref[2] : Wrapped key (rsip_wrapped_key_t:1060byte)
  */
 #define PTA_CMD_RSAES_PKCS4096_Decrypt              (0x00041210)
-
 
 /*
  * Signs message with RSASSA-PSS.
@@ -239,7 +236,6 @@
  */
 #define PTA_CMD_RSA_4096_Decrypt                    (0x00043310)
 
-
 /*
  * Encrypts plaintext with RSAES-OAEP.
  *
@@ -308,7 +304,5 @@
  * [in]      memref[3] : Label
  */
 #define PTA_CMD_RSAES_OAEP4096_Decrypt              (0x00044310)
-
-
 
 #endif /* __PTA_RSIP_RSA_H */

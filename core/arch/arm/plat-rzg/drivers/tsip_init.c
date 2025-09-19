@@ -10,7 +10,7 @@
 #include "drivers/tsip.h"
 #include "drivers/R_TSIP_Core_Lib.h"
 
-s_tsip_data_st *tsip_data = NULL;
+s_tsip_data_st * tsip_data = NULL;
 
 static TEE_Result init_tsip(void)
 {
@@ -24,9 +24,8 @@ static TEE_Result init_tsip(void)
 	tsip_data = (s_tsip_data_st *)phys_to_virt_io(TSIP_DATA_ADDR, TSIP_DATA_SIZE);
 
 	err = R_TSIP_Lib_Init((uint8_t *)tsip_data->sram, (uint8_t *)tsip_data->inst,
-						  (uint8_t *)tsip_base_address, (uint8_t *)mstp_base_address);
-	if (R_PASS != err)
-	{
+			      (uint8_t *)tsip_base_address, (uint8_t *)mstp_base_address);
+	if (R_PASS != err) {
 		EMSG("Failed to initialize TSIP Library (0x%08x).", err);
 		panic();
 	}

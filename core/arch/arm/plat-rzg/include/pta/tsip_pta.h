@@ -6,13 +6,13 @@
 #ifndef TSIP_PTA_H_
 #define TSIP_PTA_H_
 
-#define TSIP_UUID                                          \
-    {                                                      \
-        0x5f20b54e, 0x5a26, 0x11eb,                        \
-        {                                                  \
-            0x89, 0xb9, 0x2b, 0x53, 0x8d, 0xa4, 0xb7, 0xec \
-        }                                                  \
-    }
+#define TSIP_UUID                                                      \
+	{                                                              \
+		0x5f20b54e, 0x5a26, 0x11eb,                            \
+		{                                                      \
+			0x89, 0xb9, 0x2b, 0x53, 0x8d, 0xa4, 0xb7, 0xec \
+		}                                                      \
+	}
 
 /*
  * TSIP_CMD_UPDATE_KEYRING - re-encrypt keyring
@@ -45,8 +45,8 @@
  *   length : length of output data
  */
 typedef struct {
-    unsigned long offset;
-    unsigned long length;
+	unsigned long offset;
+	unsigned long length;
 } st_update_fw_t;
 
 #endif /* TSIP_PTA_H_ */

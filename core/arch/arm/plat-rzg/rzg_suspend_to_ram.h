@@ -33,7 +33,7 @@ enum suspend_to_ram_state {
 typedef void (*backup_call_t)(enum suspend_to_ram_state state, uint32_t cpu_id);
 
 #define _def_attribete(symbol_name) \
-	__attribute__((used)) __attribute__((__section__(symbol_name)))
+	(__used(__section__(symbol_name)))
 
 #define _suspend_to_ram_backup(array_name) \
 	static struct reg_backup_info *__s2r_backup_##array_name \
@@ -53,10 +53,17 @@ void suspend_to_ram_save(void);
 void suspend_to_ram_restore(void);
 void suspend_to_ram_call_cbfunc(enum suspend_to_ram_state state);
 void suspend_to_ram_init_helper(struct reg_backup_info *bkarray,
-		size_t array_num);
+				size_t array_num);
 void suspend_to_ram_save_helper(struct reg_backup_info *bkarray,
-		size_t array_num);
+				size_t array_num);
 void suspend_to_ram_restore_helper(struct reg_backup_info *bkarray,
-		size_t array_num);
+				   size_t array_num);
+
+struct reg_backup_info *__suspend_to_ram_backup_start;
+struct reg_backup_info *__suspend_to_ram_backup_end;
+size_t __suspend_to_ram_backup_num_start;
+size_t __suspend_to_ram_backup_num_end;
+backup_call_t __suspend_to_ram_cbfunc_start;
+backup_call_t __suspend_to_ram_cbfunc_end;
 
 #endif /* RZG_SUSPEND_TO_RAM_H */

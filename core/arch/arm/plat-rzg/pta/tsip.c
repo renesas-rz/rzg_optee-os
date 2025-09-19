@@ -23,7 +23,7 @@
 static TEE_Result tsip_su_activate(void)
 {
 	uint32_t err;
-	static bool activated = false;
+	static bool activated;
 
 	if (!activated) {
 		err = R_TSIP_SU_Activate();
@@ -39,8 +39,10 @@ static TEE_Result tsip_su_activate(void)
 static TEE_Result tsip_update_keyring(uint32_t type, TEE_Param p[TEE_NUM_PARAMS])
 {
 	uint32_t err;
-	uint32_t exp_type = TEE_PARAM_TYPES(
-		TEE_PARAM_TYPE_MEMREF_INPUT, TEE_PARAM_TYPE_MEMREF_OUTPUT, TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE);
+	uint32_t exp_type = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
+					    TEE_PARAM_TYPE_MEMREF_OUTPUT,
+					    TEE_PARAM_TYPE_NONE,
+					    TEE_PARAM_TYPE_NONE);
 
 	DMSG("has been called");
 
@@ -50,13 +52,13 @@ static TEE_Result tsip_update_keyring(uint32_t type, TEE_Param p[TEE_NUM_PARAMS]
 	}
 
 	if ((!IS_ALIGNED_WITH_TYPE(p[0].memref.buffer, uint32_t)) ||
-		(!IS_ALIGNED_WITH_TYPE(p[1].memref.buffer, uint32_t))) {
+	    (!IS_ALIGNED_WITH_TYPE(p[1].memref.buffer, uint32_t))) {
 		EMSG("Buffer must be 4-byte aligned");
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
 
 	if ((p[0].memref.size < TEMP_ENC_KEYRING_SIZE) ||
-		(p[1].memref.size < sizeof(tsip_data->inst))) {
+	    (p[1].memref.size < sizeof(tsip_data->inst))) {
 		EMSG("Buffer size is not large enough");
 		return TEE_ERROR_SHORT_BUFFER;
 	}
@@ -86,8 +88,10 @@ static TEE_Result tsip_update_firmware(uint32_t type, TEE_Param p[TEE_NUM_PARAMS
 	st_update_fw_t *fwu_param;
 	TSIP_UPDATE_BOOT_DATA tsip_update_boot_data;
 
-	uint32_t exp_type = TEE_PARAM_TYPES(
-		TEE_PARAM_TYPE_VALUE_INPUT, TEE_PARAM_TYPE_MEMREF_INOUT, TEE_PARAM_TYPE_MEMREF_INPUT, TEE_PARAM_TYPE_MEMREF_OUTPUT);
+	uint32_t exp_type = TEE_PARAM_TYPES(TEE_PARAM_TYPE_VALUE_INPUT,
+					    TEE_PARAM_TYPE_MEMREF_INOUT,
+					    TEE_PARAM_TYPE_MEMREF_INPUT,
+					    TEE_PARAM_TYPE_MEMREF_OUTPUT);
 
 	DMSG("has been called");
 
@@ -97,13 +101,13 @@ static TEE_Result tsip_update_firmware(uint32_t type, TEE_Param p[TEE_NUM_PARAMS
 	}
 
 	if ((p[0].value.a <= 0) || (p[0].value.a > UPDATE_BOOT_DATA_MAX) ||
-		(p[1].memref.size < (p[0].value.a * sizeof(st_update_fw_t)))) {
+	    (p[1].memref.size < (p[0].value.a * sizeof(st_update_fw_t)))) {
 		EMSG("Bad parameters");
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
 
 	if ((!IS_ALIGNED_WITH_TYPE(p[2].memref.buffer, uint32_t)) ||
-		(!IS_ALIGNED_WITH_TYPE(p[3].memref.buffer, uint32_t))) {
+	    (!IS_ALIGNED_WITH_TYPE(p[3].memref.buffer, uint32_t))) {
 		EMSG("Buffer must be 4-byte aligned");
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
@@ -119,12 +123,11 @@ static TEE_Result tsip_update_firmware(uint32_t type, TEE_Param p[TEE_NUM_PARAMS
 	memset(tsip_update_boot_data, 0, sizeof(tsip_update_boot_data));
 
 	for (int i = 0; i < p[0].value.a; i++) {
-
 		if (fwu_param[i].length == 0)
 			continue;
 
 		if ((!IS_ALIGNED(fwu_param[i].offset, sizeof(uint32_t))) ||
-			(!IS_ALIGNED(fwu_param[i].length, sizeof(uint32_t)))) {
+		    (!IS_ALIGNED(fwu_param[i].length, sizeof(uint32_t)))) {
 			EMSG("Input data must be 4-byte aligned");
 			return TEE_ERROR_BAD_PARAMETERS;
 		}
@@ -152,7 +155,7 @@ static TEE_Result tsip_update_firmware(uint32_t type, TEE_Param p[TEE_NUM_PARAMS
 
 	err = R_TSIP_UpdateBootData(&tsip_update_boot_data);
 	if (R_PASS != err) {
-		EMSG("Failed to Re-Encypt Firmware data via TSIP (0x%08x).", err);
+		EMSG("Failed to Re-Encrypt Firmware data via TSIP (0x%08x).", err);
 		return TEE_ERROR_GENERIC;
 	}
 
@@ -181,8 +184,8 @@ static void destroy_ta(void)
 }
 
 static TEE_Result open_session(uint32_t nParamTypes __unused,
-							   TEE_Param pParams[TEE_NUM_PARAMS] __unused,
-							   void **ppSessionContext __unused)
+			       TEE_Param pParams[TEE_NUM_PARAMS] __unused,
+			       void **ppSessionContext __unused)
 {
 	DMSG("open entry point for pseudo ta \"%s\"", TA_NAME);
 	return TEE_SUCCESS;
@@ -194,8 +197,8 @@ static void close_session(void *pSessionContext __unused)
 }
 
 static TEE_Result invoke_command(void *psess __unused,
-								 uint32_t cmd, uint32_t ptypes,
-								 TEE_Param params[TEE_NUM_PARAMS])
+				 uint32_t cmd, uint32_t ptypes,
+				 TEE_Param params[TEE_NUM_PARAMS])
 {
 	switch (cmd) {
 	case TSIP_CMD_UPDATE_KEYRING:
@@ -208,9 +211,9 @@ static TEE_Result invoke_command(void *psess __unused,
 }
 
 pseudo_ta_register(.uuid = TSIP_UUID, .name = TA_NAME,
-				   .flags = PTA_DEFAULT_FLAGS,
-				   .create_entry_point = create_ta,
-				   .destroy_entry_point = destroy_ta,
-				   .open_session_entry_point = open_session,
-				   .close_session_entry_point = close_session,
-				   .invoke_command_entry_point = invoke_command);
+		   .flags = PTA_DEFAULT_FLAGS,
+		   .create_entry_point = create_ta,
+		   .destroy_entry_point = destroy_ta,
+		   .open_session_entry_point = open_session,
+		   .close_session_entry_point = close_session,
+		   .invoke_command_entry_point = invoke_command);

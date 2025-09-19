@@ -9,7 +9,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#define SPI_RET_OK 	0
+#define SPI_RET_OK	0
 #define SPI_RET_NG	1
 
 #define FLASH_MEMORY_SIZE   0x04000000

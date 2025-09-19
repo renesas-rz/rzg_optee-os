@@ -9,8 +9,8 @@
 #include <r_sce_api.h>
 
 #define PTA_SCE_UUID  \
-    { 0x3b221d77, 0xe679, 0x4ca5, \
-        { 0xa4, 0x48, 0x1f, 0x9f, 0x16, 0x02, 0x15, 0xc5 } }
+	{ 0x3b221d77, 0xe679, 0x4ca5, \
+		{ 0xa4, 0x48, 0x1f, 0x9f, 0x16, 0x02, 0x15, 0xc5 } }
 
 /*
  * [in/out] memref[0] : Wrapped key (sce_aes_wrapped_key_t)
@@ -62,10 +62,10 @@
  * [in/out] memref[1] : Wrapped key (sce_aes_wrapped_key_t)
  */
 typedef struct {
-    uint32_t unused[2];
-    uint8_t  initial_vector[16];
-    uint8_t  encrypted_user_key[32];
-    uint8_t  crc[4];
+	uint32_t unused[2];
+	uint8_t  initial_vector[16];
+	uint8_t  encrypted_user_key[32];
+	uint8_t  crc[4];
 } st_encrypted_aes128_key_t;
 #define PTA_CMD_AES128_EncryptedKeyWrap                     (0x00015000)
 
@@ -74,10 +74,10 @@ typedef struct {
  * [in/out] memref[1] : Wrapped key (sce_aes_wrapped_key_t)
  */
 typedef struct {
-    uint32_t unused[2];
-    uint8_t  initial_vector[16];
-    uint8_t  encrypted_user_key[48];
-    uint8_t  crc[4];
+	uint32_t unused[2];
+	uint8_t  initial_vector[16];
+	uint8_t  encrypted_user_key[48];
+	uint8_t  crc[4];
 } st_encrypted_aes256_key_t;
 #define PTA_CMD_AES256_EncryptedKeyWrap                     (0x00015100)
 
@@ -86,10 +86,10 @@ typedef struct {
  * [in/out] memref[1] : Wrapped key (sce_rsa1024_public_wrapped_key_t)
  */
 typedef struct {
-    uint32_t unused[2];
-    uint8_t  initial_vector[16];
-    uint8_t  encrypted_user_key[160];
-    uint8_t  crc[4];
+	uint32_t unused[2];
+	uint8_t  initial_vector[16];
+	uint8_t  encrypted_user_key[160];
+	uint8_t  crc[4];
 } st_encrypted_rsa_1024_public_key_t;
 #define PTA_CMD_RSA1024_EncryptedPublicKeyWrap              (0x00016000)
 
@@ -98,10 +98,10 @@ typedef struct {
  * [in/out] memref[1] : Wrapped key (sce_rsa1024_private_wrapped_key_t)
  */
 typedef struct {
-    uint32_t unused[2];
-    uint8_t  initial_vector[16];
-    uint8_t  encrypted_user_key[272];
-    uint8_t  crc[4];
+	uint32_t unused[2];
+	uint8_t  initial_vector[16];
+	uint8_t  encrypted_user_key[272];
+	uint8_t  crc[4];
 } st_encrypted_rsa_1024_private_key_t;
 #define PTA_CMD_RSA1024_EncryptedPrivateKeyWrap             (0x00016010)
 
@@ -110,10 +110,10 @@ typedef struct {
  * [in/out] memref[1] : Wrapped key (sce_rsa2048_public_wrapped_key_t)
  */
 typedef struct {
-    uint32_t unused[2];
-    uint8_t  initial_vector[16];
-    uint8_t  encrypted_user_key[288];
-    uint8_t  crc[4];
+	uint32_t unused[2];
+	uint8_t  initial_vector[16];
+	uint8_t  encrypted_user_key[288];
+	uint8_t  crc[4];
 } st_encrypted_rsa_2048_public_key_t;
 #define PTA_CMD_RSA2048_EncryptedPublicKeyWrap              (0x00016100)
 
@@ -122,10 +122,10 @@ typedef struct {
  * [in/out] memref[1] : Wrapped key (sce_rsa2048_private_wrapped_key_t)
  */
 typedef struct {
-    uint32_t unused[2];
-    uint8_t  initial_vector[16];
-    uint8_t  encrypted_user_key[528];
-    uint8_t  crc[4];
+	uint32_t unused[2];
+	uint8_t  initial_vector[16];
+	uint8_t  encrypted_user_key[528];
+	uint8_t  crc[4];
 } st_encrypted_rsa_2048_private_key_t;
 #define PTA_CMD_RSA2048_EncryptedPrivateKeyWrap             (0x00016110)
 
@@ -134,10 +134,10 @@ typedef struct {
  * [in/out] memref[1] : Wrapped key (sce_rsa4096_public_wrapped_key_t)
  */
 typedef struct {
-    uint32_t unused[2];
-    uint8_t  initial_vector[16];
-    uint8_t  encrypted_user_key[544];
-    uint8_t  crc[4];
+	uint32_t unused[2];
+	uint8_t  initial_vector[16];
+	uint8_t  encrypted_user_key[544];
+	uint8_t  crc[4];
 } st_encrypted_rsa_4096_public_key_t;
 #define PTA_CMD_RSA4096_EncryptedPublicKeyWrap              (0x00016200)
 
@@ -146,10 +146,10 @@ typedef struct {
  * [in/out] memref[1] : Wrapped key (sce_ecc_public_wrapped_key_t)
  */
 typedef struct {
-    uint32_t unused[2];
-    uint8_t  initial_vector[16];
-    uint8_t  encrypted_user_key[80];
-    uint8_t  crc[4];
+	uint32_t unused[2];
+	uint8_t  initial_vector[16];
+	uint8_t  encrypted_user_key[80];
+	uint8_t  crc[4];
 } st_encrypted_ecc_secp192r1_public_key_t;
 #define PTA_CMD_ECC_secp192r1_EncryptedPublicKeyWrap        (0x00017000)
 
@@ -158,10 +158,10 @@ typedef struct {
  * [in/out] memref[1] : Wrapped key (sce_ecc_private_wrapped_key_t)
  */
 typedef struct {
-    uint32_t unused[2];
-    uint8_t  initial_vector[16];
-    uint8_t  encrypted_user_key[48];
-    uint8_t  crc[4];
+	uint32_t unused[2];
+	uint8_t  initial_vector[16];
+	uint8_t  encrypted_user_key[48];
+	uint8_t  crc[4];
 } st_encrypted_ecc_secp192r1_private_key_t;
 #define PTA_CMD_ECC_secp192r1_EncryptedPrivateKeyWrap       (0x00017010)
 
@@ -170,10 +170,10 @@ typedef struct {
  * [in/out] memref[1] : Wrapped key (sce_ecc_public_wrapped_key_t)
  */
 typedef struct {
-    uint32_t unused[2];
-    uint8_t  initial_vector[16];
-    uint8_t  encrypted_user_key[80];
-    uint8_t  crc[4];
+	uint32_t unused[2];
+	uint8_t  initial_vector[16];
+	uint8_t  encrypted_user_key[80];
+	uint8_t  crc[4];
 } st_encrypted_ecc_secp224r1_public_key_t;
 #define PTA_CMD_ECC_secp224r1_EncryptedPublicKeyWrap        (0x00017100)
 
@@ -182,10 +182,10 @@ typedef struct {
  * [in/out] memref[1] : Wrapped key (sce_ecc_private_wrapped_key_t)
  */
 typedef struct {
-    uint32_t unused[2];
-    uint8_t  initial_vector[16];
-    uint8_t  encrypted_user_key[48];
-    uint8_t  crc[4];
+	uint32_t unused[2];
+	uint8_t  initial_vector[16];
+	uint8_t  encrypted_user_key[48];
+	uint8_t  crc[4];
 } st_encrypted_ecc_secp224r1_private_key_t;
 #define PTA_CMD_ECC_secp224r1_EncryptedPrivateKeyWrap       (0x00017110)
 
@@ -194,10 +194,10 @@ typedef struct {
  * [in/out] memref[1] : Wrapped key (sce_ecc_public_wrapped_key_t)
  */
 typedef struct {
-    uint32_t unused[2];
-    uint8_t  initial_vector[16];
-    uint8_t  encrypted_user_key[80];
-    uint8_t  crc[4];
+	uint32_t unused[2];
+	uint8_t  initial_vector[16];
+	uint8_t  encrypted_user_key[80];
+	uint8_t  crc[4];
 } st_encrypted_ecc_secp256r1_public_key_t;
 #define PTA_CMD_ECC_secp256r1_EncryptedPublicKeyWrap        (0x00017200)
 
@@ -206,10 +206,10 @@ typedef struct {
  * [in/out] memref[1] : Wrapped key (sce_ecc_private_wrapped_key_t)
  */
 typedef struct {
-    uint32_t unused[2];
-    uint8_t  initial_vector[16];
-    uint8_t  encrypted_user_key[48];
-    uint8_t  crc[4];
+	uint32_t unused[2];
+	uint8_t  initial_vector[16];
+	uint8_t  encrypted_user_key[48];
+	uint8_t  crc[4];
 } st_encrypted_ecc_secp256r1_private_key_t;
 #define PTA_CMD_ECC_secp256r1_EncryptedPrivateKeyWrap       (0x00017210)
 
@@ -218,10 +218,10 @@ typedef struct {
  * [in/out] memref[1] : Wrapped key (sce_ecc_public_wrapped_key_t)
  */
 typedef struct {
-    uint32_t unused[2];
-    uint8_t  initial_vector[16];
-    uint8_t  encrypted_user_key[144];
-    uint8_t  crc[4];
+	uint32_t unused[2];
+	uint8_t  initial_vector[16];
+	uint8_t  encrypted_user_key[144];
+	uint8_t  crc[4];
 } st_encrypted_ecc_brainpoolp512r1_public_key_t;
 #define PTA_CMD_ECC_BrainpoolP512r1_EncryptedPublicKeyWrap  (0x00018000)
 
@@ -230,10 +230,10 @@ typedef struct {
  * [in/out] memref[1] : Wrapped key (sce_ecc_private_wrapped_key_t)
  */
 typedef struct {
-    uint32_t unused[2];
-    uint8_t  initial_vector[16];
-    uint8_t  encrypted_user_key[80];
-    uint8_t  crc[4];
+	uint32_t unused[2];
+	uint8_t  initial_vector[16];
+	uint8_t  encrypted_user_key[80];
+	uint8_t  crc[4];
 } st_encrypted_ecc_brainpoolp512r1_private_key_t;
 #define PTA_CMD_ECC_BrainpoolP512r1_EncryptedPrivateKeyWrap (0x00018010)
 

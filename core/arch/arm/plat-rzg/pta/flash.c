@@ -32,7 +32,6 @@ static TEE_Result spi_write(uint32_t param_types, TEE_Param p[TEE_NUM_PARAMS])
 	rzg_spi_init_driver();
 
 	if (0 < p[1].memref.size) {
-
 		if (rzg_spi_write_buff(p[0].value.a, (uint64_t)p[1].memref.buffer, p[1].memref.size)) {
 			EMSG("Fail to write data to SPI");
 			result = TEE_ERROR_GENERIC;
@@ -59,8 +58,8 @@ static void destroy_ta(void)
 }
 
 static TEE_Result open_session(uint32_t nParamTypes __unused,
-							   TEE_Param pParams[TEE_NUM_PARAMS] __unused,
-							   void **ppSessionContext __unused)
+			       TEE_Param pParams[TEE_NUM_PARAMS] __unused,
+			       void **ppSessionContext __unused)
 {
 	DMSG("open entry point for pseudo ta \"%s\"", TA_NAME);
 	return TEE_SUCCESS;
@@ -72,11 +71,10 @@ static void close_session(void *pSessionContext __unused)
 }
 
 static TEE_Result invoke_command(void *psess __unused,
-								 uint32_t cmd, uint32_t ptypes,
-								 TEE_Param params[TEE_NUM_PARAMS])
+				 uint32_t cmd, uint32_t ptypes,
+				 TEE_Param params[TEE_NUM_PARAMS])
 {
-	switch (cmd)
-	{
+	switch (cmd) {
 	case FLASH_CMD_WRITE_SPI:
 		return spi_write(ptypes, params);
 	default:
@@ -86,9 +84,9 @@ static TEE_Result invoke_command(void *psess __unused,
 }
 
 pseudo_ta_register(.uuid = FLASH_UUID, .name = TA_NAME,
-				   .flags = PTA_DEFAULT_FLAGS,
-				   .create_entry_point = create_ta,
-				   .destroy_entry_point = destroy_ta,
-				   .open_session_entry_point = open_session,
-				   .close_session_entry_point = close_session,
-				   .invoke_command_entry_point = invoke_command);
+		   .flags = PTA_DEFAULT_FLAGS,
+		   .create_entry_point = create_ta,
+		   .destroy_entry_point = destroy_ta,
+		   .open_session_entry_point = open_session,
+		   .close_session_entry_point = close_session,
+		   .invoke_command_entry_point = invoke_command);

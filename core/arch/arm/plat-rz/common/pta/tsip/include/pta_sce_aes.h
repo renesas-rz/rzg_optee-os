@@ -9,8 +9,8 @@
 #include <r_sce_api.h>
 
 #define PTA_SCE_AES_UUID \
-    { 0x4be7b9c4, 0x4951, 0x4105, \
-        { 0xa3, 0xd3, 0x08, 0x1b, 0x50, 0x98, 0x10, 0xef } }
+	{ 0x4be7b9c4, 0x4951, 0x4105, \
+		{ 0xa3, 0xd3, 0x08, 0x1b, 0x50, 0x98, 0x10, 0xef } }
 
 /*
  * [in/out] memref[0] : AES handler (sce_aes_handle_t)
@@ -275,6 +275,5 @@
  * [in]     memref[1] : mac (2 to 16bytes)
  */
 #define PTA_CMD_AES256CMAC_VerifyFinal      (0x00023113)
-
 
 #endif /* __PTA_SCE_AES_H */

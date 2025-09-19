@@ -49,14 +49,13 @@ void sflash_write_buffer(uintptr_t addr, uintptr_t buff, size_t len)
 	uintptr_t last_sector_addr = ROUNDDOWN(addr + len - 1, SPI_SECTOR_SIZE);
 	uint32_t  write_offset;
 	uint32_t  write_length;
-	int32_t   secotr_count;
+	int32_t   sector_count;
 
-	secotr_count = ((last_sector_addr - base_sector_addr) / SPI_SECTOR_SIZE) + 1;
+	sector_count = ((last_sector_addr - base_sector_addr) / SPI_SECTOR_SIZE) + 1;
 	write_offset = addr - base_sector_addr;
 	write_length = MIN(len, SPI_SECTOR_SIZE - write_offset);
 
 	if (write_offset != 0) {
-
 		sflash_read(base_sector_addr, sflash_work_base, SPI_SECTOR_SIZE);
 
 		memcpy((void *)(sflash_work_base + write_offset), (void *)buff, write_length);
@@ -65,33 +64,31 @@ void sflash_write_buffer(uintptr_t addr, uintptr_t buff, size_t len)
 
 		base_sector_addr += SPI_SECTOR_SIZE;
 
-		secotr_count--;
+		sector_count--;
 	}
 
 	write_length = (addr + len) - last_sector_addr;
 
-	if ((secotr_count > 0) && ((write_length % SPI_SECTOR_SIZE) > 0)) {
-
+	if ((sector_count > 0) && ((write_length % SPI_SECTOR_SIZE) > 0)) {
 		sflash_read(last_sector_addr, sflash_work_base, SPI_SECTOR_SIZE);
 
 		memcpy((void *)sflash_work_base, (void *)((buff + len) - write_length), write_length);
 
 		xspi_write(get_channel(addr), last_sector_addr, sflash_work_base, SPI_SECTOR_SIZE);
 
-		secotr_count--;
+		sector_count--;
 	}
 
-	write_length = secotr_count * SPI_SECTOR_SIZE;
+	write_length = sector_count * SPI_SECTOR_SIZE;
 
-	if(secotr_count > 0) {
-
+	if (sector_count > 0)
 		xspi_write(get_channel(addr), base_sector_addr, buff + (base_sector_addr - addr), write_length);
-	}
 }
 
 void sflash_read(uintptr_t addr, uintptr_t buff, size_t len)
 {
 	vaddr_t virt_addr = sflash_phys_to_virt(addr);
+
 	memcpy((void *)buff, (void *)virt_addr, len);
 }
 

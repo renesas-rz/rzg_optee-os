@@ -9,49 +9,49 @@
 /*
  * Selectable definitions
  */
-/* In the case of addr width 24bit						*/
+/* In the case of addr width 24bit					*/
 #define SET_DRENR_ADE_VALUE  DRENR_ADE_ADD23_OUT
 #define SET_DREAR_EAC_VALUE  DREAR_EAC_EXADDR24
-/* In the case of addr width 32bit						*/
+/* In the case of addr width 32bit					*/
 /* #define SET_DRENR_ADE_VALUE     DRENR_ADE_ADD31_OUT	*/
 /* #define SET_DREAR_EAC_VALUE     DREAR_EAC_EXADDR25	*/
 
-/* In the case of bit width 1-1-1 and addr width 24bit				*/
-/* #define SET_DRCMR_CMD_VALUE  DRCMR_CMD_FAST_READ_3B				*/
-/* #define SET_DRENR_ADB_VALUE  DRENR_ADB_1BIT						*/
-/* #define SET_DRENR_DRDB_VALUE DRENR_DRDB_1BIT						*/
-/* In the case of bit width 1-1-4 and addr width 24bit				*/
+/* In the case of bit width 1-1-1 and addr width 24bit			*/
+/* #define SET_DRCMR_CMD_VALUE  DRCMR_CMD_FAST_READ_3B			*/
+/* #define SET_DRENR_ADB_VALUE  DRENR_ADB_1BIT				*/
+/* #define SET_DRENR_DRDB_VALUE DRENR_DRDB_1BIT				*/
+/* In the case of bit width 1-1-4 and addr width 24bit			*/
 /* #define SET_DRCMR_CMD_VALUE  DRCMR_CMD_QUAD_OUTPUT_FAST_READ_3B	*/
-/* #define SET_DRENR_ADB_VALUE  DRENR_ADB_1BIT						*/
-/* #define SET_DRENR_DRDB_VALUE DRENR_DRDB_4BIT						*/
-/* In the case of bit width 1-4-4 and addr width 24bit				*/
+/* #define SET_DRENR_ADB_VALUE  DRENR_ADB_1BIT				*/
+/* #define SET_DRENR_DRDB_VALUE DRENR_DRDB_4BIT				*/
+/* In the case of bit width 1-4-4 and addr width 24bit			*/
 #define SET_DRCMR_CMD_VALUE  DRCMR_CMD_QUAD_INPUT_OUTPUT_FAST_READ_3B
 #define SET_DRENR_ADB_VALUE  DRENR_ADB_4BIT
 #define SET_DRENR_DRDB_VALUE DRENR_DRDB_4BIT
 
-/* In the case of bit width 1-1-1 and addr width 32bit					*/
-/* #define SET_DRCMR_CMD_VALUE  DRCMR_CMD_FAST_READ_4B					*/
-/* #define SET_DRENR_ADB_VALUE  DRENR_ADB_1BIT							*/
-/* #define SET_DRENR_DRDB_VALUE DRENR_DRDB_1BIT							*/
-/* In the case of bit width 1-1-4 and addr width 32bit					*/
-/* #define SET_DRCMR_CMD_VALUE  DRCMR_CMD_QUAD_OUTPUT_FAST_READ_4B		*/
-/* #define SET_DRENR_ADB_VALUE  DRENR_ADB_1BIT							*/
-/* #define SET_DRENR_DRDB_VALUE DRENR_DRDB_4BIT							*/
-/* In the case of bit width 1-4-4 and addr width 32bit					*/
+/* In the case of bit width 1-1-1 and addr width 32bit			*/
+/* #define SET_DRCMR_CMD_VALUE  DRCMR_CMD_FAST_READ_4B			*/
+/* #define SET_DRENR_ADB_VALUE  DRENR_ADB_1BIT				*/
+/* #define SET_DRENR_DRDB_VALUE DRENR_DRDB_1BIT				*/
+/* In the case of bit width 1-1-4 and addr width 32bit			*/
+/* #define SET_DRCMR_CMD_VALUE  DRCMR_CMD_QUAD_OUTPUT_FAST_READ_4B	*/
+/* #define SET_DRENR_ADB_VALUE  DRENR_ADB_1BIT				*/
+/* #define SET_DRENR_DRDB_VALUE DRENR_DRDB_4BIT				*/
+/* In the case of bit width 1-4-4 and addr width 32bit			*/
 /* #define SET_DRCMR_CMD_VALUE  DRCMR_CMD_QUAD_INPUT_OUTPUT_FAST_READ_4B*/
-/* #define SET_DRENR_ADB_VALUE  DRENR_ADB_4BIT							*/
-/* #define SET_DRENR_DRDB_VALUE DRENR_DRDB_4BIT							*/
+/* #define SET_DRENR_ADB_VALUE  DRENR_ADB_4BIT				*/
+/* #define SET_DRENR_DRDB_VALUE DRENR_DRDB_4BIT				*/
 
 /* dummy cycle SPI_MULTI_DUMMY_1CYCLE - SPI_MULTI_DUMMY_20CYCLE */
 #define SET_DRDMCR_VALUE     SPI_MULTI_DUMMY_10CYCLE
 
 /* SDR mode serial flash settings */
 #define SPIM_PHYCNT_SET_VALUE (PHYCNT_DEF_DATA | PHYCNT_PHYMEM_SDR_MODE |					\
-								PHYCNT_WBUF_NOT_USED | PHYCNT_WBUF2_NOT_USED |				\
-								PHYCNT_CKSEL_SLOW | PHYCNT_HS_OTHER_MODE |					\
-								PHYCNT_OCT_OTHER_MODE | PHYCNT_EXDS_NOT_USED |				\
+								PHYCNT_WBUF_NOT_USED | PHYCNT_WBUF2_NOT_USED |	\
+								PHYCNT_CKSEL_SLOW | PHYCNT_HS_OTHER_MODE |	\
+								PHYCNT_OCT_OTHER_MODE | PHYCNT_EXDS_NOT_USED |	\
 								PHYCNT_OCTA_HYPER_FLASH | PHYCNT_ALT_ALIGN_NOT_SUPPORTED |	\
-								PHYCNT_CAL_NOT_PERFOMED)
+								PHYCNT_CAL_NOT_PERFORMED)
 #define SPIM_PHYCNT_SDR_TIM_ADJ_SET_VALUE (SPIM_PHYCNT_SET_VALUE | PHYCNT_CKSEL_FAST)
 
 /* Read timing setting */
@@ -60,15 +60,15 @@
 
 /* Set the QSPIn_SSL setting value */
 #define SPIM_CMNCR_EXTREAD_SET_VALUE (CMNCR_IO0FV_OUT_PREV | CMNCR_IO2FV_OUT_PREV |	\
-					CMNCR_IO3FV_OUT_PREV | CMNCR_MOIIO0_OUT1 |						\
-					CMNCR_MOIIO1_OUT1    | CMNCR_MOIIO2_OUT1 |						\
-					CMNCR_MOIIO3_OUT1    | CMNCR_DEF_DATA    |						\
+					CMNCR_IO3FV_OUT_PREV | CMNCR_MOIIO0_OUT1 |	\
+					CMNCR_MOIIO1_OUT1    | CMNCR_MOIIO2_OUT1 |	\
+					CMNCR_MOIIO3_OUT1    | CMNCR_DEF_DATA    |	\
 					CMNCR_MD_EXT_READ)
 
 #define SPIM_CMNCR_MANUAL_SET_VALUE (CMNCR_IO0FV_OUT_PREV | CMNCR_IO2FV_OUT_PREV |	\
-					CMNCR_IO3FV_OUT_PREV | CMNCR_MOIIO0_OUT1 |						\
-					CMNCR_MOIIO1_OUT1    | CMNCR_MOIIO2_OUT1 |						\
-					CMNCR_MOIIO3_OUT1    | CMNCR_DEF_DATA |							\
+					CMNCR_IO3FV_OUT_PREV | CMNCR_MOIIO0_OUT1 |	\
+					CMNCR_MOIIO1_OUT1    | CMNCR_MOIIO2_OUT1 |	\
+					CMNCR_MOIIO3_OUT1    | CMNCR_DEF_DATA |		\
 					CMNCR_MD_MANUAL)
 
 /* Set SSL delay setting value */
@@ -85,8 +85,8 @@
 
 /* Set the bit width of command and address output to 1 bit and	*/
 /* the address size to 4 byte									*/
-#define SPIM_DRENR_SET_VALUE (DRENR_CDB_1BIT | DRENR_OCDB_1BIT | SET_DRENR_ADB_VALUE |	\
-				DRENR_OPDB_1BIT | SET_DRENR_DRDB_VALUE | DRENR_CDE | DRENR_DME |		\
+#define SPIM_DRENR_SET_VALUE (DRENR_CDB_1BIT | DRENR_OCDB_1BIT | SET_DRENR_ADB_VALUE |			\
+				DRENR_OPDB_1BIT | SET_DRENR_DRDB_VALUE | DRENR_CDE | DRENR_DME |	\
 				SET_DRENR_ADE_VALUE | DRENR_OPDE_NO_OUT)
 /* Dummy cycle setting */
 #define SPIM_DRDMCR_SET_VALUE (SET_DRDMCR_VALUE)
@@ -110,10 +110,10 @@
 #define SPI_MANUAL_COMMAND_SIZE_16_BIT SMENR_SPIDE_16BIT_SEND
 #define SPI_MANUAL_COMMAND_SIZE_32_BIT SMENR_SPIDE_32BIT_SEND
 /* Read Status Register(05h) */
-#define STATUS_BUSY_BIT	               (1<<0)
-#define STATUS_WEL_BIT	               (1<<1)
-#define STATUS_BUSY		               (1<<0)
-#define STATUS_WEL		               (1<<1)
+#define STATUS_BUSY_BIT                BIT(0)
+#define STATUS_WEL_BIT                 BIT(1)
+#define STATUS_BUSY                    BIT(0)
+#define STATUS_WEL                     BIT(1)
 /* Read Status Register(BUSY flag) read delay time(micro sec)	*/
 #define STATUS_BUSY_READ_DELAY_TIME	   (100)
 

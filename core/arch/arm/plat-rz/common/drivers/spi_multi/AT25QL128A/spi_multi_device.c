@@ -30,9 +30,9 @@ void spi_multi_setup_device(void)
 	spi_io_write(SPIM_DROPR, val);
 
 	read_status = spi_multi_cmd_read(SMCMR_CMD_READ_STATUS_REGISTER_2);
-	if ((read_status & STATUS_2_QE) == STATUS_2_QE) {
+	if ((read_status & STATUS_2_QE) == STATUS_2_QE)
 		return;
-	}
+
 	/* Write Enable Command */
 	spi_multi_cmd_write(SMCMR_CMD_WRITE_ENABLE, SPI_MANUAL_COMMAND_SIZE_0, 0);
 	/* Write Status Register-2 Command Quad Enable */
@@ -53,8 +53,7 @@ void spi_multi_setup_device(void)
 
 void spi_multi_busy_wait(void)
 {
-	while(1) {
-
+	while (1) {
 		uint8_t read_status = spi_multi_cmd_read(SMCMR_CMD_READ_STATUS_REGISTER_1);
 
 		if ((read_status & STATUS_1_BUSY_BIT) != STATUS_1_BUSY)

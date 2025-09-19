@@ -9,7 +9,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-
-extern bool r_otp_read(uint32_t addr, uint32_t *p_value, uint32_t count);
+bool r_otp_read(uint32_t addr, uint32_t *p_value, uint32_t count);
 
 #endif /* __OTP_DRV_H__ */

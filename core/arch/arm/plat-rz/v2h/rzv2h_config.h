@@ -11,12 +11,12 @@
 /* Make stacks aligned to data cache line length */
 #define STACK_ALIGNMENT		64
 
-#define GICD_BASE			0x14900000U
+#define GICD_BASE		0x14900000U
 
 #define CONSOLE_UART_BASE	0x11C01400U
 
-#define CHIPID_BASE			0x1045114CU
-#define CHIPID_SIZE			16
+#define CHIPID_BASE		0x1045114CU
+#define CHIPID_SIZE		16
 
 #define CPG_REG_BASE		0x10420000U
 #define CPG_REG_SIZE		0x00010000
