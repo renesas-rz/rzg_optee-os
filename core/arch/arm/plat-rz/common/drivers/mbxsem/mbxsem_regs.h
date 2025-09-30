@@ -19,7 +19,7 @@
 #define MBXSEM_SEMRCENAR	(0x01A0)		/* Semaphore Read Clear Enable Register */
 
 #define MBXSEM_SEMAR_SEM	(0x1)			/* Semaphore bit */
-#define MBXSEM_SEMRCENAR_EN(value, num)Å@\
+#define MBXSEM_SEMRCENAR_EN(value, num) \
 				((value) & BIT(num))	/* Check SEMAR register read clear Enable bit */
 
 #endif	/* __MBXSEM_REGS_H__ */
