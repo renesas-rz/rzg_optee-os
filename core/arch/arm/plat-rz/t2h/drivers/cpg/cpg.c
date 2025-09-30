@@ -14,6 +14,7 @@
 #include <sys.h>
 #include <sys_regs.h>
 #include <xspi.h>
+#include <mbxsem.h>
 
 static void cpg_mstop_xspi0(void)
 {
@@ -214,18 +215,30 @@ static void cpg_reset_xspi1_stop(void)
 
 void cpg_xspi_start(void)
 {
+	/* Hardware Semaphore lock */
+	mbxsem_wait_regprotect();
+
 	cpg_mstop_xspi0();
 	cpg_reset_xspi0();
 
 	cpg_mstop_xspi1();
 	cpg_reset_xspi1();
+
+	/* Hardware Semaphore unlock */
+	mbxsem_post_regprotect();
 }
 
 void cpg_xspi_stop(void)
 {
+	/* Hardware Semaphore lock */
+	mbxsem_wait_regprotect();
+
 	cpg_mstop_xspi0_stop();
 	cpg_reset_xspi0_stop();
 
 	cpg_mstop_xspi1_stop();
 	cpg_reset_xspi1_stop();
+
+	/* Hardware Semaphore unlock */
+	mbxsem_post_regprotect();
 }

@@ -9,6 +9,7 @@
 #include <mm/core_memprot.h>
 #include <io.h>
 #include <kernel/panic.h>
+#include <mbxsem.h>
 
 register_phys_mem_pgdir(MEM_AREA_IO_NSEC, SYS_BASE, SYS_SIZE + SYS_NS_SIZE);
 register_phys_mem_pgdir(MEM_AREA_IO_SEC, SYS_SAFETY_BASE, SYS_SAFETY_SIZE);
@@ -55,10 +56,16 @@ void sys_safetybase_lock(uint32_t lock_mask)
 
 void sys_set_end_address(void)
 {
+	/* Hardware Semaphore lock */
+	mbxsem_wait_regprotect();
+
 	sys_base_unlock(PRCRx_SYS_CTRL);
 	io_write32(sys_base + XSPI0CS0_END_ADD, (0x47FFFFFFU));
 	io_write32(sys_base + XSPI1CS1_END_ADD, (0x57FFFFFFU));
 	sys_base_lock(PRCRx_SYS_CTRL);
+
+	/* Hardware Semaphore unlock */
+	mbxsem_post_regprotect();
 }
 
 static TEE_Result sys_init(void)

@@ -16,3 +16,5 @@ subdirs-$(CFG_RZ_TSIP) += r_sce
 
 srcs-$(CFG_RZ_RSIP) += rsip.c
 subdirs-$(CFG_RZ_RSIP) += r_rsip
+
+subdirs-$(CFG_RZ_MBXSEM) += mbxsem

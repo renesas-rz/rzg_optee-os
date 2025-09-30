@@ -12,6 +12,7 @@ $(call force,CFG_GIC,y)
 $(call force,CFG_ARM_GICV3,y)
 $(call force,CFG_RZ_XSPI,y)
 $(call force,CFG_RZ_OTP_PUCCINI,y)
+$(call force,CFG_RZ_MBXSEM,y)
 
 CFG_TEE_CORE_NB_CORE ?= 4
 CFG_NUM_THREADS ?= 4
