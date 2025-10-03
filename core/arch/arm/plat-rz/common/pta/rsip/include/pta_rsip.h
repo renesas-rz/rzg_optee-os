@@ -435,6 +435,4 @@ typedef struct {
  */
 #define PTA_CMD_ECC_BrainpoolP256r1_Public_Key_Export       (0x0001C300)
 
-rsip_instance_ctrl_t rsip_instance_ctrl;
-
 #endif /* __PTA_RSIP_H */
