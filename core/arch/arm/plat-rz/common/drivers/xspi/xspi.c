@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /*
- * Copyright (c) 2023-2024, Renesas Electronics Corporation
+ * Copyright (c) 2023-2025, Renesas Electronics Corporation
  */
 
 #include <stdint.h>
@@ -40,11 +40,6 @@
 
 #if defined(XSPI_REG_BASE)
 #define XSPI_REG_BASE_0			(XSPI_REG_BASE)
-#endif
-
-register_phys_mem_pgdir(MEM_AREA_IO_NSEC, XSPI_REG_BASE_0, XSPI_REG_SIZE);
-#if defined(XSPI_REG_BASE_1)
-register_phys_mem_pgdir(MEM_AREA_IO_NSEC, XSPI_REG_BASE_1, XSPI_REG_SIZE);
 #endif
 
 vaddr_t xspi_base;

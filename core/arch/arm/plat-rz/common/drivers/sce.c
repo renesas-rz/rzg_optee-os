@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /*
- * Copyright (c) 2021-2024, Renesas Electronics Corporation
+ * Copyright (c) 2021-2025, Renesas Electronics Corporation
  */
 
 #include <string.h>
@@ -12,8 +12,6 @@
 
 #include <r_sce.h>
 #include "platform_config.h"
-
-register_phys_mem_pgdir(MEM_AREA_IO_SEC, SCE_REG_BASE, SCE_REG_SIZE);
 
 static sce_cfg_t sce_cfg;
 static sce_instance_ctrl_t sce_instance_ctrl;

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /*
- * Copyright (c) 2021, Renesas Electronics Corporation
+ * Copyright (c) 2021-2025, Renesas Electronics Corporation
  */
 
 #include <trace.h>
@@ -13,8 +13,6 @@
 #include "platform_config.h"
 
 #define REGISTER_SIZE	(sizeof(uint32_t))
-
-register_phys_mem_pgdir(MEM_AREA_IO_SEC, CHIPID_BASE, CHIPID_SIZE);
 
 static void read_chipid(uint8_t *chipid)
 {

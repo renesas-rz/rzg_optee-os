@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /*
- * Copyright (c) 2020-2023, Renesas Electronics Corporation
+ * Copyright (c) 2020-2025, Renesas Electronics Corporation
  */
 
 #include <stdint.h>
@@ -13,8 +13,6 @@
 #include <spi_multi_regs.h>
 #include <spi_multi_reg_values.h>
 #include <spi_multi_device.h>
-
-register_phys_mem_pgdir(MEM_AREA_IO_NSEC, SPI_MULTI_BASE, SPI_MULTI_SIZE);
 
 vaddr_t spi_multi_base;
 

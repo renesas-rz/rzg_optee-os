@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /*
- * Copyright (c) 2023-2024, Renesas Electronics Corporation
+ * Copyright (c) 2023-2025, Renesas Electronics Corporation
  */
 
 #include <initcall.h>
@@ -10,8 +10,6 @@
 #include "otp_drv.h"
 #include "otp_regs.h"
 #include <trace.h>
-
-register_phys_mem_pgdir(MEM_AREA_IO_NSEC, OTP_BASE, OTP_REG_SIZE);
 
 vaddr_t otp_base;
 

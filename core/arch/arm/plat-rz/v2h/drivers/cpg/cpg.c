@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /*
- * Copyright (c) 2024, Renesas Electronics Corporation
+ * Copyright (c) 2024-2025, Renesas Electronics Corporation
  */
 
 #include <stdint.h>
@@ -26,8 +26,6 @@ struct CPG_SETUP_DATA {
 	struct CPG_REG_SETTING mon;
 	uint32_t  type;
 };
-
-register_phys_mem_pgdir(MEM_AREA_IO_NSEC, CPG_REG_BASE, CPG_REG_SIZE);
 
 static vaddr_t cpg_base;
 

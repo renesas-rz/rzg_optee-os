@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /*
- * Copyright (c) 2023, Renesas Electronics Corporation
+ * Copyright (c) 2023-2025, Renesas Electronics Corporation
  */
 
 #include <stdint.h>
@@ -18,11 +18,6 @@
 
 #if defined(SPI_FLASH_BASE)
 #define SPI_FLASH_BASE_0    (SPI_FLASH_BASE)
-#endif
-
-register_phys_mem_pgdir(MEM_AREA_IO_NSEC, SPI_FLASH_BASE_0, SPI_FLASH_SIZE);
-#if defined(SPI_FLASH_BASE_1)
-register_phys_mem_pgdir(MEM_AREA_IO_NSEC, SPI_FLASH_BASE_1, SPI_FLASH_SIZE);
 #endif
 
 static vaddr_t sflash_base[2];

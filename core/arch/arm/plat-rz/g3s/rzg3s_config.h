@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Copyright (c) 2024, Renesas Electronics Corporation
+ * Copyright (c) 2024-2025, Renesas Electronics Corporation
  */
 
 #ifndef RZG3S_CONFIG_H
@@ -11,11 +11,13 @@
 /* Make stacks aligned to data cache line length */
 #define STACK_ALIGNMENT		64
 
-#define GICD_BASE		0x11900000U
+#define GICD_BASE		0x12400000U
 
 #define CONSOLE_UART_BASE	0x1004B800U
 
-#define CHIPID_BASE		0x11861140U
+#define OTP_BASE		0x11860000U
+#define OTP_SIZE		0x00010000
+#define CHIPID_BASE		(OTP_BASE + 0x1140U)
 #define CHIPID_SIZE		16
 
 #define CPG_REG_BASE		0x11010000

@@ -11,9 +11,6 @@
 #include <kernel/panic.h>
 #include <mbxsem.h>
 
-register_phys_mem_pgdir(MEM_AREA_IO_NSEC, SYS_BASE, SYS_SIZE + SYS_NS_SIZE);
-register_phys_mem_pgdir(MEM_AREA_IO_SEC, SYS_SAFETY_BASE, SYS_SAFETY_SIZE);
-
 vaddr_t sys_base;
 vaddr_t sys_ns_base;
 vaddr_t sys_safety_base;

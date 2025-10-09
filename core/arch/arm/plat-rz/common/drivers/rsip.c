@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /*
- * Copyright (c) 2024, Renesas Electronics Corporation
+ * Copyright (c) 2024-2025, Renesas Electronics Corporation
  */
 
 #include <string.h>
@@ -12,8 +12,6 @@
 
 #include <r_rsip.h>
 #include <r_rsip_addr.h>
-
-register_phys_mem_pgdir(MEM_AREA_IO_SEC, SCE_REG_BASE, SCE_REG_SIZE);
 
 rsip_cfg_t rsip_cfg;
 rsip_instance_ctrl_t rsip_instance_ctrl;

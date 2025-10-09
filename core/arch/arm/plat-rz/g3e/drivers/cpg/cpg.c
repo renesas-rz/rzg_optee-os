@@ -27,8 +27,6 @@ struct CPG_SETUP_DATA {
 	uint32_t  type;
 };
 
-register_phys_mem_pgdir(MEM_AREA_IO_NSEC, CPG_REG_BASE, CPG_REG_SIZE);
-
 static vaddr_t cpg_base;
 
 static inline void cpg_io_write(uint32_t reg, uint32_t data)
