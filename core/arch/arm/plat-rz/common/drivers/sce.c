@@ -44,4 +44,4 @@ static TEE_Result SCE_Init(void)
 	return TEE_SUCCESS;
 }
 
-driver_init(SCE_Init);
+service_init(SCE_Init);

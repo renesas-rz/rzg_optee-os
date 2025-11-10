@@ -33,4 +33,4 @@ static TEE_Result RSIP_Init(void)
 	return TEE_SUCCESS;
 }
 
-driver_init(RSIP_Init);
+service_init(RSIP_Init);
