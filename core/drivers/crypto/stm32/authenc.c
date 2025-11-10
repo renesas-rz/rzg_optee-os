@@ -10,7 +10,6 @@
 #include <drvcrypt.h>
 #include <drvcrypt_authenc.h>
 #include <initcall.h>
-#include <kernel/dt.h>
 #include <stdlib.h>
 #include <string.h>
 #include <string_ext.h>
@@ -20,9 +19,6 @@
 
 #include "common.h"
 #include "stm32_cryp.h"
-
-#define TOBE32(x)			TEE_U32_BSWAP(x)
-#define FROMBE32(x)			TEE_U32_BSWAP(x)
 
 #define MAX_TAG_SIZE			16U
 
@@ -62,7 +58,7 @@ static TEE_Result stm32_ae_gcm_generate_iv(struct stm32_ae_ctx *c,
 
 	if (dinit->nonce.length == 12) {
 		memcpy(iv, dinit->nonce.data, dinit->nonce.length);
-		iv[3] = TOBE32(2);
+		iv[3] = TEE_U32_TO_BIG_ENDIAN(2);
 		return TEE_SUCCESS;
 	}
 
@@ -104,7 +100,7 @@ static TEE_Result stm32_ae_gcm_generate_iv(struct stm32_ae_ctx *c,
 	xor_vec((uint8_t *)j0, tag1, tag2, sizeof(tag1));
 
 	memcpy(iv, j0, sizeof(j0));
-	iv[3] = TOBE32(FROMBE32(iv[3]) + 1);
+	iv[3] = TEE_U32_TO_BIG_ENDIAN(TEE_U32_FROM_BIG_ENDIAN(iv[3]) + 1);
 
 	/* Compute first mask=AES_ECB(J0_real) into tag1 */
 	memset(&ctx, 0, sizeof(ctx));
@@ -121,7 +117,7 @@ static TEE_Result stm32_ae_gcm_generate_iv(struct stm32_ae_ctx *c,
 
 	/* Compute second mask=AES_ECB(J0_used_by_HW) into tag2 */
 	memset(&ctx, 0, sizeof(ctx));
-	j0[3] = TOBE32(1);
+	j0[3] = TEE_U32_TO_BIG_ENDIAN(1);
 	res = stm32_cryp_init(&ctx, false, STM32_CRYP_MODE_AES_ECB,
 			      dinit->key.data, dinit->key.length,
 			      NULL, 0);
@@ -359,15 +355,15 @@ static TEE_Result stm32_ae_allocate(void **ctx, uint32_t algo)
  * Registration of the Authenc Driver
  */
 static struct drvcrypt_authenc driver_authenc = {
-	.alloc_ctx = &stm32_ae_allocate,
-	.free_ctx = &stm32_ae_free,
-	.init = &stm32_ae_initialize,
-	.update_aad = &stm32_ae_update_aad,
-	.update_payload = &stm32_ae_update_payload,
-	.enc_final = &stm32_ae_enc_final,
-	.dec_final = &stm32_ae_dec_final,
-	.final = &stm32_ae_final,
-	.copy_state = &stm32_ae_copy_state,
+	.alloc_ctx = stm32_ae_allocate,
+	.free_ctx = stm32_ae_free,
+	.init = stm32_ae_initialize,
+	.update_aad = stm32_ae_update_aad,
+	.update_payload = stm32_ae_update_payload,
+	.enc_final = stm32_ae_enc_final,
+	.dec_final = stm32_ae_dec_final,
+	.final = stm32_ae_final,
+	.copy_state = stm32_ae_copy_state,
 };
 
 TEE_Result stm32_register_authenc(void)

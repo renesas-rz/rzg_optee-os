@@ -14,6 +14,7 @@
 #include <mbedtls/platform_util.h>
 #include <mbedtls/sha1.h>
 #include <mbedtls/sha256.h>
+#include <mbedtls/sha512.h>
 #include <stdlib.h>
 #include <string_ext.h>
 #include <string.h>
@@ -56,13 +57,14 @@ static TEE_Result mbed_hash_final(struct crypto_hash_ctx *ctx, uint8_t *digest,
 				  size_t len)
 {
 	struct mbed_hash_ctx *hc = to_hash_ctx(ctx);
-	size_t hash_size = mbedtls_md_get_size(hc->md_ctx.md_info);
 	uint8_t block_digest[TEE_MAX_HASH_SIZE] = { 0 };
 	uint8_t *tmp_digest = NULL;
+	size_t hash_size = 0;
 
 	if (len == 0)
 		return TEE_ERROR_BAD_PARAMETERS;
 
+	hash_size = mbedtls_md_get_size(mbedtls_md_info_from_ctx(&hc->md_ctx));
 	if (hash_size > len) {
 		if (hash_size > sizeof(block_digest))
 			return TEE_ERROR_BAD_STATE;
@@ -200,11 +202,6 @@ TEE_Result hash_sha256_check(const uint8_t *hash, const uint8_t *data,
 int mbedtls_internal_sha1_process(mbedtls_sha1_context *ctx,
 				  const unsigned char data[64])
 {
-	MBEDTLS_INTERNAL_VALIDATE_RET(ctx != NULL,
-				      MBEDTLS_ERR_SHA1_BAD_INPUT_DATA);
-	MBEDTLS_INTERNAL_VALIDATE_RET((const unsigned char *)data != NULL,
-				      MBEDTLS_ERR_SHA1_BAD_INPUT_DATA);
-
 	crypto_accel_sha1_compress(ctx->state, data, 1);
 
 	return 0;
@@ -215,13 +212,18 @@ int mbedtls_internal_sha1_process(mbedtls_sha1_context *ctx,
 int mbedtls_internal_sha256_process(mbedtls_sha256_context *ctx,
 				    const unsigned char data[64])
 {
-	MBEDTLS_INTERNAL_VALIDATE_RET(ctx != NULL,
-				      MBEDTLS_ERR_SHA256_BAD_INPUT_DATA);
-	MBEDTLS_INTERNAL_VALIDATE_RET((const unsigned char *)data != NULL,
-				      MBEDTLS_ERR_SHA256_BAD_INPUT_DATA);
-
 	crypto_accel_sha256_compress(ctx->state, data, 1);
 
 	return 0;
 }
 #endif /*MBEDTLS_SHA256_PROCESS_ALT*/
+
+#if defined(MBEDTLS_SHA512_PROCESS_ALT)
+int mbedtls_internal_sha512_process(mbedtls_sha512_context *ctx,
+				    const unsigned char data[64])
+{
+	crypto_accel_sha512_compress(ctx->state, data, 1);
+
+	return 0;
+}
+#endif /*MBEDTLS_SHA512_PROCESS_ALT*/

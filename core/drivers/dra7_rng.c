@@ -92,7 +92,7 @@ static void dra7_rng_read64(uint32_t *low_word, uint32_t *high_word)
 			/* Clear the shutdown overflow event */
 			io_write32(rng + RNG_INTACK, SHUTDOWN_OFLO);
 
-			DMSG("Fixed FRO shutdown\n");
+			DMSG("Fixed FRO shutdown");
 		}
 	}
 	/* Read random value */
@@ -111,6 +111,8 @@ TEE_Result hw_get_random_bytes(void *buf, size_t len)
 	static size_t fifo_pos;
 	uint8_t *buffer = buf;
 	size_t buffer_pos = 0;
+
+	assert(rng);
 
 	while (buffer_pos < len) {
 		uint32_t exceptions = cpu_spin_lock_xsave(&rng_lock);
@@ -186,4 +188,4 @@ static TEE_Result dra7_rng_init(void)
 
 	return TEE_SUCCESS;
 }
-driver_init(dra7_rng_init);
+service_init_crypto(dra7_rng_init);

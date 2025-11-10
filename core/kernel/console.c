@@ -5,9 +5,13 @@
 
 #include <compiler.h>
 #include <console.h>
+#include <drivers/cbmem_console.h>
+#include <drivers/semihosting_console.h>
+#include <drivers/ffa_console.h>
 #include <drivers/serial.h>
+#include <initcall.h>
 #include <kernel/dt.h>
-#include <kernel/boot.h>
+#include <kernel/dt_driver.h>
 #include <kernel/panic.h>
 #include <libfdt.h>
 #include <stdlib.h>
@@ -15,6 +19,21 @@
 #include <string_ext.h>
 
 static struct serial_chip *serial_console __nex_bss;
+
+/* May be overridden by platform */
+__weak void plat_console_init(void)
+{
+}
+
+void console_init(void)
+{
+	if (IS_ENABLED(CFG_SEMIHOSTING_CONSOLE))
+		semihosting_console_init(CFG_SEMIHOSTING_CONSOLE_FILE);
+	else if (IS_ENABLED(CFG_FFA_CONSOLE))
+		ffa_console_init();
+	else
+		plat_console_init();
+}
 
 void __weak console_putc(int ch)
 {
@@ -28,7 +47,7 @@ void __weak console_putc(int ch)
 
 void __weak console_flush(void)
 {
-	if (!serial_console)
+	if (!serial_console || !serial_console->ops->flush)
 		return;
 
 	serial_console->ops->flush(serial_console);
@@ -38,6 +57,20 @@ void register_serial_console(struct serial_chip *chip)
 {
 	serial_console = chip;
 }
+
+#ifdef CFG_CONSOLE_RUNTIME_SET
+static TEE_Result console_runtime_set(void)
+{
+	if (CFG_CONSOLE_RUNTIME_LOG_LEVEL == TRACE_MIN)
+		IMSG("Disabling output console");
+
+	trace_set_level(CFG_CONSOLE_RUNTIME_LOG_LEVEL);
+
+	return TEE_SUCCESS;
+}
+
+boot_final(console_runtime_set);
+#endif
 
 #ifdef CFG_DT
 static int find_chosen_node(void *fdt)
@@ -127,6 +160,10 @@ void configure_console_from_dt(void)
 	int offs;
 
 	fdt = get_dt();
+
+	if (IS_ENABLED(CFG_CBMEM_CONSOLE) && cbmem_console_init_from_dt(fdt))
+		return;
+
 	if (get_console_node_from_dt(fdt, &offs, &uart, &parms))
 		return;
 

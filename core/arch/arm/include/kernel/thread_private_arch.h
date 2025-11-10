@@ -37,18 +37,20 @@
 #endif /*ARM32*/
 
 #ifdef ARM64
-#if defined(__clang__) && !defined(__OPTIMIZE_SIZE__)
+#if (defined(__clang__) && !defined(__OPTIMIZE_SIZE__)) || \
+	defined(CFG_CORE_SANITIZE_KADDRESS) || \
+	defined(CFG_CORE_DEBUG_CHECK_STACKS) || defined(CFG_NS_VIRTUALIZATION)
 #define STACK_TMP_SIZE		(4096 + STACK_TMP_OFFS + CFG_STACK_TMP_EXTRA)
 #else
 #define STACK_TMP_SIZE		(2048 + STACK_TMP_OFFS + CFG_STACK_TMP_EXTRA)
 #endif
-#define STACK_THREAD_SIZE	(8192 + CFG_STACK_THREAD_EXTRA)
-
-#if TRACE_LEVEL > 0
-#define STACK_ABT_SIZE		3072
+#if defined(CFG_CORE_SANITIZE_KADDRESS) || defined(CFG_CORE_DEBUG_CHECK_STACKS)
+#define STACK_THREAD_SIZE	(10240 + CFG_STACK_THREAD_EXTRA)
 #else
-#define STACK_ABT_SIZE		1024
+#define STACK_THREAD_SIZE	(8192 + CFG_STACK_THREAD_EXTRA)
 #endif
+
+#define STACK_ABT_SIZE		4096
 #endif /*ARM64*/
 
 #ifdef CFG_CORE_DEBUG_CHECK_STACKS
@@ -181,6 +183,8 @@ void thread_set_fiq_sp(vaddr_t sp);
 
 /* Read usr_sp banked CPU register */
 uint32_t thread_get_usr_sp(void);
+uint32_t thread_get_usr_lr(void);
+void thread_set_usr_lr(uint32_t usr_lr);
 #endif /*ARM32*/
 
 void thread_alloc_and_run(uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3,
@@ -189,13 +193,18 @@ void thread_resume_from_rpc(uint32_t thread_id, uint32_t a0, uint32_t a1,
 			    uint32_t a2, uint32_t a3);
 
 /*
- * Suspends current thread and temorarily exits to non-secure world.
- * This function returns later when non-secure world returns.
+ * The thread_rpc() function suspends current thread and temporarily exits
+ * to non-secure world.  This function returns later when non-secure world
+ * returns.
  *
  * The purpose of this function is to request services from non-secure
  * world.
  */
 #define THREAD_RPC_NUM_ARGS     4
+#ifdef ARM64
+void thread_rpc_spsr(uint32_t rv[THREAD_RPC_NUM_ARGS], uint64_t spsr);
+void __thread_rpc(uint32_t rv[THREAD_RPC_NUM_ARGS]);
+
 #ifdef CFG_CORE_FFA
 struct thread_rpc_arg {
 	union {
@@ -214,8 +223,18 @@ struct thread_rpc_arg {
 	};
 };
 
-void thread_rpc(struct thread_rpc_arg *rpc_arg);
+static inline void thread_rpc(struct thread_rpc_arg *rpc_arg)
+{
+	__thread_rpc(rpc_arg->pad);
+}
 #else
+static inline void thread_rpc(uint32_t rv[THREAD_RPC_NUM_ARGS])
+{
+	__thread_rpc(rv);
+}
+#endif
+#endif
+#ifdef ARM32
 void thread_rpc(uint32_t rv[THREAD_RPC_NUM_ARGS]);
 #endif
 
@@ -234,8 +253,16 @@ uint32_t thread_handle_std_smc(uint32_t a0, uint32_t a1, uint32_t a2,
 			       uint32_t a6, uint32_t a7);
 
 /* Called from assembly only. Handles a SVC from user mode. */
-void thread_svc_handler(struct thread_svc_regs *regs);
+void thread_scall_handler(struct thread_scall_regs *regs);
 
 void thread_spmc_register_secondary_ep(vaddr_t ep);
 #endif /*__ASSEMBLER__*/
+
+/*
+ * Used in entry_a64.S entry_a32.S to allocate a temporary
+ * thread_core_local[0] for the boot CPU and the associated abort and
+ * temporary stacks.
+ */
+#define THREAD_BOOT_INIT_TMP_ALLOC	(SMALL_PAGE_SIZE * 6)
+
 #endif /*__KERNEL_THREAD_PRIVATE_ARCH_H*/

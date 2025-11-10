@@ -39,7 +39,7 @@ struct thread_ctx {
 	uint32_t flags;
 	struct core_mmu_user_map user_map;
 	bool have_user_map;
-#ifdef ARM64
+#if defined(ARM64) || defined(RV64)
 	vaddr_t kern_sp;	/* Saved kernel SP during user TA execution */
 #endif
 #ifdef CFG_CORE_PAUTH
@@ -72,8 +72,13 @@ struct thread_ctx {
 #ifndef __ASSEMBLER__
 extern const void *stack_tmp_export;
 extern const uint32_t stack_tmp_stride;
-extern struct thread_ctx threads[];
-extern struct thread_core_local thread_core_local[];
+extern struct thread_ctx *threads;
+extern size_t thread_count;
+extern struct thread_core_local *thread_core_local;
+extern unsigned long thread_core_local_pa;
+extern size_t thread_core_count;
+extern struct thread_core_local *__thread_core_local_new;
+extern size_t __thread_core_count_new;
 
 #ifdef CFG_WITH_STACK_CANARIES
 #define STACK_CANARY_SIZE	(4 * sizeof(long))

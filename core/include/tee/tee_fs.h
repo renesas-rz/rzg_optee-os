@@ -3,9 +3,11 @@
  * Copyright (c) 2014, STMicroelectronics International N.V.
  */
 
-#ifndef TEE_FS_H
-#define TEE_FS_H
+#ifndef __TEE_TEE_FS_H
+#define __TEE_TEE_FS_H
 
+#include <pta_stats.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <tee_api_defines_extensions.h>
@@ -34,13 +36,14 @@ struct tee_file_operations {
 	TEE_Result (*create)(struct tee_pobj *po, bool overwrite,
 			     const void *head, size_t head_size,
 			     const void *attr, size_t attr_size,
-			     const void *data, size_t data_size,
-			     struct tee_file_handle **fh);
+			     const void *data_core, const void *data_user,
+			     size_t data_size, struct tee_file_handle **fh);
 	void (*close)(struct tee_file_handle **fh);
 	TEE_Result (*read)(struct tee_file_handle *fh, size_t pos,
-			   void *buf, size_t *len);
+			   void *buf_core, void *buf_user, size_t *len);
 	TEE_Result (*write)(struct tee_file_handle *fh, size_t pos,
-			    const void *buf, size_t len);
+			    const void *buf_core, const void *buf_user,
+			    size_t len);
 	TEE_Result (*rename)(struct tee_pobj *old_po, struct tee_pobj *new_po,
 			     bool overwrite);
 	TEE_Result (*remove)(struct tee_pobj *po);
@@ -59,6 +62,10 @@ extern const struct tee_file_operations rpmb_fs_ops;
 
 TEE_Result tee_rpmb_fs_raw_open(const char *fname, bool create,
 				struct tee_file_handle **fh);
+TEE_Result tee_rpmb_reinit(void);
+
+/* Ger RPMB memory allocation statistics */
+TEE_Result rpmb_mem_stats(struct pta_stats_alloc *stats, bool reset);
 
 /**
  * Weak function which can be overridden by platforms to indicate that the RPMB
@@ -66,6 +73,17 @@ TEE_Result tee_rpmb_fs_raw_open(const char *fname, bool create,
  * prevent a RPMB key write in the wrong state.
  */
 bool plat_rpmb_key_is_ready(void);
+#else
+static inline TEE_Result tee_rpmb_reinit(void)
+{
+	return TEE_ERROR_STORAGE_NOT_AVAILABLE;
+}
+
+static inline TEE_Result rpmb_mem_stats(struct pta_stats_alloc *stats __unused,
+					bool reset __unused)
+{
+	return TEE_ERROR_STORAGE_NOT_AVAILABLE;
+}
 #endif
 
 /*
@@ -98,4 +116,4 @@ tee_svc_storage_file_ops(uint32_t storage_id)
 	}
 }
 
-#endif /*TEE_FS_H*/
+#endif /*__TEE_TEE_FS_H*/

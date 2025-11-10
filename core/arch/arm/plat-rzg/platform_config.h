@@ -1,6 +1,7 @@
-/* SPDX-License-Identifier: BSD-3-Clause */
+/* SPDX-License-Identifier: BSD-2-Clause */
 /*
- * Copyright (c) 2020-2023, Renesas Electronics Corporation
+ * Copyright (c) 2016, GlobalLogic
+ * Copyright (c) 2020, Renesas Electronics Corporation
  */
 
 #ifndef PLATFORM_CONFIG_H
@@ -11,41 +12,40 @@
 /* Make stacks aligned to data cache line length */
 #define STACK_ALIGNMENT		64
 
-#define DEVICE0_BASE		0xE6000000
-#define DEVICE0_SIZE		0x002FFFFF
-
-#define DEVICE1_BASE		0xE6360000
-#define DEVICE1_SIZE		0x19CA0000
-
-#define GIC_BASE			0xF1000000
-#define GICC_BASE			0xF1020000
-#define GICD_BASE			0xF1010000
-
-#define	CPG_BASE			0xE6150000
-#define	CPG_REG_SIZE		0x00000BB0
-
-#define RPC_BASE			0xEE200000
-#define RPC_REG_SIZE		0x00009000
-
-#define PRR_BASE			0xFFF00044
-#define PRR_REG_SIZE		0x00000200
-
-#define PRR_PRODUCT_MASK	0x00007F00
-#define PRR_CUT_MASK		0x000000FF
-#define PRR_PRODUCT_G2H		0x00004F00
-#define PRR_PRODUCT_G2M		0x00005200
-#define PRR_PRODUCT_G2N		0x00005500
-#define PRR_PRODUCT_G2E		0x00005700
-#define PRR_PRODUCT_10		0x00U
-#define PRR_PRODUCT_11		0x01U
-#define PRR_PRODUCT_20		0x10U
-#define PRR_PRODUCT_21		0x11U
-#define PRR_PRODUCT_30		0x20U
+#define GIC_BASE		0xF1000000
+#define GICC_BASE		0xF1020000
+#define GICD_BASE		0xF1010000
 
 #define CONSOLE_UART_BASE	0xE6E88000
 
-#define TSIP_DATA_ADDR		0x440FE000
-#define TSIP_DATA_SIZE		0x00002000
+#if defined(PLATFORM_FLAVOR_ek874)
+#define NSEC_DDR_0_BASE		0x47E00000U
+#define NSEC_DDR_0_SIZE		0x78200000
+
+#elif defined(PLATFORM_FLAVOR_hihope_rzg2h)
+
+#define NSEC_DDR_0_BASE		0x47E00000U
+#define NSEC_DDR_0_SIZE		0x78200000
+#define NSEC_DDR_1_BASE		0x500000000U
+#define NSEC_DDR_1_SIZE		0x80000000
+
+#elif defined(PLATFORM_FLAVOR_hihope_rzg2m)
+
+#define NSEC_DDR_0_BASE		0x47E00000U
+#define NSEC_DDR_0_SIZE		0x78200000
+#define NSEC_DDR_1_BASE		0x600000000U
+#define NSEC_DDR_1_SIZE		0x80000000
+
+#elif defined(PLATFORM_FLAVOR_hihope_rzg2n)
+
+#define NSEC_DDR_0_BASE		0x47E00000U
+#define NSEC_DDR_0_SIZE		0x78200000
+#define NSEC_DDR_1_BASE		0x480000000U
+#define NSEC_DDR_1_SIZE		0x80000000
+
+#else
+#error "Unknown platform flavor"
+#endif
 
 #define TEE_SHMEM_START		(TZDRAM_BASE + TZDRAM_SIZE)
 #define TEE_SHMEM_SIZE		0x100000

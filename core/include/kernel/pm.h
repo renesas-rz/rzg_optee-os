@@ -20,6 +20,7 @@
  * PM_HINT_POWER_STATE - When set device power shall be suspended/restored
  * PM_HINT_IO_STATE - When set IO pins shall be suspended/restored
  * PM_HINT_CONTEXT_STATE - When set the full context be suspended/restored
+ * PM_HINT_SUSPEND_TYPE - Contains the type of suspend operation
  * PM_HINT_PLATFORM_STATE_MASK - Bit mask reserved for platform specific hints
  * PM_HINT_PLATFORM_STATE_SHIFT - LSBit position of platform specific hints mask
  */
@@ -27,8 +28,24 @@
 #define PM_HINT_POWER_STATE		BIT(1)
 #define PM_HINT_IO_STATE		BIT(2)
 #define PM_HINT_CONTEXT_STATE		BIT(3)
+#define PM_HINT_SUSPEND_TYPE_MASK       GENMASK_32(5, 4)
+#define PM_HINT_SUSPEND_TYPE_SHIFT      U(4)
 #define PM_HINT_PLATFORM_STATE_MASK	GENMASK_32(31, 16)
 #define PM_HINT_PLATFORM_STATE_SHIFT	U(16)
+
+enum pm_suspend_type {
+	PM_SUSPEND_STANDBY,
+	PM_SUSPEND_TO_MEM,
+};
+
+#define PM_HINT_SUSPEND_TYPE(__hint) \
+	(((__hint) & PM_HINT_SUSPEND_TYPE_MASK) >> PM_HINT_SUSPEND_TYPE_SHIFT)
+
+#define PM_HINT_STATE(_x)		((_x) & ~PM_HINT_PLATFORM_STATE_MASK)
+#define PM_HINT_PLATFORM_STATE(_x) \
+	(((_x) & PM_HINT_PLATFORM_STATE_MASK) >> PM_HINT_PLATFORM_STATE_SHIFT)
+
+#define PM_HINT_IS_STATE(_x, _name) ((_x) & PM_HINT_ ## _name ## _STATE)
 
 /*
  * PM_OP_SUSPEND: platform is suspending to a target low power state
@@ -123,6 +140,19 @@ struct pm_callback_handle {
 void register_pm_cb(struct pm_callback_handle *pm_handle);
 
 /*
+ * Unregister a previously registered PM callback handle
+ * Refer to struct pm_callback_handle for description of the callbacks
+ * API and the registration directives.
+ *
+ * @pm_handle: Reference previously registered
+ *
+ * This function removes from the list of the PM called callbacks the
+ * entry that match callback function reference and private handle and
+ * PM order (PM_CB_ORDER_*).
+ */
+void unregister_pm_cb(struct pm_callback_handle *pm_handle);
+
+/*
  * Register a driver callback for generic suspend/resume.
  * Refer to struct pm_callback_handle for description of the callbacks
  * API.
@@ -140,6 +170,19 @@ static inline void register_pm_driver_cb(pm_callback callback, void *handle,
 }
 
 /*
+ * Unregister a driver callback from generic suspend/resume sequence.
+ *
+ * @callback: Callback function that what registered
+ * @handle: Private handle argument that was registered for the callback
+ */
+static inline void unregister_pm_driver_cb(pm_callback callback, void *handle)
+{
+	unregister_pm_cb(&PM_CALLBACK_HANDLE_INITIALIZER(callback, handle,
+							 PM_CB_ORDER_DRIVER,
+							 NULL));
+}
+
+/*
  * Register a core service callback for generic suspend/resume.
  * Refer to struct pm_callback_handle for description of the callbacks
  * API.
@@ -152,8 +195,23 @@ static inline void register_pm_core_service_cb(pm_callback callback,
 					       void *handle, const char *name)
 {
 	register_pm_cb(&PM_CALLBACK_HANDLE_INITIALIZER(callback, handle,
-						PM_CB_ORDER_CORE_SERVICE,
-						name));
+						       PM_CB_ORDER_CORE_SERVICE,
+						       name));
+}
+
+/*
+ * Unregister a core service callback from generic suspend/resume sequences
+ *
+ * @callback: Registered callback function
+ * @handle: Private handle argument that was registered for the callback
+ */
+static inline void unregister_pm_core_service_cb(pm_callback callback,
+						 void *handle)
+{
+	enum pm_callback_order order = PM_CB_ORDER_CORE_SERVICE;
+
+	unregister_pm_cb(&PM_CALLBACK_HANDLE_INITIALIZER(callback, handle,
+							 order, NULL));
 }
 
 /*

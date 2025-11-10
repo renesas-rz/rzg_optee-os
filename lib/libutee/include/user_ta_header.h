@@ -10,29 +10,55 @@
 #include <tee_api_types.h>
 #include <util.h>
 
-#define TA_FLAG_USER_MODE		0	 /* Deprecated, was (1 << 0) */
-#define TA_FLAG_EXEC_DDR		0	 /* Deprecated, was (1 << 1) */
-#define TA_FLAG_SINGLE_INSTANCE		(1 << 2)
-#define TA_FLAG_MULTI_SESSION		(1 << 3)
-#define TA_FLAG_INSTANCE_KEEP_ALIVE	(1 << 4) /* remains after last close */
-#define TA_FLAG_SECURE_DATA_PATH	(1 << 5) /* accesses SDP memory */
-#define TA_FLAG_REMAP_SUPPORT		0	 /* Deprecated, was (1 << 6) */
-#define TA_FLAG_CACHE_MAINTENANCE	(1 << 7) /* use cache flush syscall */
+#define TA_FLAG_USER_MODE		0	 /* Deprecated, was BIT32(0) */
+#define TA_FLAG_EXEC_DDR		0	 /* Deprecated, was BIT32(1) */
+#define TA_FLAG_SINGLE_INSTANCE		BIT32(2)
+#define TA_FLAG_MULTI_SESSION		BIT32(3)
+#define TA_FLAG_INSTANCE_KEEP_ALIVE	BIT32(4) /* remains after last close */
+#define TA_FLAG_SECURE_DATA_PATH	BIT32(5) /* accesses SDP memory */
+#define TA_FLAG_REMAP_SUPPORT		0	 /* Deprecated, was BIT32(6) */
+#define TA_FLAG_CACHE_MAINTENANCE	BIT32(7) /* use cache flush syscall */
 	/*
 	 * TA instance can execute multiple sessions concurrently
 	 * (pseudo-TAs only).
 	 */
-#define TA_FLAG_CONCURRENT		(1 << 8)
+#define TA_FLAG_CONCURRENT		BIT32(8)
 	/*
-	 * Device enumeration is done in two stages by the normal world, first
-	 * before the tee-supplicant has started and then once more when the
-	 * tee-supplicant is started. The flags below control if the TA should
-	 * be reported in the first or second or case.
+	 * Device enumeration is initiated at multiple stages by the normal
+	 * world:
+	 * 1. First when the kernel driver has initialized
+	 * 2. When RPMB is available via inkernel RPMB routing
+	 * 3. When the tee-supplicant is started
+	 *
+	 * The flags below control at which stage a TA will be enumerated:
+	 * TA_FLAG_DEVICE_ENUM - at stage 1
+	 * TA_FLAG_DEVICE_ENUM_TEE_STORAGE_PRIVATE -
+	 *      when secure storage is available, at stage 2 or 3 depending
+	 *      on whether TEE_STORAGE_PRIVATE is using RPMB FS
+	 *      (CFG_REE_FS=n CFG_RPMB_FS=y) or REE FS (CFG_REE_FS=y). The
+	 *      former utilizes in kernel RPMB routing, and the latter
+	 *      depends on tee-supplicant to access secure storage.
+	 * TA_FLAG_DEVICE_ENUM_SUPP - at stage 3
+	 *
+	 * The TA is enumerated at stage 2 if
+	 * TA_FLAG_DEVICE_ENUM_TEE_STORAGE_PRIVATE is set and
+	 * TEE_STORAGE_PRIVATE is using RPMB FS, or if it's using REE FS it
+	 * will be enumerated at stage 3.
 	 */
-#define TA_FLAG_DEVICE_ENUM		(1 << 9)  /* without tee-supplicant */
-#define TA_FLAG_DEVICE_ENUM_SUPP	(1 << 10) /* with tee-supplicant */
+#define TA_FLAG_DEVICE_ENUM		BIT32(9)  /* without tee-supplicant */
+#define TA_FLAG_DEVICE_ENUM_SUPP	BIT32(10) /* with tee-supplicant */
+	/* See also "gpd.ta.doesNotCloseHandleOnCorruptObject" */
+#define TA_FLAG_DONT_CLOSE_HANDLE_ON_CORRUPT_OBJECT \
+					BIT32(11)
+#define TA_FLAG_DEVICE_ENUM_TEE_STORAGE_PRIVATE	\
+					BIT32(12) /* with TEE_STORAGE_PRIVATE */
+/*
+ * Don't restart a TA with TA_FLAG_INSTANCE_KEEP_ALIVE set if it has
+ * crashed.
+ */
+#define TA_FLAG_INSTANCE_KEEP_CRASHED	BIT32(13)
 
-#define TA_FLAGS_MASK			GENMASK_32(10, 0)
+#define TA_FLAGS_MASK			GENMASK_32(13, 0)
 
 struct ta_head {
 	TEE_UUID uuid;
@@ -64,12 +90,13 @@ struct ftrace_buf {
 	uint32_t lr_idx;	/* lr index used for stack unwinding */
 	uint64_t begin_time[FTRACE_RETFUNC_DEPTH]; /* Timestamp */
 	uint64_t suspend_time;	/* Suspend timestamp */
-	uint32_t curr_size;	/* Size of ftrace buffer */
+	uint32_t curr_idx;	/* Current entry in the (circular) buffer */
 	uint32_t max_size;	/* Max allowed size of ftrace buffer */
 	uint32_t head_off;	/* Ftrace buffer header offset */
 	uint32_t buf_off;	/* Ftrace buffer offset */
 	bool syscall_trace_enabled; /* Some syscalls are never traced */
 	bool syscall_trace_suspended; /* By foreign interrupt or RPC */
+	bool overflow;		/* Circular buffer has wrapped */
 };
 
 /* Defined by the linker script */
@@ -111,10 +138,14 @@ extern struct __elf_phdr_info __elf_phdr_info;
 #define TA_PROP_STR_SINGLE_INSTANCE	"gpd.ta.singleInstance"
 #define TA_PROP_STR_MULTI_SESSION	"gpd.ta.multiSession"
 #define TA_PROP_STR_KEEP_ALIVE		"gpd.ta.instanceKeepAlive"
+#define TA_PROP_STR_KEEP_CRASHED	"optee.ta.instanceKeepCrashed"
 #define TA_PROP_STR_DATA_SIZE		"gpd.ta.dataSize"
 #define TA_PROP_STR_STACK_SIZE		"gpd.ta.stackSize"
 #define TA_PROP_STR_VERSION		"gpd.ta.version"
 #define TA_PROP_STR_DESCRIPTION		"gpd.ta.description"
+#define TA_PROP_STR_ENDIAN		"gpd.ta.endian"
+#define TA_PROP_STR_DOES_NOT_CLOSE_HANDLE_ON_CORRUPT_OBJECT \
+	"gpd.ta.doesNotCloseHandleOnCorruptObject"
 
 enum user_ta_prop_type {
 	USER_TA_PROP_TYPE_BOOL,	/* bool */
@@ -123,6 +154,8 @@ enum user_ta_prop_type {
 	USER_TA_PROP_TYPE_IDENTITY,	/* TEE_Identity */
 	USER_TA_PROP_TYPE_STRING,	/* zero terminated string of char */
 	USER_TA_PROP_TYPE_BINARY_BLOCK,	/* zero terminated base64 coded string */
+	USER_TA_PROP_TYPE_U64,	/* uint64_t */
+	USER_TA_PROP_TYPE_INVALID,	/* invalid value */
 };
 
 struct user_ta_property {
@@ -134,9 +167,12 @@ struct user_ta_property {
 extern const struct user_ta_property ta_props[];
 extern const size_t ta_num_props;
 
+extern uint8_t __ta_no_share_heap[];
+extern const size_t __ta_no_share_heap_size;
 /* Needed by TEE_CheckMemoryAccessRights() */
 extern uint32_t ta_param_types;
 extern TEE_Param ta_params[TEE_NUM_PARAMS];
+extern struct malloc_ctx *__ta_no_share_malloc_ctx;
 
 int tahead_get_trace_level(void);
 

@@ -13,6 +13,7 @@
 #include <mm/core_memprot.h>
 #include <mm/core_mmu.h>
 #include <mm/fobj.h>
+#include <mm/phys_mem.h>
 #include <mm/tee_mm.h>
 #include <stdlib.h>
 #include <string.h>
@@ -152,10 +153,11 @@ static struct fobj *rwp_paged_iv_alloc(unsigned int num_pages)
 
 	if (MUL_OVERFLOW(num_pages, SMALL_PAGE_SIZE, &size))
 		goto err;
-	mm = tee_mm_alloc(&tee_mm_sec_ddr, size);
+	mm = nex_phys_mem_ta_alloc(size);
 	if (!mm)
 		goto err;
-	rwp->idx = (tee_mm_get_smem(mm) - tee_mm_sec_ddr.lo) / SMALL_PAGE_SIZE;
+	rwp->idx = (tee_mm_get_smem(mm) - nex_phys_mem_get_ta_base()) /
+		   SMALL_PAGE_SIZE;
 
 	memset(idx_to_state_padded(rwp->idx), 0,
 	       num_pages * sizeof(struct rwp_state_padded));
@@ -216,8 +218,8 @@ DECLARE_KEEP_PAGER(rwp_paged_iv_save_page);
 static void rwp_paged_iv_free(struct fobj *fobj)
 {
 	struct fobj_rwp_paged_iv *rwp = to_rwp_paged_iv(fobj);
-	paddr_t pa = rwp->idx * SMALL_PAGE_SIZE + tee_mm_sec_ddr.lo;
-	tee_mm_entry_t *mm = tee_mm_find(&tee_mm_sec_ddr, pa);
+	paddr_t pa = rwp->idx * SMALL_PAGE_SIZE + nex_phys_mem_get_ta_base();
+	tee_mm_entry_t *mm = nex_phys_mem_mm_find(pa);
 
 	assert(mm);
 
@@ -265,10 +267,11 @@ static struct fobj *rwp_unpaged_iv_alloc(unsigned int num_pages)
 
 	if (MUL_OVERFLOW(num_pages, SMALL_PAGE_SIZE, &size))
 		goto err_free_state;
-	mm = tee_mm_alloc(&tee_mm_sec_ddr, size);
+	mm = nex_phys_mem_ta_alloc(size);
 	if (!mm)
 		goto err_free_state;
-	rwp->store = phys_to_virt(tee_mm_get_smem(mm), MEM_AREA_TA_RAM, size);
+	rwp->store = phys_to_virt(tee_mm_get_smem(mm),
+				  MEM_AREA_SEC_RAM_OVERALL, size);
 	assert(rwp->store);
 
 	fobj_init(&rwp->fobj, &ops_rwp_unpaged_iv, num_pages);
@@ -333,7 +336,7 @@ static void rwp_unpaged_iv_free(struct fobj *fobj)
 		panic();
 
 	rwp = to_rwp_unpaged_iv(fobj);
-	mm = tee_mm_find(&tee_mm_sec_ddr, virt_to_phys(rwp->store));
+	mm = nex_phys_mem_mm_find(virt_to_phys(rwp->store));
 
 	assert(mm);
 
@@ -356,6 +359,7 @@ __weak __relrodata_unpaged("ops_rwp_unpaged_iv") = {
 
 static TEE_Result rwp_init(void)
 {
+	paddr_size_t ta_size = nex_phys_mem_get_ta_size();
 	uint8_t key[RWP_AE_KEY_BITS / 8] = { 0 };
 	struct fobj *fobj = NULL;
 	size_t num_pool_pages = 0;
@@ -371,11 +375,11 @@ static TEE_Result rwp_init(void)
 	if (!IS_ENABLED(CFG_CORE_PAGE_TAG_AND_IV))
 		return TEE_SUCCESS;
 
-	assert(tee_mm_sec_ddr.size && !(tee_mm_sec_ddr.size & SMALL_PAGE_SIZE));
+	assert(ta_size && !(ta_size & SMALL_PAGE_SIZE));
 
-	num_pool_pages = tee_mm_sec_ddr.size / SMALL_PAGE_SIZE;
-	num_fobj_pages = ROUNDUP(num_pool_pages * sizeof(*rwp_state_base),
-				 SMALL_PAGE_SIZE) / SMALL_PAGE_SIZE;
+	num_pool_pages = ta_size / SMALL_PAGE_SIZE;
+	num_fobj_pages = ROUNDUP_DIV(num_pool_pages * sizeof(*rwp_state_base),
+				     SMALL_PAGE_SIZE);
 
 	/*
 	 * Each page in the pool needs a struct rwp_state.
@@ -391,8 +395,8 @@ static TEE_Result rwp_init(void)
 	rwp_state_base = (void *)tee_pager_init_iv_region(fobj);
 	assert(rwp_state_base);
 
-	rwp_store_base = phys_to_virt(tee_mm_sec_ddr.lo, MEM_AREA_TA_RAM,
-				      tee_mm_sec_ddr.size);
+	rwp_store_base = phys_to_virt(nex_phys_mem_get_ta_base(),
+				      MEM_AREA_SEC_RAM_OVERALL, ta_size);
 	assert(rwp_store_base);
 
 	return TEE_SUCCESS;
@@ -451,7 +455,7 @@ static struct fobj_rop *to_rop(struct fobj *fobj)
 static void rop_uninit(struct fobj_rop *rop)
 {
 	fobj_uninit(&rop->fobj);
-	tee_mm_free(tee_mm_find(&tee_mm_sec_ddr, virt_to_phys(rop->store)));
+	tee_mm_free(nex_phys_mem_mm_find(virt_to_phys(rop->store)));
 	free(rop->hashes);
 }
 
@@ -661,7 +665,7 @@ static TEE_Result rrp_load_page(struct fobj *fobj, unsigned int page_idx,
 
 	for (n = rrp->page_reloc_idx[page_idx]; n < end_rel; n++) {
 		where = (void *)((vaddr_t)va + rrp->relocs[n]);
-		*where += boot_mmu_config.load_offset;
+		*where += boot_mmu_config.map_offset;
 	}
 
 	return TEE_SUCCESS;
@@ -759,11 +763,12 @@ struct fobj *fobj_sec_mem_alloc(unsigned int num_pages)
 	if (MUL_OVERFLOW(num_pages, SMALL_PAGE_SIZE, &size))
 		goto err;
 
-	f->mm = tee_mm_alloc(&tee_mm_sec_ddr, size);
+	f->mm = phys_mem_ta_alloc(size);
 	if (!f->mm)
 		goto err;
 
-	va = phys_to_virt(tee_mm_get_smem(f->mm), MEM_AREA_TA_RAM, size);
+	va = phys_to_virt(tee_mm_get_smem(f->mm), MEM_AREA_SEC_RAM_OVERALL,
+			  size);
 	if (!va)
 		goto err;
 

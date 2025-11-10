@@ -7,16 +7,18 @@
 
 #include <assert.h>
 #include <drivers/atmel_rtc.h>
+#include <drivers/gpio.h>
 #include <dt-bindings/gpio/atmel,piobu.h>
-#include <gpio.h>
 #include <io.h>
 #include <kernel/boot.h>
 #include <kernel/dt.h>
+#include <kernel/dt_driver.h>
+#include <kernel/interrupt.h>
 #include <kernel/pm.h>
 #include <libfdt.h>
 #include <mm/core_memprot.h>
 
-#define SECUMOD_MAX_PINS		8
+#define SECUMOD_MAX_PINS		(piobu_device->compat->max_pins)
 #define SECUMOD_PIN_MASK		(BIT(SECUMOD_MAX_PINS) - 1)
 #define SECUMOD_PIN_SHIFT		16
 #define SECUMOD_PIN_VAL(pin)		BIT(SECUMOD_PIN_SHIFT + (pin))
@@ -44,15 +46,39 @@
 #define SECUMOD_PIOBU_PULLUP_SHIFT	12
 #define SECUMOD_PIOBU_SWITCH_SHIFT	15
 
-#define SECUMOD_JTAGCR			0x68
 #define SECUMOD_JTAGCR_FNTRST		0x1
 
-#define SECUMOD_BMPR			0x7C
-#define SECUMOD_NMPR			0x80
-#define SECUMOD_NIEPR			0x84
-#define SECUMOD_NIDPR			0x88
-#define SECUMOD_NIMPR			0x8C
-#define SECUMOD_WKPR			0x90
+/*
+ * PIOBU instance data
+ * @compat - Reference to compat data passed at driver initialization
+ */
+struct piobu_instance {
+	struct piobu_compat *compat;
+};
+
+/*
+ * @max_pins	the number of the tamper I/Os
+ * @of_jtagcr	offset of SECUMOD JTAG Protection Control Register
+ * @of_bmpr	offset of SECUMOD Backup Mode Protection Register
+ * @of_nmpr	offset of SECUMOD Normal Mode Protection Register
+ * @of_niepr	offset of SECUMOD Normal Interrupt Enable Protection Register
+ * @of_nidpr	offset of SECUMOD Normal Interrupt Disable Protection Register
+ * @of_nimpr	offset of SECUMOD Normal Interrupt Mask Protection Register
+ * @of_wkpr	offset of SECUMOD Wake-up Register
+ */
+struct piobu_compat {
+	uint8_t max_pins;
+	uint8_t of_jtagcr;
+	uint8_t of_bmpr;
+	uint8_t of_nmpr;
+	uint8_t of_niepr;
+	uint8_t of_nidpr;
+	uint8_t of_nimpr;
+	uint8_t of_wkpr;
+};
+
+/* Expects at most a single instance */
+static struct piobu_instance *piobu_device;
 
 static vaddr_t secumod_base;
 static uint32_t gpio_protected;
@@ -64,8 +90,8 @@ static struct gpio_chip secumod_chip;
  * gpio_pin:    pin from which value needs to be read
  * Return target GPIO pin level.
  */
-static enum gpio_level gpio_get_value(struct gpio_chip *chip __unused,
-				      unsigned int gpio_pin)
+static enum gpio_level secumod_gpio_get_value(struct gpio_chip *chip __unused,
+					      unsigned int gpio_pin)
 {
 	vaddr_t piobu_addr = 0;
 	uint32_t piobu = 0;
@@ -88,8 +114,8 @@ static enum gpio_level gpio_get_value(struct gpio_chip *chip __unused,
  * gpio_pin:    pin to which value needs to be written
  * value:       Level state for the target pin
  */
-static void gpio_set_value(struct gpio_chip *chip __unused,
-			   unsigned int gpio_pin, enum gpio_level value)
+static void secumod_gpio_set_value(struct gpio_chip *chip __unused,
+				   unsigned int gpio_pin, enum gpio_level value)
 {
 	vaddr_t piobu_addr = 0;
 
@@ -109,8 +135,8 @@ static void gpio_set_value(struct gpio_chip *chip __unused,
  * chip:        pointer to GPIO controller chip instance
  * gpio_pin:    pin from which direction needs to be read
  */
-static enum gpio_dir gpio_get_direction(struct gpio_chip *chip __unused,
-					unsigned int gpio_pin)
+static enum gpio_dir secumod_gpio_get_direction(struct gpio_chip *chip __unused,
+						unsigned int gpio_pin)
 {
 	vaddr_t piobu_addr = 0;
 	uint32_t piobu = 0;
@@ -133,8 +159,9 @@ static enum gpio_dir gpio_get_direction(struct gpio_chip *chip __unused,
  * gpio_pin:    pin on which direction needs to be set
  * direction:   direction which needs to be set on pin
  */
-static void gpio_set_direction(struct gpio_chip *chip __unused,
-			       unsigned int gpio_pin, enum gpio_dir direction)
+static void secumod_gpio_set_direction(struct gpio_chip *chip __unused,
+				       unsigned int gpio_pin,
+				       enum gpio_dir direction)
 {
 	vaddr_t piobu_addr = 0;
 
@@ -154,10 +181,11 @@ static void gpio_set_direction(struct gpio_chip *chip __unused,
  * chip:        pointer to GPIO controller chip instance
  * gpio_pin:    pin from which interrupt value needs to be read
  */
-static enum gpio_interrupt gpio_get_interrupt(struct gpio_chip *chip __unused,
-					      unsigned int gpio_pin)
+static enum gpio_interrupt
+secumod_gpio_get_interrupt(struct gpio_chip *chip __unused,
+			   unsigned int gpio_pin)
 {
-	vaddr_t nimpr_addr = secumod_base + SECUMOD_NIMPR;
+	vaddr_t nimpr_addr = secumod_base + piobu_device->compat->of_nimpr;
 	uint32_t data = 0;
 
 	assert(gpio_pin < SECUMOD_MAX_PINS &&
@@ -177,11 +205,11 @@ static enum gpio_interrupt gpio_get_interrupt(struct gpio_chip *chip __unused,
  * gpio_pin:    pin on which interrupt value needs to be set
  * interrupt:   interrupt value which needs to be set on pin
  */
-static void gpio_set_interrupt(struct gpio_chip *chip __unused,
-			       unsigned int gpio_pin,
-			       enum gpio_interrupt interrupt)
+static void secumod_gpio_set_interrupt(struct gpio_chip *chip __unused,
+				       unsigned int gpio_pin,
+				       enum gpio_interrupt interrupt)
 {
-	vaddr_t niepr_addr = secumod_base + SECUMOD_NIEPR;
+	vaddr_t niepr_addr = secumod_base + piobu_device->compat->of_niepr;
 
 	assert(gpio_pin < SECUMOD_MAX_PINS &&
 	       !(gpio_protected & BIT32(gpio_pin)));
@@ -193,13 +221,35 @@ static void gpio_set_interrupt(struct gpio_chip *chip __unused,
 }
 
 static const struct gpio_ops atmel_piobu_ops = {
-	.get_direction = gpio_get_direction,
-	.set_direction = gpio_set_direction,
-	.get_value = gpio_get_value,
-	.set_value = gpio_set_value,
-	.get_interrupt = gpio_get_interrupt,
-	.set_interrupt = gpio_set_interrupt,
+	.get_direction = secumod_gpio_get_direction,
+	.set_direction = secumod_gpio_set_direction,
+	.get_value = secumod_gpio_get_value,
+	.set_value = secumod_gpio_set_value,
+	.get_interrupt = secumod_gpio_get_interrupt,
+	.set_interrupt = secumod_gpio_set_interrupt,
 };
+
+static TEE_Result secumod_dt_get(struct dt_pargs *pargs, void *data,
+				 struct gpio **out_gpio)
+{
+	TEE_Result res = TEE_ERROR_GENERIC;
+	struct gpio *gpio = NULL;
+	struct gpio_chip *chip = data;
+
+	res = gpio_dt_alloc_pin(pargs, &gpio);
+	if (res)
+		return res;
+
+	if (gpio_protected & BIT32(gpio->pin)) {
+		free(gpio);
+		return TEE_ERROR_GENERIC;
+	}
+
+	gpio->chip = chip;
+	*out_gpio = gpio;
+
+	return TEE_SUCCESS;
+}
 
 static enum itr_return secumod_it_handler(struct itr_handler *handler __unused)
 {
@@ -242,8 +292,16 @@ static struct itr_handler secumod_itr_handler = {
 
 static void secumod_interrupt_init(void)
 {
-	itr_add_type_prio(&secumod_itr_handler, IRQ_TYPE_LEVEL_HIGH, 7);
-	itr_enable(secumod_itr_handler.it);
+	TEE_Result res = TEE_ERROR_GENERIC;
+
+	secumod_itr_handler.chip = interrupt_get_main_chip();
+
+	res = interrupt_add_configure_handler(&secumod_itr_handler,
+					      IRQ_TYPE_LEVEL_HIGH, 7);
+	if (res)
+		panic();
+
+	interrupt_enable(secumod_itr_handler.chip, secumod_itr_handler.it);
 }
 
 static void secumod_cfg_input_pio(uint8_t gpio_pin, uint32_t config)
@@ -271,14 +329,16 @@ static void secumod_cfg_input_pio(uint8_t gpio_pin, uint32_t config)
 		   def_level << SECUMOD_PIOBU_SWITCH_SHIFT);
 
 	/* Enable Tampering Interrupt */
-	gpio_set_interrupt(&secumod_chip, gpio_pin, GPIO_INTERRUPT_ENABLE);
+	secumod_gpio_set_interrupt(&secumod_chip, gpio_pin,
+				   GPIO_INTERRUPT_ENABLE);
 
 	/* Enable Intrusion Detection */
-	io_setbits32(secumod_base + SECUMOD_NMPR, SECUMOD_PIN_VAL(gpio_pin));
+	io_setbits32(secumod_base + piobu_device->compat->of_nmpr,
+		     SECUMOD_PIN_VAL(gpio_pin));
 
 	/* Enable Wakeup */
 	if (PIOBU_PIN_WAKEUP(config))
-		io_setbits32(secumod_base + SECUMOD_WKPR,
+		io_setbits32(secumod_base + piobu_device->compat->of_wkpr,
 			     SECUMOD_PIN_VAL(gpio_pin));
 
 	gpio_protected |= BIT32(gpio_pin);
@@ -293,14 +353,15 @@ static void secumod_hw_init(const void *fdt, int node)
 	const uint32_t *prop = NULL;
 
 	/* Disable JTAG Reset and Debug */
-	io_write32(secumod_base + SECUMOD_JTAGCR, SECUMOD_JTAGCR_FNTRST);
+	io_write32(secumod_base + piobu_device->compat->of_jtagcr,
+		   SECUMOD_JTAGCR_FNTRST);
 
 	/* Switch IOs to normal mode */
 	io_write32(secumod_base + SECUMOD_CR, SECUMOD_CR_KEY |
 		   SECUMOD_CR_NORMAL);
 
 	/* Clear all detection intrusion in normal mode */
-	io_write32(secumod_base + SECUMOD_NMPR, 0);
+	io_write32(secumod_base + piobu_device->compat->of_nmpr, 0);
 
 	/* Clear Alarms */
 	io_write32(secumod_base + SECUMOD_SCR,
@@ -350,14 +411,20 @@ static void piobu_register_pm(void) {}
 #endif
 
 static TEE_Result atmel_secumod_probe(const void *fdt, int node,
-				      const void *compat_data __unused)
+				      const void *compat_data)
 {
 	size_t size = 0;
 
 	if (secumod_base)
 		return TEE_ERROR_GENERIC;
 
-	if (dt_map_dev(fdt, node, &secumod_base, &size) < 0)
+	piobu_device = calloc(1, sizeof(*piobu_device));
+	if (!piobu_device)
+		return TEE_ERROR_OUT_OF_MEMORY;
+
+	piobu_device->compat = (struct piobu_compat *)compat_data;
+
+	if (dt_map_dev(fdt, node, &secumod_base, &size, DT_MAP_AUTO) < 0)
 		return TEE_ERROR_GENERIC;
 
 	secumod_hw_init(fdt, node);
@@ -367,11 +434,42 @@ static TEE_Result atmel_secumod_probe(const void *fdt, int node,
 
 	piobu_register_pm();
 
-	return TEE_SUCCESS;
+	assert(gpio_ops_is_valid(&atmel_piobu_ops));
+
+	return gpio_register_provider(fdt, node, secumod_dt_get, &secumod_chip);
 }
 
+static const struct piobu_compat sama5d2_compat = {
+	.max_pins = 8,
+	.of_jtagcr = 0x68,
+	.of_bmpr = 0x7C,
+	.of_nmpr = 0x80,
+	.of_niepr = 0x84,
+	.of_nidpr = 0x88,
+	.of_nimpr = 0x8C,
+	.of_wkpr = 0x90,
+};
+
+static const struct piobu_compat sama7g54_compat = {
+	.max_pins = 4,
+	.of_jtagcr = 0x70,
+	.of_bmpr = 0x84,
+	.of_nmpr = 0x88,
+	.of_niepr = 0x8C,
+	.of_nidpr = 0x90,
+	.of_nimpr = 0x94,
+	.of_wkpr = 0x98,
+};
+
 static const struct dt_device_match atmel_secumod_match_table[] = {
-	{ .compatible = "atmel,sama5d2-secumod" },
+	{
+		.compatible = "atmel,sama5d2-secumod",
+		.compat_data = &sama5d2_compat,
+	},
+	{
+		.compatible = "microchip,sama7g5-secumod",
+		.compat_data = &sama7g54_compat,
+	},
 	{ }
 };
 

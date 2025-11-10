@@ -16,10 +16,14 @@ struct serial_chip {
 };
 
 struct serial_ops {
+	/* Mandatory handler */
 	void (*putc)(struct serial_chip *chip, int ch);
+	/* Optional handlers */
 	void (*flush)(struct serial_chip *chip);
 	bool (*have_rx_data)(struct serial_chip *chip);
 	int (*getchar)(struct serial_chip *chip);
+	void (*rx_intr_enable)(struct serial_chip *chip);
+	void (*rx_intr_disable)(struct serial_chip *chip);
 };
 
 struct serial_driver {

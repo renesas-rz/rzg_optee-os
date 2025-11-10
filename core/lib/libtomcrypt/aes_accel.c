@@ -49,6 +49,10 @@
 #include <crypto/crypto_accel.h>
 #include <tomcrypt_private.h>
 
+#define EXPANDED_AES_KEY_WORD_COUNT	60
+#define EXPANDED_AES_KEY_LEN		(EXPANDED_AES_KEY_WORD_COUNT * \
+					 sizeof(uint32_t))
+
 int rijndael_setup(const unsigned char *key, int keylen, int num_rounds,
 	      symmetric_key *skey)
 {
@@ -60,9 +64,12 @@ int rijndael_setup(const unsigned char *key, int keylen, int num_rounds,
 	if (keylen != 16 && keylen != 24 && keylen != 32)
 		return CRYPT_INVALID_KEYSIZE;
 
+	skey->rijndael.eK = LTC_ALIGN_BUF(skey->rijndael.K, 16);
+	skey->rijndael.dK = skey->rijndael.eK + EXPANDED_AES_KEY_WORD_COUNT;
+
 	if (crypto_accel_aes_expand_keys(key, keylen, skey->rijndael.eK,
 					 skey->rijndael.dK,
-					 sizeof(skey->rijndael.eK),
+					 EXPANDED_AES_KEY_LEN,
 					 &round_count))
 		return CRYPT_INVALID_ARG;
 
@@ -163,6 +170,7 @@ static int aes_cbc_decrypt_nblocks(const unsigned char *ct, unsigned char *pt,
 	return CRYPT_OK;
 }
 
+#ifdef LTC_CTR_MODE
 static int aes_ctr_encrypt_nblocks(const unsigned char *pt, unsigned char *ct,
 				   unsigned long blocks, unsigned char *IV,
 				   int mode, symmetric_key *skey)
@@ -182,6 +190,7 @@ static int aes_ctr_encrypt_nblocks(const unsigned char *pt, unsigned char *ct,
 
 	return CRYPT_OK;
 }
+#endif
 
 static int aes_xts_encrypt_nblocks(const unsigned char *pt, unsigned char *ct,
 				   unsigned long blocks, unsigned char *tweak,
@@ -238,7 +247,9 @@ const struct ltc_cipher_descriptor aes_desc = {
 	.accel_ecb_decrypt = aes_ecb_decrypt_nblocks,
 	.accel_cbc_encrypt = aes_cbc_encrypt_nblocks,
 	.accel_cbc_decrypt = aes_cbc_decrypt_nblocks,
+#ifdef LTC_CTR_MODE
 	.accel_ctr_encrypt = aes_ctr_encrypt_nblocks,
+#endif
 	.accel_xts_encrypt = aes_xts_encrypt_nblocks,
 	.accel_xts_decrypt = aes_xts_decrypt_nblocks,
 };

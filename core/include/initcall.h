@@ -3,8 +3,8 @@
  * Copyright (c) 2014, Linaro Limited
  */
 
-#ifndef INITCALL_H
-#define INITCALL_H
+#ifndef __INITCALL_H
+#define __INITCALL_H
 
 #include <scattered_array.h>
 #include <tee_api_types.h>
@@ -34,8 +34,20 @@ struct initcall {
 			SCATTERED_ARRAY_BEGIN(preinitcall, struct initcall)
 #define preinitcall_end SCATTERED_ARRAY_END(preinitcall, struct initcall)
 
-#define initcall_begin	SCATTERED_ARRAY_BEGIN(initcall, struct initcall)
-#define initcall_end	SCATTERED_ARRAY_END(initcall, struct initcall)
+#define early_initcall_begin \
+			SCATTERED_ARRAY_BEGIN(early_initcall, struct initcall)
+#define early_initcall_end \
+			SCATTERED_ARRAY_END(early_initcall, struct initcall)
+
+#define service_initcall_begin \
+			SCATTERED_ARRAY_BEGIN(service_initcall, struct initcall)
+#define service_initcall_end \
+			SCATTERED_ARRAY_END(service_initcall, struct initcall)
+
+#define driver_initcall_begin \
+			SCATTERED_ARRAY_BEGIN(driver_initcall, struct initcall)
+#define driver_initcall_end \
+			SCATTERED_ARRAY_END(driver_initcall, struct initcall)
 
 #define finalcall_begin	SCATTERED_ARRAY_BEGIN(finalcall, struct initcall)
 #define finalcall_end	SCATTERED_ARRAY_END(finalcall, struct initcall)
@@ -66,9 +78,9 @@ struct initcall {
  *  | At the end of boot_init_primary_late() just before the print:     |
  *  | "Primary CPU switching to normal world boot"                      |
  *  +-------------------------------+-----------------------------------+
- *  | 1. call_preinitcalls()        | In the nexus                      |
+ *  | 1. call_preinitcalls()        | In the nexus, final calls         |
  *  | 2. call_initcalls()           +-----------------------------------+
- *  | 3. call_finalcalls()          | 1. call_finalcalls()              |
+ *  | 3. call_finalcalls()          | 1. nex_*init*() / boot_final()    |
  *  +-------------------------------+-----------------------------------+
  *  | "Primary CPU switching to normal world boot" is printed           |
  *  +-------------------------------+-----------------------------------+
@@ -91,18 +103,46 @@ struct initcall {
 #define preinit(fn)			__define_initcall(preinit, 2, fn)
 #define preinit_late(fn)		__define_initcall(preinit, 3, fn)
 
-#define early_init(fn)			__define_initcall(init, 1, fn)
-#define early_init_late(fn)		__define_initcall(init, 2, fn)
-#define service_init(fn)		__define_initcall(init, 3, fn)
-#define service_init_late(fn)		__define_initcall(init, 4, fn)
-#define driver_init(fn)			__define_initcall(init, 5, fn)
-#define driver_init_late(fn)		__define_initcall(init, 6, fn)
-#define release_init_resource(fn)	__define_initcall(init, 7, fn)
+#define early_init(fn)			__define_initcall(early_init, 1, fn)
+#define early_init_late(fn)		__define_initcall(early_init, 2, fn)
+#define service_init_crypto(fn)		__define_initcall(service_init, 1, fn)
+#define service_init(fn)		__define_initcall(service_init, 2, fn)
+#define service_init_late(fn)		__define_initcall(service_init, 3, fn)
+#define driver_init(fn)			__define_initcall(driver_init, 1, fn)
+#define driver_init_late(fn)		__define_initcall(driver_init, 2, fn)
+#define release_init_resource(fn)	__define_initcall(driver_init, 3, fn)
 
-#define boot_final(fn)			__define_initcall(final, 1, fn)
+/*
+ * These nex_* init-calls are provided for drivers and services that reside
+ * in the nexus in case of virtualization. The init-calls are performed
+ * before exiting to the non-secure world at the end of boot
+ * initialization. In case of virtualization the init-calls are based on
+ * final calls, while otherwise are the same as the non-nex counterpart.
+ */
+#ifdef CFG_NS_VIRTUALIZATION
+#define nex_early_init(fn)		__define_initcall(final, 1, fn)
+#define nex_early_init_late(fn)		__define_initcall(final, 2, fn)
+#define nex_service_init(fn)		__define_initcall(final, 3, fn)
+#define nex_service_init_late(fn)	__define_initcall(final, 4, fn)
+#define nex_driver_init(fn)		__define_initcall(final, 5, fn)
+#define nex_driver_init_late(fn)	__define_initcall(final, 6, fn)
+#define nex_release_init_resource(fn)	__define_initcall(final, 7, fn)
+#else
+#define nex_early_init(fn)		early_init(fn)
+#define nex_early_init_late(fn)		early_init_late(fn)
+#define nex_service_init(fn)		service_init(fn)
+#define nex_service_init_late(fn)	service_init_late(fn)
+#define nex_driver_init(fn)		driver_init(fn)
+#define nex_driver_init_late(fn)	driver_init_late(fn)
+#define nex_release_init_resource(fn)	release_init_resource(fn)
+#endif
+
+#define boot_final(fn)			__define_initcall(final, 8, fn)
 
 void call_preinitcalls(void);
-void call_initcalls(void);
+void call_early_initcalls(void);
+void call_service_initcalls(void);
+void call_driver_initcalls(void);
 void call_finalcalls(void);
 
 #endif

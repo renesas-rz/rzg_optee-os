@@ -97,6 +97,7 @@ static const struct attr_size attr_ids[] = {
 	PKCS11_ID_SZ(PKCS11_CKA_ALWAYS_AUTHENTICATE, 1),
 	PKCS11_ID_SZ(PKCS11_CKA_WRAP_WITH_TRUSTED, 1),
 	/* Specific PKCS11 TA internal attribute ID */
+	PKCS11_ID_SZ(PKCS11_CKA_OPTEE_HIDDEN_EC_POINT, 0),
 	PKCS11_ID_SZ(PKCS11_CKA_UNDEFINED_ID, 0),
 };
 
@@ -255,6 +256,7 @@ static const struct any_id __maybe_unused string_rc[] = {
 	PKCS11_ID(PKCS11_CKR_ATTRIBUTE_TYPE_INVALID),
 	PKCS11_ID(PKCS11_CKR_ATTRIBUTE_VALUE_INVALID),
 	PKCS11_ID(PKCS11_CKR_ACTION_PROHIBITED),
+	PKCS11_ID(PKCS11_CKR_DATA_INVALID),
 	PKCS11_ID(PKCS11_CKR_DATA_LEN_RANGE),
 	PKCS11_ID(PKCS11_CKR_DEVICE_MEMORY),
 	PKCS11_ID(PKCS11_CKR_ENCRYPTED_DATA_INVALID),
@@ -575,16 +577,26 @@ bool pkcs2tee_load_attr(TEE_Attribute *tee_ref, uint32_t tee_id,
 
 		data32 = (ec_params2tee_keysize(a_ptr, a_size) + 7) / 8;
 
-		if (get_attribute_ptr(obj->attributes, PKCS11_CKA_EC_POINT,
+		/*
+		 * For private keys we need EC public key for TEE operations so
+		 * first try to get hidden EC POINT and as backwards
+		 * compatibility also check for CKA_EC_POINT.
+		 *
+		 * For public keys we only have CKA_EC_POINT but there is no
+		 * harm to check for hidden one too.
+		 */
+		if (get_attribute_ptr(obj->attributes,
+				      PKCS11_CKA_OPTEE_HIDDEN_EC_POINT,
 				      &a_ptr, &a_size)) {
-			/*
-			 * Public X/Y is required for both TEE keypair and
-			 * public key, so abort if EC_POINT is not provided
-			 * during object import.
-			 */
-
-			EMSG("Missing EC_POINT attribute");
-			return false;
+			if (get_attribute_ptr(obj->attributes,
+					      PKCS11_CKA_EC_POINT,
+					      &a_ptr, &a_size)) {
+				/*
+				 * Without EC public key we cannot proceed.
+				 */
+				EMSG("Missing EC_POINT attribute");
+				return false;
+			}
 		}
 
 		der_ptr = (uint8_t *)a_ptr;
@@ -660,6 +672,7 @@ enum pkcs11_rc pkcs2tee_load_hashed_attr(TEE_Attribute *tee_ref,
 	uint32_t a_size = 0;
 	enum pkcs11_rc rc = PKCS11_CKR_OK;
 	TEE_Result res = TEE_ERROR_GENERIC;
+	size_t tmp_sz = 0;
 
 	rc = get_attribute_ptr(obj->attributes, pkcs11_id, &a_ptr, &a_size);
 	if (rc)
@@ -671,7 +684,9 @@ enum pkcs11_rc pkcs2tee_load_hashed_attr(TEE_Attribute *tee_ref,
 		return tee2pkcs_error(res);
 	}
 
-	res = TEE_DigestDoFinal(handle, a_ptr, a_size, hash_ptr, hash_size);
+	tmp_sz = *hash_size;
+	res = TEE_DigestDoFinal(handle, a_ptr, a_size, hash_ptr, &tmp_sz);
+	*hash_size = tmp_sz;
 	TEE_FreeOperation(handle);
 	if (res) {
 		EMSG("TEE_DigestDoFinal() failed %#"PRIx32, tee_algo);

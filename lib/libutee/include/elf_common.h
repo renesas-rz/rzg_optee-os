@@ -251,6 +251,7 @@ typedef struct {
 #define	EM_UNICORE	110	/* Microprocessor series from PKU-Unity Ltd.
 				   and MPRC of Peking University */
 #define	EM_AARCH64	183	/* AArch64 (64-bit ARM) */
+#define	EM_RISCV	243	/* RISC-V */
 
 /* Non-standard or deprecated. */
 #define	EM_486		6	/* Intel i486. */
@@ -259,7 +260,8 @@ typedef struct {
 #define	EM_ALPHA	0x9026	/* Alpha (written in the absence of an ABI) */
 
 /* e_flags for EM_ARM */
-#define EF_ARM_ABI_VERSION	0x05000000	/* ABI version 5 */
+#define EF_ARM_ABI_UNKNOWN	0x00000000
+#define EF_ARM_ABI_V5		0x05000000	/* ABI version 5 */
 #define EF_ARM_ABIMASK		0xFF000000
 #define EF_ARM_BE8		0x00800000
 #define EF_ARM_ABI_FLOAT_HARD	0x00000400	/* ABI version 5 and later */
@@ -682,6 +684,13 @@ typedef struct {
 #define	R_386_TLS_DTPOFF32	36	/* GOT entry containing TLS offset */
 #define	R_386_TLS_TPOFF32	37	/* GOT entry of -ve static TLS offset */
 #define	R_386_IRELATIVE		42	/* PLT entry resolved indirectly at runtime */
+
+#define	R_RISCV_NONE		0	/* No relocation. */
+#define	R_RISCV_64		2	/* 64-bit relocation. */
+#define	R_RISCV_RELATIVE	3	/* Adjust a link address (A) to its
+					   load address (B + A). */
+#define	R_RISCV_JUMP_SLOT	5	/* Indicates the symbol associated
+					   with a PLT entry. */
 
 #define	R_AARCH64_NONE		0	/* No relocation. */
 #define	R_AARCH64_ABS64		257

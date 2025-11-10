@@ -8,6 +8,7 @@
  */
 
 #include <assert.h>
+#include <kernel/mutex.h>
 #include <malloc.h>
 #include <platform_config.h>
 #include <string.h>
@@ -19,7 +20,6 @@
 #include "ti_sci.h"
 #include "ti_sci_protocol.h"
 
-static uint8_t message_sequence;
 
 /**
  * struct ti_sci_xfer - Structure representing a message flow
@@ -66,7 +66,6 @@ static int ti_sci_setup_xfer(uint16_t msg_type, uint32_t msg_flags,
 	}
 
 	hdr = (struct ti_sci_msg_hdr *)tx_buf;
-	hdr->seq = ++message_sequence;
 	hdr->type = msg_type;
 	hdr->host = OPTEE_HOST_ID;
 	hdr->flags = msg_flags | TI_SCI_FLAG_REQ_ACK_ON_PROCESSED;
@@ -81,86 +80,74 @@ static int ti_sci_setup_xfer(uint16_t msg_type, uint32_t msg_flags,
 }
 
 /**
- * ti_sci_get_response() - Receive response from mailbox channel
- *
- * @xfer:	Transfer to initiate and wait for response
- *
- * Return: 0 if all goes well, else appropriate error message
- */
-static inline int ti_sci_get_response(struct ti_sci_xfer *xfer)
-{
-	struct k3_sec_proxy_msg *msg = &xfer->rx_message;
-	struct ti_sci_msg_hdr *hdr = NULL;
-	unsigned int retry = 5;
-	int ret = 0;
-
-	for (; retry > 0; retry--) {
-		/* Receive the response */
-		ret = k3_sec_proxy_recv(msg);
-		if (ret) {
-			EMSG("Message receive failed (%d)", ret);
-			return ret;
-		}
-
-		/* msg is updated by Secure Proxy driver */
-		hdr = (struct ti_sci_msg_hdr *)msg->buf;
-
-		/* Sanity check for message response */
-		if (hdr->seq == message_sequence)
-			break;
-
-		IMSG("Message with sequence ID %u is not expected", hdr->seq);
-	}
-	if (!retry) {
-		EMSG("Timed out waiting for message");
-		return TEE_ERROR_BUSY;
-	}
-
-	if (!(hdr->flags & TI_SCI_FLAG_RESP_GENERIC_ACK)) {
-		DMSG("Message not acknowledged");
-		return TEE_ERROR_ACCESS_DENIED;
-	}
-
-	return 0;
-}
-
-/**
  * ti_sci_do_xfer() - Do one transfer
  *
  * @xfer: Transfer to initiate and wait for response
  *
  * Return: 0 if all goes well, else appropriate error message
  */
-static inline int ti_sci_do_xfer(struct ti_sci_xfer *xfer)
+static int ti_sci_do_xfer(struct ti_sci_xfer *xfer)
 {
-	struct k3_sec_proxy_msg *msg = &xfer->tx_message;
+	struct k3_sec_proxy_msg *txmsg = &xfer->tx_message;
+	struct k3_sec_proxy_msg *rxmsg = &xfer->rx_message;
+	struct ti_sci_msg_hdr *txhdr = (struct ti_sci_msg_hdr *)txmsg->buf;
+	struct ti_sci_msg_hdr *rxhdr = (struct ti_sci_msg_hdr *)rxmsg->buf;
+	static uint8_t message_sequence;
+	static struct mutex ti_sci_mutex_lock = MUTEX_INITIALIZER;
+	unsigned int retry = 5;
 	int ret = 0;
 
+	mutex_lock(&ti_sci_mutex_lock);
+
+	message_sequence++;
+	txhdr->seq = message_sequence;
+
 	/* Send the message */
-	ret = k3_sec_proxy_send(msg);
+	ret = k3_sec_proxy_send(txmsg);
 	if (ret) {
 		EMSG("Message sending failed (%d)", ret);
-		return ret;
+		goto unlock;
 	}
+
+	FMSG("Sending %"PRIx16" with seq %"PRIu8" host %"PRIu8,
+	     txhdr->type, txhdr->seq, txhdr->host);
 
 	/* Get the response */
-	ret = ti_sci_get_response(xfer);
-	if (ret) {
-		if ((TEE_Result)ret != TEE_ERROR_ACCESS_DENIED)
-			EMSG("Failed to get response (%d)", ret);
-		return ret;
+	for (; retry > 0; retry--) {
+		/* Receive the response */
+		ret = k3_sec_proxy_recv(rxmsg);
+		if (ret) {
+			EMSG("Message receive failed (%d)", ret);
+			goto unlock;
+		}
+
+		/* Sanity check for message response */
+		if (rxhdr->seq == message_sequence)
+			break;
+
+		IMSG("Message with sequence ID %"PRIu8" is not expected",
+		     rxhdr->seq);
+	}
+	if (!retry) {
+		EMSG("Timed out waiting for message");
+		ret = TEE_ERROR_BUSY;
+		goto unlock;
 	}
 
-	return 0;
+	if (!(rxhdr->flags & TI_SCI_FLAG_RESP_GENERIC_ACK)) {
+		DMSG("Message not acknowledged");
+		ret = TEE_ERROR_ACCESS_DENIED;
+		goto unlock;
+	}
+
+	FMSG("Receive %"PRIx16" with seq %"PRIu8" host %"PRIu8,
+	     rxhdr->type, rxhdr->seq, rxhdr->host);
+
+unlock:
+	mutex_unlock(&ti_sci_mutex_lock);
+	return ret;
 }
 
-/**
- * ti_sci_get_revision() - Get the revision of the SCI entity
- *
- * Updates the SCI information in the internal data structure.
- *
- * Return: 0 if all goes well, else appropriate error message
- */
 int ti_sci_get_revision(struct ti_sci_msg_resp_version *rev_info)
 {
 	struct ti_sci_msg_req_version req = { };
@@ -318,17 +305,6 @@ int ti_sci_change_fwl_owner(uint16_t fwl_id, uint16_t region,
 	return 0;
 }
 
-/**
- * ti_sci_get_dkek() - Get the DKEK
- * @sa2ul_instance:	SA2UL instance to get key
- * @context:		Context string input to KDF
- * @label:		Label string input to KDF
- * @dkek:		Returns with DKEK populated
- *
- * Updates the DKEK the internal data structure.
- *
- * Return: 0 if all goes well, else appropriate error message
- */
 int ti_sci_get_dkek(uint8_t sa2ul_instance,
 		    const char *context, const char *label,
 		    uint8_t dkek[SA2UL_DKEK_KEY_LEN])
@@ -364,11 +340,189 @@ int ti_sci_get_dkek(uint8_t sa2ul_instance,
 	return 0;
 }
 
-/**
- * ti_sci_init() - Basic initialization
- *
- * Return: 0 if all goes well, else appropriate error message
- */
+int ti_sci_read_otp_mmr(uint8_t mmr_idx, uint32_t *val)
+{
+	struct ti_sci_msg_req_read_otp_mmr req = { };
+	struct ti_sci_msg_resp_read_otp_mmr resp = { };
+	struct ti_sci_xfer xfer = { };
+	int ret = 0;
+
+	ret = ti_sci_setup_xfer(TI_SCI_MSG_READ_OTP_MMR, 0,
+				&req, sizeof(req), &resp, sizeof(resp), &xfer);
+	if (ret)
+		goto exit;
+
+	req.mmr_idx = mmr_idx;
+
+	ret = ti_sci_do_xfer(&xfer);
+	if (ret)
+		goto exit;
+
+	*val = resp.mmr_val;
+
+exit:
+	memzero_explicit(&resp, sizeof(resp));
+	return ret;
+}
+
+int ti_sci_write_otp_row(uint8_t row_idx, uint32_t row_val, uint32_t row_mask)
+{
+	struct ti_sci_msg_req_write_otp_row req = { };
+	struct ti_sci_msg_resp_write_otp_row resp = { };
+	struct ti_sci_xfer xfer = { };
+	int ret = 0;
+
+	ret = ti_sci_setup_xfer(TI_SCI_MSG_WRITE_OTP_ROW, 0,
+				&req, sizeof(req), &resp, sizeof(resp), &xfer);
+	if (ret)
+		goto exit;
+
+	req.row_idx = row_idx;
+	req.row_val = row_val;
+	req.row_mask = row_mask;
+
+	ret = ti_sci_do_xfer(&xfer);
+	if (ret)
+		goto exit;
+
+	DMSG("resp.row_val: 0x%08x", resp.row_val);
+
+	if (resp.row_val != (req.row_val & req.row_mask)) {
+		EMSG("Value not written correctly");
+		DMSG("req.row_val : 0x%08"PRIx32, req.row_val);
+		DMSG("req.row_mask: 0x%08"PRIx32, req.row_mask);
+		ret = TEE_ERROR_BAD_STATE;
+	}
+
+exit:
+	memzero_explicit(&resp, sizeof(resp));
+	memzero_explicit(&req, sizeof(req));
+	return ret;
+}
+
+int ti_sci_lock_otp_row(uint8_t row_idx, uint8_t hw_write_lock,
+			uint8_t hw_read_lock, uint8_t row_soft_lock)
+{
+	struct ti_sci_msg_req_lock_otp_row req = { };
+	struct ti_sci_msg_resp_lock_otp_row resp = { };
+	struct ti_sci_xfer xfer = { };
+	int ret = 0;
+
+	ret = ti_sci_setup_xfer(TI_SCI_MSG_LOCK_OTP_ROW, 0,
+				&req, sizeof(req), &resp, sizeof(resp), &xfer);
+	if (ret)
+		return ret;
+
+	req.row_idx = row_idx;
+	req.hw_write_lock = hw_write_lock;
+	req.hw_read_lock = hw_read_lock;
+	req.row_soft_lock = row_soft_lock;
+
+	ret = ti_sci_do_xfer(&xfer);
+	if (ret)
+		return ret;
+
+	return 0;
+}
+
+int ti_sci_set_swrev(uint8_t identifier, uint32_t swrev)
+{
+	struct ti_sci_msq_req_set_swrev req = { };
+	struct ti_sci_msq_resp_set_swrev resp = { };
+	struct ti_sci_xfer xfer = { };
+	int ret = 0;
+
+	ret = ti_sci_setup_xfer(TI_SCI_MSG_WRITE_SWREV, 0,
+				&req, sizeof(req),
+				&resp, sizeof(resp),
+				&xfer);
+	if (ret)
+		return ret;
+
+	req.identifier = identifier;
+	req.swrev = swrev;
+
+	ret = ti_sci_do_xfer(&xfer);
+	if (ret)
+		return ret;
+
+	memzero_explicit(&req, sizeof(req));
+	return 0;
+}
+
+int ti_sci_get_swrev(uint32_t *swrev)
+{
+	struct ti_sci_msq_req_get_swrev req = { };
+	struct ti_sci_msq_resp_get_swrev resp = { };
+	struct ti_sci_xfer xfer = { };
+	int ret = 0;
+
+	ret = ti_sci_setup_xfer(TI_SCI_MSG_READ_SWREV, 0,
+				&req, sizeof(req), &resp, sizeof(resp), &xfer);
+	if (ret)
+		return ret;
+
+	req.identifier = OTP_REV_ID_SEC_BRDCFG;
+
+	ret = ti_sci_do_xfer(&xfer);
+	if (ret)
+		return ret;
+
+	*swrev = resp.swrev;
+	memzero_explicit(&resp, sizeof(resp));
+	return 0;
+}
+
+int ti_sci_get_keycnt_keyrev(uint32_t *key_cnt, uint32_t *key_rev)
+{
+	struct ti_sci_msq_req_get_keycnt_keyrev req = { };
+	struct ti_sci_msq_resp_get_keycnt_keyrev resp = { };
+	struct ti_sci_xfer xfer = { };
+	int ret = 0;
+
+	ret = ti_sci_setup_xfer(TI_SCI_MSG_READ_KEYCNT_KEYREV, 0,
+				&req, sizeof(req), &resp, sizeof(resp), &xfer);
+	if (ret)
+		return ret;
+
+	ret = ti_sci_do_xfer(&xfer);
+	if (ret)
+		return ret;
+
+	*key_cnt = resp.keycnt;
+	*key_rev = resp.keyrev;
+	memzero_explicit(&resp, sizeof(resp));
+	return 0;
+}
+
+int ti_sci_set_keyrev(uint32_t keyrev,
+		      uint32_t cert_addr_lo,
+		      uint32_t cert_addr_hi)
+{
+	struct ti_sci_msq_req_set_keyrev req = { };
+	struct ti_sci_msq_resp_set_keyrev resp = { };
+	struct ti_sci_xfer xfer = { };
+	int ret = 0;
+
+	ret = ti_sci_setup_xfer(TI_SCI_MSG_WRITE_KEYREV, 0,
+				&req, sizeof(req),
+				&resp, sizeof(resp),
+				&xfer);
+	if (ret)
+		return ret;
+
+	req.value = keyrev;
+	req.cert_addr_lo = cert_addr_lo;
+	req.cert_addr_hi = cert_addr_hi;
+
+	ret = ti_sci_do_xfer(&xfer);
+	if (ret)
+		return ret;
+
+	memzero_explicit(&req, sizeof(req));
+	return 0;
+}
+
 int ti_sci_init(void)
 {
 	struct ti_sci_msg_resp_version rev_info = { };

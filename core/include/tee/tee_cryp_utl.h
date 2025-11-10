@@ -3,8 +3,8 @@
  * Copyright (c) 2014, Linaro Limited
  */
 
-#ifndef TEE_CRYP_UTL_H
-#define TEE_CRYP_UTL_H
+#ifndef __TEE_TEE_CRYP_UTL_H
+#define __TEE_TEE_CRYP_UTL_H
 
 #include <tee_api_types.h>
 #include <crypto/crypto.h>
@@ -29,6 +29,12 @@ TEE_Result tee_do_cipher_update(void *ctx, uint32_t algo,
  */
 void plat_prng_add_jitter_entropy(enum crypto_rng_src sid, unsigned int *pnum);
 
+/*
+ * plat_rng_init() - Initialize RNG support.
+ * If not overridden with a platform implementation, the function defaults
+ * to __plat_rng_init() that implements a weak seeding of the RNG.
+ */
 void plat_rng_init(void);
+void __plat_rng_init(void);
 
 #endif

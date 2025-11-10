@@ -7,11 +7,30 @@
 #include <stdlib.h>
 #include <string.h>
 #include <tee/tee_pobj.h>
-#include <trace.h>
 
 static TAILQ_HEAD(tee_pobjs, tee_pobj) tee_pobjs =
 		TAILQ_HEAD_INITIALIZER(tee_pobjs);
 static struct mutex pobjs_mutex = MUTEX_INITIALIZER;
+static struct mutex pobjs_usage_mutex = MUTEX_INITIALIZER;
+
+static bool pobj_need_usage_lock(struct tee_pobj *obj)
+{
+	/* Only lock if we don't have exclusive access to the object */
+	return obj->flags & (TEE_DATA_FLAG_SHARE_WRITE |
+			     TEE_DATA_FLAG_SHARE_READ);
+}
+
+void tee_pobj_lock_usage(struct tee_pobj *obj)
+{
+	if (pobj_need_usage_lock(obj))
+		mutex_lock(&pobjs_usage_mutex);
+}
+
+void tee_pobj_unlock_usage(struct tee_pobj *obj)
+{
+	if (pobj_need_usage_lock(obj))
+		mutex_unlock(&pobjs_usage_mutex);
+}
 
 static TEE_Result tee_pobj_check_access(uint32_t oflags, uint32_t nflags)
 {

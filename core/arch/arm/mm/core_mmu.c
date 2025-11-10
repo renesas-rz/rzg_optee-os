@@ -11,9 +11,9 @@
 #include <kernel/cache_helpers.h>
 #include <kernel/spinlock.h>
 #include <kernel/tee_l2cc_mutex.h>
-#include <kernel/tee_misc.h>
 #include <kernel/tlb_helpers.h>
 #include <kernel/tz_ssvce_pl310.h>
+#include <mm/core_memprot.h>
 #include <mm/core_mmu.h>
 #include <platform_config.h>
 #include <trace.h>
@@ -31,14 +31,14 @@
 static bitstr_t bit_decl(g_asid, MMU_NUM_ASID_PAIRS) __nex_bss;
 static unsigned int g_asid_spinlock __nex_bss = SPINLOCK_UNLOCK;
 
-void tlbi_mva_range(vaddr_t va, size_t len, size_t granule)
+void tlbi_va_range(vaddr_t va, size_t len, size_t granule)
 {
 	assert(granule == CORE_MMU_PGDIR_SIZE || granule == SMALL_PAGE_SIZE);
 	assert(!(va & (granule - 1)) && !(len & (granule - 1)));
 
 	dsb_ishst();
 	while (len) {
-		tlbi_mva_allasid_nosync(va);
+		tlbi_va_allasid_nosync(va);
 		len -= granule;
 		va += granule;
 	}
@@ -46,14 +46,14 @@ void tlbi_mva_range(vaddr_t va, size_t len, size_t granule)
 	isb();
 }
 
-void tlbi_mva_range_asid(vaddr_t va, size_t len, size_t granule, uint32_t asid)
+void tlbi_va_range_asid(vaddr_t va, size_t len, size_t granule, uint32_t asid)
 {
 	assert(granule == CORE_MMU_PGDIR_SIZE || granule == SMALL_PAGE_SIZE);
 	assert(!(va & (granule - 1)) && !(len & (granule - 1)));
 
 	dsb_ishst();
 	while (len) {
-		tlbi_mva_asid_nosync(va, asid);
+		tlbi_va_asid_nosync(va, asid);
 		len -= granule;
 		va += granule;
 	}
@@ -99,6 +99,26 @@ TEE_Result cache_op_outer(enum cache_op op, paddr_t pa, size_t len)
 {
 	TEE_Result ret = TEE_SUCCESS;
 	uint32_t exceptions = thread_mask_exceptions(THREAD_EXCP_FOREIGN_INTR);
+	vaddr_t pl310_base_pa_op = 0;
+
+	/*
+	 * According the ARM PL310 documentation, if the operation is specific
+	 * to the PA, the behavior is presented in the following manner:
+	 * - Secure access: The data in the cache is only affected by the
+	 * operation if it is secure.
+	 * - Non-secure access: The data in the cache is only affected by the
+	 * operation if it is non-secure.
+	 *
+	 * https://developer.arm.com/documentation/ddi0246/a/programmer-s-model/register-descriptions/register-7--cache-maintenance-operations
+	 *
+	 * Depending on the buffer location, use the secure or non-secure PL310
+	 * base address to do physical address based cache operation on the
+	 * buffer.
+	 */
+	if (tee_pbuf_is_sec(pa, len))
+		pl310_base_pa_op = pl310_base();
+	else
+		pl310_base_pa_op = pl310_nsbase();
 
 	tee_l2cc_mutex_lock();
 	switch (op) {
@@ -107,28 +127,29 @@ TEE_Result cache_op_outer(enum cache_op op, paddr_t pa, size_t len)
 		break;
 	case DCACHE_AREA_INVALIDATE:
 		if (len)
-			arm_cl2_invbypa(pl310_base(), pa, pa + len - 1);
+			arm_cl2_invbypa(pl310_base_pa_op, pa, pa + len - 1);
 		break;
 	case DCACHE_CLEAN:
 		arm_cl2_cleanbyway(pl310_base());
 		break;
 	case DCACHE_AREA_CLEAN:
 		if (len)
-			arm_cl2_cleanbypa(pl310_base(), pa, pa + len - 1);
+			arm_cl2_cleanbypa(pl310_base_pa_op, pa, pa + len - 1);
 		break;
 	case DCACHE_CLEAN_INV:
 		arm_cl2_cleaninvbyway(pl310_base());
 		break;
 	case DCACHE_AREA_CLEAN_INV:
 		if (len)
-			arm_cl2_cleaninvbypa(pl310_base(), pa, pa + len - 1);
+			arm_cl2_cleaninvbypa(pl310_base_pa_op, pa,
+					     pa + len - 1);
 		break;
 	default:
 		ret = TEE_ERROR_NOT_IMPLEMENTED;
 	}
 
 	tee_l2cc_mutex_unlock();
-	thread_set_exceptions(exceptions);
+	thread_unmask_exceptions(exceptions);
 	return ret;
 }
 #endif /*CFG_PL310*/
@@ -202,6 +223,19 @@ bool arch_va2pa_helper(void *va, paddr_t *pa)
 out:
 	thread_unmask_exceptions(exceptions);
 	return ret;
+}
+
+vaddr_t arch_aslr_base_addr(vaddr_t start_addr, uint64_t seed,
+			    unsigned int iteration_count)
+{
+	vaddr_t base_addr = start_addr + seed;
+	const unsigned int va_width = core_mmu_get_va_width();
+	const vaddr_t va_mask = GENMASK_64(va_width - 1, SMALL_PAGE_SHIFT);
+
+	if (iteration_count)
+		base_addr ^= BIT64(va_width - iteration_count);
+
+	return base_addr & va_mask;
 }
 
 bool cpu_mmu_enabled(void)

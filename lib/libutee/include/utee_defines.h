@@ -22,6 +22,10 @@
 #define TEE_MAIN_ALGO_SHA384     0x05
 #define TEE_MAIN_ALGO_SHA512     0x06
 #define TEE_MAIN_ALGO_SM3        0x07
+#define TEE_MAIN_ALGO_SHA3_224   0x08
+#define TEE_MAIN_ALGO_SHA3_256   0x09
+#define TEE_MAIN_ALGO_SHA3_384   0x0A
+#define TEE_MAIN_ALGO_SHA3_512   0x0B
 #define TEE_MAIN_ALGO_AES        0x10
 #define TEE_MAIN_ALGO_DES        0x11
 #define TEE_MAIN_ALGO_DES2       0x12
@@ -40,6 +44,9 @@
 #define TEE_MAIN_ALGO_CONCAT_KDF 0xC1 /* OP-TEE extension */
 #define TEE_MAIN_ALGO_PBKDF2     0xC2 /* OP-TEE extension */
 #define TEE_MAIN_ALGO_X25519     0x44 /* Not in v1.2 spec */
+#define TEE_MAIN_ALGO_SHAKE128   0xC3 /* OP-TEE extension */
+#define TEE_MAIN_ALGO_SHAKE256   0xC4 /* OP-TEE extension */
+#define TEE_MAIN_ALGO_X448	 0x49
 
 
 #define TEE_CHAIN_MODE_ECB_NOPAD        0x0
@@ -64,6 +71,12 @@ static inline uint32_t __tee_alg_get_class(uint32_t algo)
 		return TEE_OPERATION_ASYMMETRIC_SIGNATURE;
 	if (algo == TEE_ALG_DES3_CMAC)
 		return TEE_OPERATION_MAC;
+	if (algo == TEE_ALG_SM4_XTS)
+		return TEE_OPERATION_CIPHER;
+	if (algo == TEE_ALG_RSASSA_PKCS1_PSS_MGF1_MD5)
+		return TEE_OPERATION_ASYMMETRIC_SIGNATURE;
+	if (algo == TEE_ALG_RSAES_PKCS1_OAEP_MGF1_MD5)
+		return TEE_OPERATION_ASYMMETRIC_CIPHER;
 
 	return (algo >> 28) & 0xF; /* Bits [31:28] */
 }
@@ -81,6 +94,20 @@ static inline uint32_t __tee_alg_get_main_alg(uint32_t algo)
 		return TEE_MAIN_ALGO_X25519;
 	case TEE_ALG_ED25519:
 		return TEE_MAIN_ALGO_ED25519;
+	case TEE_ALG_ECDSA_SHA1:
+	case TEE_ALG_ECDSA_SHA224:
+	case TEE_ALG_ECDSA_SHA256:
+	case TEE_ALG_ECDSA_SHA384:
+	case TEE_ALG_ECDSA_SHA512:
+		return TEE_MAIN_ALGO_ECDSA;
+	case TEE_ALG_HKDF:
+		return TEE_MAIN_ALGO_HKDF;
+	case TEE_ALG_SHAKE128:
+		return TEE_MAIN_ALGO_SHAKE128;
+	case TEE_ALG_SHAKE256:
+		return TEE_MAIN_ALGO_SHAKE256;
+	case TEE_ALG_X448:
+		return TEE_MAIN_ALGO_X448;
 	default:
 		break;
 	}
@@ -186,20 +213,33 @@ static inline size_t __tee_alg_get_digest_size(uint32_t algo)
 	case TEE_ALG_SHA1:
 	case TEE_ALG_HMAC_SHA1:
 	case TEE_ALG_DSA_SHA1:
+	case TEE_ALG_ECDSA_SHA1:
 		return TEE_SHA1_HASH_SIZE;
 	case TEE_ALG_SHA224:
+	case TEE_ALG_SHA3_224:
 	case TEE_ALG_HMAC_SHA224:
+	case TEE_ALG_HMAC_SHA3_224:
 	case TEE_ALG_DSA_SHA224:
+	case TEE_ALG_ECDSA_SHA224:
 		return TEE_SHA224_HASH_SIZE;
 	case TEE_ALG_SHA256:
+	case TEE_ALG_SHA3_256:
 	case TEE_ALG_HMAC_SHA256:
+	case TEE_ALG_HMAC_SHA3_256:
 	case TEE_ALG_DSA_SHA256:
+	case TEE_ALG_ECDSA_SHA256:
 		return TEE_SHA256_HASH_SIZE;
 	case TEE_ALG_SHA384:
+	case TEE_ALG_SHA3_384:
 	case TEE_ALG_HMAC_SHA384:
+	case TEE_ALG_HMAC_SHA3_384:
+	case TEE_ALG_ECDSA_SHA384:
 		return TEE_SHA384_HASH_SIZE;
 	case TEE_ALG_SHA512:
+	case TEE_ALG_SHA3_512:
 	case TEE_ALG_HMAC_SHA512:
+	case TEE_ALG_HMAC_SHA3_512:
+	case TEE_ALG_ECDSA_SHA512:
 		return TEE_SHA512_HASH_SIZE;
 	case TEE_ALG_SM3:
 	case TEE_ALG_HMAC_SM3:
@@ -262,12 +302,18 @@ static inline size_t __tee_alg_get_digest_size(uint32_t algo)
 #endif
 
 /* If we we're on a big endian platform we'll have to update these */
-#define TEE_U64_FROM_BIG_ENDIAN(x)  TEE_U64_BSWAP(x)
-#define TEE_U32_FROM_BIG_ENDIAN(x)  TEE_U32_BSWAP(x)
-#define TEE_U16_FROM_BIG_ENDIAN(x)  TEE_U16_BSWAP(x)
-#define TEE_U64_TO_BIG_ENDIAN(x)    TEE_U64_BSWAP(x)
-#define TEE_U32_TO_BIG_ENDIAN(x)    TEE_U32_BSWAP(x)
-#define TEE_U16_TO_BIG_ENDIAN(x)    TEE_U16_BSWAP(x)
+#define TEE_U64_FROM_LITTLE_ENDIAN(x)  ((uint64_t)(x))
+#define TEE_U32_FROM_LITTLE_ENDIAN(x)  ((uint32_t)(x))
+#define TEE_U16_FROM_LITTLE_ENDIAN(x)  ((uint16_t)(x))
+#define TEE_U64_TO_LITTLE_ENDIAN(x)    ((uint64_t)(x))
+#define TEE_U32_TO_LITTLE_ENDIAN(x)    ((uint32_t)(x))
+#define TEE_U16_TO_LITTLE_ENDIAN(x)    ((uint16_t)(x))
+#define TEE_U64_FROM_BIG_ENDIAN(x)     TEE_U64_BSWAP(x)
+#define TEE_U32_FROM_BIG_ENDIAN(x)     TEE_U32_BSWAP(x)
+#define TEE_U16_FROM_BIG_ENDIAN(x)     TEE_U16_BSWAP(x)
+#define TEE_U64_TO_BIG_ENDIAN(x)       TEE_U64_BSWAP(x)
+#define TEE_U32_TO_BIG_ENDIAN(x)       TEE_U32_BSWAP(x)
+#define TEE_U16_TO_BIG_ENDIAN(x)       TEE_U16_BSWAP(x)
 
 #define TEE_TIME_MILLIS_BASE    1000
 

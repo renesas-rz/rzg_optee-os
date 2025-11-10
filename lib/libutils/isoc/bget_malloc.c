@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-2-Clause
 /*
  * Copyright (c) 2014, STMicroelectronics International N.V.
- * Copyright (c) 2022, Linaro Limited.
+ * Copyright (c) 2015-2025, Linaro Limited.
  */
 
 #define PROTOTYPES
@@ -82,6 +82,7 @@
 #include <config.h>
 #include <malloc.h>
 #include <memtag.h>
+#include <pta_stats.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib_ext.h>
@@ -135,7 +136,7 @@ struct malloc_ctx {
 	struct malloc_pool *pool;
 	size_t pool_len;
 #ifdef BufStats
-	struct malloc_stats mstats;
+	struct pta_stats_alloc mstats;
 #endif
 #ifdef __KERNEL__
 	unsigned int spinlock;
@@ -175,7 +176,7 @@ static void malloc_unlock(struct malloc_ctx *ctx __unused,
 
 static DEFINE_CTX(malloc_ctx);
 
-#ifdef CFG_VIRTUALIZATION
+#ifdef CFG_NS_VIRTUALIZATION
 static __nex_data DEFINE_CTX(nex_malloc_ctx);
 #endif
 
@@ -209,7 +210,7 @@ static __maybe_unused bufsize bget_buf_size(void *buf)
 	return osize;
 }
 
-static void *maybe_tag_buf(void *buf, size_t __maybe_unused requested_size)
+static void *maybe_tag_buf(uint8_t *buf, size_t hdr_size, size_t requested_size)
 {
 	if (!buf)
 		return NULL;
@@ -217,20 +218,29 @@ static void *maybe_tag_buf(void *buf, size_t __maybe_unused requested_size)
 	COMPILE_TIME_ASSERT(MEMTAG_GRANULE_SIZE <= SizeQuant);
 
 	if (MEMTAG_IS_ENABLED) {
-		size_t sz = ROUNDUP(requested_size, MEMTAG_GRANULE_SIZE);
+		size_t sz = 0;
+
+		/*
+		 * MEMTAG needs actual allocated size (>= SizeQuant),
+		 * unlike ASan which tags only requested bytes. For
+		 * malloc(0), bget allocates SizeQuant, so we pass
+		 * MAX(requested_size, SizeQuant) to ensure correct tagging.
+		 */
+		requested_size = MAX(requested_size, SizeQuant);
+
+		sz = ROUNDUP(requested_size, MEMTAG_GRANULE_SIZE);
 
 		/*
 		 * Allocated buffer can be larger than requested when
 		 * allocating with memalign(), but we should never tag more
 		 * than allocated.
 		 */
-		assert(bget_buf_size(buf) >= sz);
-		return memtag_set_random_tags(buf, sz);
+		assert(bget_buf_size(buf) >= sz + hdr_size);
+		return memtag_set_random_tags(buf, sz + hdr_size);
 	}
 
 #if defined(__KERNEL__)
-	if (IS_ENABLED(CFG_CORE_SANITIZE_KADDRESS))
-		asan_tag_access(buf, (uint8_t *)buf + requested_size);
+	asan_tag_access(buf, buf + hdr_size + requested_size);
 #endif
 	return buf;
 }
@@ -249,8 +259,7 @@ static void *maybe_untag_buf(void *buf)
 	}
 
 #if defined(__KERNEL__)
-	if (IS_ENABLED(CFG_CORE_SANITIZE_KADDRESS))
-		asan_tag_heap_free(buf, (uint8_t *)buf + bget_buf_size(buf));
+	asan_tag_heap_free(buf, (uint8_t *)buf + bget_buf_size(buf));
 #endif
 	return buf;
 }
@@ -271,8 +280,9 @@ static void tag_asan_free(void *buf __maybe_unused, size_t len __maybe_unused)
 
 #ifdef BufStats
 
-static void *raw_malloc_return_hook(void *p, size_t requested_size,
-				   struct malloc_ctx *ctx)
+static void *raw_malloc_return_hook(void *p, size_t hdr_size,
+				    size_t requested_size,
+				    struct malloc_ctx *ctx)
 {
 	if (ctx->poolset.totalloc > ctx->mstats.max_allocated)
 		ctx->mstats.max_allocated = ctx->poolset.totalloc;
@@ -287,7 +297,7 @@ static void *raw_malloc_return_hook(void *p, size_t requested_size,
 		}
 	}
 
-	return maybe_tag_buf(p, MAX(SizeQuant, requested_size));
+	return maybe_tag_buf(p, hdr_size, requested_size);
 }
 
 static void gen_malloc_reset_stats(struct malloc_ctx *ctx)
@@ -307,29 +317,29 @@ void malloc_reset_stats(void)
 }
 
 static void gen_malloc_get_stats(struct malloc_ctx *ctx,
-				 struct malloc_stats *stats)
+				 struct pta_stats_alloc *stats)
 {
 	uint32_t exceptions = malloc_lock(ctx);
 
-	memcpy_unchecked(stats, &ctx->mstats, sizeof(*stats));
-	stats->allocated = ctx->poolset.totalloc;
+	raw_malloc_get_stats(ctx, stats);
 	malloc_unlock(ctx, exceptions);
 }
 
-void malloc_get_stats(struct malloc_stats *stats)
+void malloc_get_stats(struct pta_stats_alloc *stats)
 {
 	gen_malloc_get_stats(&malloc_ctx, stats);
 }
 
 #else /* BufStats */
 
-static void *raw_malloc_return_hook(void *p, size_t requested_size,
+static void *raw_malloc_return_hook(void *p, size_t hdr_size,
+				    size_t requested_size,
 				    struct malloc_ctx *ctx )
 {
 	if (!p)
 		print_oom(requested_size, ctx);
 
-	return maybe_tag_buf(p, MAX(SizeQuant, requested_size));
+	return maybe_tag_buf(p, hdr_size, requested_size);
 }
 
 #endif /* BufStats */
@@ -416,38 +426,65 @@ static bool bpool_foreach(struct malloc_ctx *ctx,
 	for (bpool_foreach_iterator_init((ctx),(iterator));   \
 	     bpool_foreach((ctx),(iterator), (bp));)
 
-void *raw_memalign(size_t hdr_size, size_t ftr_size, size_t alignment,
-		   size_t pl_size, struct malloc_ctx *ctx)
+void *raw_malloc_flags(uint32_t flags, void *ptr, size_t hdr_size,
+		       size_t ftr_size, size_t alignment, size_t pl_nmemb,
+		       size_t pl_size, struct malloc_ctx *ctx)
 {
-	void *ptr = NULL;
-	bufsize s;
+	void *p = NULL;
+	bufsize s = 0;
+
+	raw_malloc_validate_pools(ctx);
 
 	if (!alignment || !IS_POWER_OF_TWO(alignment))
 		return NULL;
 
-	raw_malloc_validate_pools(ctx);
-
-	/* Compute total size, excluding the header */
-	if (ADD_OVERFLOW(pl_size, ftr_size, &s))
+	/* Compute total size, excluding hdr_size */
+	if (MUL_OVERFLOW(pl_nmemb, pl_size, &s))
+		goto out;
+	if (ADD_OVERFLOW(s, ftr_size, &s))
 		goto out;
 
 	/* BGET doesn't like 0 sized allocations */
 	if (!s)
 		s++;
 
-	ptr = bget(alignment, hdr_size, s, &ctx->poolset);
+	if ((flags & MAF_ZERO_INIT) && !ptr)
+		p = bgetz(alignment, hdr_size, s, &ctx->poolset);
+	else
+		p = bget(alignment, hdr_size, s, &ctx->poolset);
+
+	if (p && ptr) {
+		void *old_ptr = maybe_untag_buf(ptr);
+		bufsize old_sz = bget_buf_size(old_ptr);
+		bufsize new_sz = s + hdr_size;
+
+		if (old_sz < new_sz) {
+			memcpy_unchecked(p, old_ptr, old_sz);
+			if (flags & MAF_ZERO_INIT)
+				memset_unchecked((uint8_t *)p + old_sz, 0,
+						 new_sz - old_sz);
+		} else {
+			memcpy_unchecked(p, old_ptr, new_sz);
+		}
+
+		brel(old_ptr, &ctx->poolset, false /*!wipe*/);
+	}
 out:
-	return raw_malloc_return_hook(ptr, pl_size, ctx);
+	return raw_malloc_return_hook(p, hdr_size, pl_nmemb * pl_size, ctx);
+}
+
+void *raw_memalign(size_t hdr_size, size_t ftr_size, size_t alignment,
+		   size_t pl_size, struct malloc_ctx *ctx)
+{
+	return raw_malloc_flags(MAF_NULL, NULL, hdr_size, ftr_size, alignment,
+				1, pl_size, ctx);
 }
 
 void *raw_malloc(size_t hdr_size, size_t ftr_size, size_t pl_size,
 		 struct malloc_ctx *ctx)
 {
-	/*
-	 * Note that we're feeding SizeQ as alignment, this is the smallest
-	 * alignment that bget() can use.
-	 */
-	return raw_memalign(hdr_size, ftr_size, SizeQ, pl_size, ctx);
+	return raw_malloc_flags(MAF_NULL, NULL, hdr_size, ftr_size, 1, 1,
+				pl_size, ctx);
 }
 
 void raw_free(void *ptr, struct malloc_ctx *ctx, bool wipe)
@@ -461,76 +498,25 @@ void raw_free(void *ptr, struct malloc_ctx *ctx, bool wipe)
 void *raw_calloc(size_t hdr_size, size_t ftr_size, size_t pl_nmemb,
 		 size_t pl_size, struct malloc_ctx *ctx)
 {
-	void *ptr = NULL;
-	bufsize s;
-
-	raw_malloc_validate_pools(ctx);
-
-	/* Compute total size, excluding hdr_size */
-	if (MUL_OVERFLOW(pl_nmemb, pl_size, &s))
-		goto out;
-	if (ADD_OVERFLOW(s, ftr_size, &s))
-		goto out;
-
-	/* BGET doesn't like 0 sized allocations */
-	if (!s)
-		s++;
-
-	ptr = bgetz(0, hdr_size, s, &ctx->poolset);
-out:
-	return raw_malloc_return_hook(ptr, pl_nmemb * pl_size, ctx);
+	return raw_malloc_flags(MAF_ZERO_INIT, NULL, hdr_size, ftr_size, 1,
+				pl_nmemb, pl_size, ctx);
 }
 
 void *raw_realloc(void *ptr, size_t hdr_size, size_t ftr_size,
 		  size_t pl_size, struct malloc_ctx *ctx)
 {
-	void *p = NULL;
-	bufsize s;
-
-	/* Compute total size */
-	if (ADD_OVERFLOW(pl_size, hdr_size, &s))
-		goto out;
-	if (ADD_OVERFLOW(s, ftr_size, &s))
-		goto out;
-
-	raw_malloc_validate_pools(ctx);
-
-	/* BGET doesn't like 0 sized allocations */
-	if (!s)
-		s++;
-
-	p = bget(0, 0, s, &ctx->poolset);
-
-	if (p && ptr) {
-		void *old_ptr = maybe_untag_buf(ptr);
-		bufsize old_sz = bget_buf_size(old_ptr);
-
-		if (old_sz < s) {
-			memcpy(p, old_ptr, old_sz);
-#ifndef __KERNEL__
-			/* User space reallocations are always zeroed */
-			memset((uint8_t *)p + old_sz, 0, s - old_sz);
-#endif
-		} else {
-			memcpy(p, old_ptr, s);
-		}
-
-		brel(old_ptr, &ctx->poolset, false /*!wipe*/);
-	}
-out:
-	return raw_malloc_return_hook(p, pl_size, ctx);
+	return raw_malloc_flags(MAF_NULL, ptr, hdr_size, ftr_size, 1, 1,
+				pl_size, ctx);
 }
-
-#ifdef ENABLE_MDBG
 
 struct mdbg_hdr {
 	const char *fname;
 	uint16_t line;
-	uint32_t pl_size;
-	uint32_t magic;
-#if defined(ARM64)
+#ifdef __LP64__
 	uint64_t pad;
 #endif
+	uint32_t pl_size;
+	uint32_t magic;
 };
 
 #define MDBG_HEADER_MAGIC	0xadadadad
@@ -550,7 +536,7 @@ static uint32_t *mdbg_get_footer(struct mdbg_hdr *hdr)
 	footer = (uint32_t *)((uint8_t *)(hdr + 1) + hdr->pl_size +
 			      mdbg_get_ftr_size(hdr->pl_size));
 	footer--;
-	return footer;
+	return strip_tag(footer);
 }
 
 static void mdbg_update_hdr(struct mdbg_hdr *hdr, const char *fname,
@@ -567,128 +553,119 @@ static void mdbg_update_hdr(struct mdbg_hdr *hdr, const char *fname,
 	*footer = MDBG_FOOTER_MAGIC;
 }
 
-static void *gen_mdbg_malloc(struct malloc_ctx *ctx, const char *fname,
-			     int lineno, size_t size)
-{
-	struct mdbg_hdr *hdr;
-	uint32_t exceptions = malloc_lock(ctx);
-
-	/*
-	 * Check struct mdbg_hdr works with BGET_HDR_QUANTUM.
-	 */
-	COMPILE_TIME_ASSERT((sizeof(struct mdbg_hdr) % BGET_HDR_QUANTUM) == 0);
-
-	hdr = raw_malloc(sizeof(struct mdbg_hdr),
-			 mdbg_get_ftr_size(size), size, ctx);
-	if (hdr) {
-		mdbg_update_hdr(hdr, fname, lineno, size);
-		hdr++;
-	}
-
-	malloc_unlock(ctx, exceptions);
-	return hdr;
-}
-
 static void assert_header(struct mdbg_hdr *hdr __maybe_unused)
 {
 	assert(hdr->magic == MDBG_HEADER_MAGIC);
 	assert(*mdbg_get_footer(hdr) == MDBG_FOOTER_MAGIC);
 }
 
-static void gen_mdbg_free(struct malloc_ctx *ctx, void *ptr, bool wipe)
+static void *mem_alloc_unlocked(uint32_t flags, void *ptr, size_t alignment,
+				size_t nmemb, size_t size, const char *fname,
+				int lineno, struct malloc_ctx *ctx)
 {
-	struct mdbg_hdr *hdr = ptr;
+	struct mdbg_hdr *hdr = NULL;
+	size_t ftr_size = 0;
+	size_t hdr_size = 0;
 
-	if (hdr) {
+	/*
+	 * Check struct mdbg_hdr works with BGET_HDR_QUANTUM.
+	 */
+	static_assert((sizeof(struct mdbg_hdr) % BGET_HDR_QUANTUM) == 0);
+
+	if (IS_ENABLED2(ENABLE_MDBG)) {
+		if (ptr) {
+			hdr = ptr;
+			hdr--;
+			assert_header(hdr);
+		}
+		ftr_size = mdbg_get_ftr_size(nmemb * size);
+		hdr_size = sizeof(struct mdbg_hdr);
+		ptr = hdr;
+	}
+
+	ptr = raw_malloc_flags(flags, ptr, hdr_size, ftr_size, alignment, nmemb,
+			       size, ctx);
+
+	if (IS_ENABLED2(ENABLE_MDBG) && ptr) {
+		hdr = ptr;
+		mdbg_update_hdr(hdr, fname, lineno, nmemb * size);
+		hdr++;
+		ptr = hdr;
+	}
+
+	return ptr;
+}
+
+static struct malloc_ctx *get_ctx(uint32_t flags __maybe_unused)
+{
+#ifdef CFG_NS_VIRTUALIZATION
+	if (flags & MAF_NEX)
+		return &nex_malloc_ctx;
+#endif
+	return &malloc_ctx;
+}
+
+static void *mem_alloc(uint32_t flags, void *ptr, size_t alignment,
+		       size_t nmemb, size_t size, const char *fname, int lineno)
+{
+	struct malloc_ctx *ctx = get_ctx(flags);
+	uint32_t exceptions = 0;
+	void *p = NULL;
+
+	exceptions = malloc_lock(ctx);
+	p = mem_alloc_unlocked(flags, ptr, alignment, nmemb, size, fname,
+			       lineno, ctx);
+	malloc_unlock(ctx, exceptions);
+
+	return p;
+}
+
+void free_flags(uint32_t flags, void *ptr)
+{
+	struct malloc_ctx *ctx = get_ctx(flags);
+	uint32_t exceptions = 0;
+
+	exceptions = malloc_lock(ctx);
+
+	if (IS_ENABLED2(ENABLE_MDBG) && ptr) {
+		struct mdbg_hdr *hdr = ptr;
+
 		hdr--;
 		assert_header(hdr);
 		hdr->magic = 0;
 		*mdbg_get_footer(hdr) = 0;
-		raw_free(hdr, ctx, wipe);
+		ptr = hdr;
 	}
-}
 
-static void free_helper(void *ptr, bool wipe)
-{
-	uint32_t exceptions = malloc_lock(&malloc_ctx);
+	raw_free(ptr, ctx, flags & MAF_FREE_WIPE);
 
-	gen_mdbg_free(&malloc_ctx, ptr, wipe);
-	malloc_unlock(&malloc_ctx, exceptions);
-}
-
-static void *gen_mdbg_calloc(struct malloc_ctx *ctx, const char *fname, int lineno,
-		      size_t nmemb, size_t size)
-{
-	struct mdbg_hdr *hdr;
-	uint32_t exceptions = malloc_lock(ctx);
-
-	hdr = raw_calloc(sizeof(struct mdbg_hdr),
-			  mdbg_get_ftr_size(nmemb * size), nmemb, size,
-			  ctx);
-	if (hdr) {
-		mdbg_update_hdr(hdr, fname, lineno, nmemb * size);
-		hdr++;
-	}
 	malloc_unlock(ctx, exceptions);
-	return hdr;
 }
-
-static void *gen_mdbg_realloc_unlocked(struct malloc_ctx *ctx, const char *fname,
-				       int lineno, void *ptr, size_t size)
-{
-	struct mdbg_hdr *hdr = ptr;
-
-	if (hdr) {
-		hdr--;
-		assert_header(hdr);
-	}
-	hdr = raw_realloc(hdr, sizeof(struct mdbg_hdr),
-			   mdbg_get_ftr_size(size), size, ctx);
-	if (hdr) {
-		mdbg_update_hdr(hdr, fname, lineno, size);
-		hdr++;
-	}
-	return hdr;
-}
-
-static void *gen_mdbg_realloc(struct malloc_ctx *ctx, const char *fname,
-			      int lineno, void *ptr, size_t size)
-{
-	void *p;
-	uint32_t exceptions = malloc_lock(ctx);
-
-	p = gen_mdbg_realloc_unlocked(ctx, fname, lineno, ptr, size);
-	malloc_unlock(ctx, exceptions);
-	return p;
-}
-
-#define realloc_unlocked(ctx, ptr, size)					\
-		gen_mdbg_realloc_unlocked(ctx, __FILE__, __LINE__, (ptr), (size))
-
-static void *gen_mdbg_memalign(struct malloc_ctx *ctx, const char *fname,
-			       int lineno, size_t alignment, size_t size)
-{
-	struct mdbg_hdr *hdr;
-	uint32_t exceptions = malloc_lock(ctx);
-
-	hdr = raw_memalign(sizeof(struct mdbg_hdr), mdbg_get_ftr_size(size),
-			   alignment, size, ctx);
-	if (hdr) {
-		mdbg_update_hdr(hdr, fname, lineno, size);
-		hdr++;
-	}
-	malloc_unlock(ctx, exceptions);
-	return hdr;
-}
-
 
 static void *get_payload_start_size(void *raw_buf, size_t *size)
 {
-	struct mdbg_hdr *hdr = raw_buf;
+	if (IS_ENABLED2(ENABLE_MDBG)) {
+		struct mdbg_hdr *hdr = raw_buf;
 
-	assert(bget_buf_size(hdr) >= hdr->pl_size);
-	*size = hdr->pl_size;
-	return hdr + 1;
+		assert(bget_buf_size(hdr) >= hdr->pl_size);
+		*size = hdr->pl_size;
+		return hdr + 1;
+	}
+
+	*size = bget_buf_size(raw_buf);
+	return raw_buf;
+}
+
+/* For use in raw_malloc_add_pool() below */
+#define realloc_unlocked(ctx, ptr, size)                                      \
+	mem_alloc_unlocked(MAF_NULL, (ptr), 1, 1, (size), __FILE__, __LINE__, \
+			   (ctx))
+
+#ifdef ENABLE_MDBG
+void *__mdbg_alloc(uint32_t flags, void *ptr, size_t alignment, size_t nmemb,
+		   size_t size, const char *fname, int lineno)
+{
+	return mem_alloc(flags, ptr, alignment, nmemb, size, fname, lineno);
 }
 
 static void gen_mdbg_check(struct malloc_ctx *ctx, int bufdump)
@@ -710,7 +687,7 @@ static void gen_mdbg_check(struct malloc_ctx *ctx, int bufdump)
 			if (!fname)
 				fname = "unknown";
 
-			IMSG("buffer: %d bytes %s:%d\n",
+			IMSG("buffer: %d bytes %s:%d",
 				hdr->pl_size, fname, hdr->line);
 		}
 	}
@@ -718,201 +695,88 @@ static void gen_mdbg_check(struct malloc_ctx *ctx, int bufdump)
 	malloc_unlock(ctx, exceptions);
 }
 
-void *mdbg_malloc(const char *fname, int lineno, size_t size)
-{
-	return gen_mdbg_malloc(&malloc_ctx, fname, lineno, size);
-}
-
-void *mdbg_calloc(const char *fname, int lineno, size_t nmemb, size_t size)
-{
-	return gen_mdbg_calloc(&malloc_ctx, fname, lineno, nmemb, size);
-}
-
-void *mdbg_realloc(const char *fname, int lineno, void *ptr, size_t size)
-{
-	return gen_mdbg_realloc(&malloc_ctx, fname, lineno, ptr, size);
-}
-
-void *mdbg_memalign(const char *fname, int lineno, size_t alignment,
-		    size_t size)
-{
-	return gen_mdbg_memalign(&malloc_ctx, fname, lineno, alignment, size);
-}
-
 void mdbg_check(int bufdump)
 {
 	gen_mdbg_check(&malloc_ctx, bufdump);
 }
+#endif
 
 /*
- * Since malloc debug is enabled, malloc() and friends are redirected by macros
- * to mdbg_malloc() etc.
+ * If malloc debug is enabled, malloc() and friends are redirected by macros
+ * to __mdbg_alloc() etc.
  * We still want to export the standard entry points in case they are referenced
  * by the application, either directly or via external libraries.
  */
+
 #undef malloc
 void *malloc(size_t size)
 {
-	return mdbg_malloc(__FILE__, __LINE__, size);
+	return mem_alloc(MAF_NULL, NULL, 1, 1, size, __FILE__, __LINE__);
+}
+
+#undef malloc_flags
+void *malloc_flags(uint32_t flags, void *ptr, size_t alignment, size_t size)
+{
+	return mem_alloc(flags, ptr, alignment, 1, size, __FILE__, __LINE__);
 }
 
 #undef calloc
 void *calloc(size_t nmemb, size_t size)
 {
-	return mdbg_calloc(__FILE__, __LINE__, nmemb, size);
+	return mem_alloc(MAF_ZERO_INIT, NULL, 1, nmemb, size, __FILE__,
+			 __LINE__);
 }
 
 #undef realloc
 void *realloc(void *ptr, size_t size)
 {
-	return mdbg_realloc(__FILE__, __LINE__, ptr, size);
+	return mem_alloc(MAF_NULL, ptr, 1, 1, size, __FILE__, __LINE__);
 }
 
-#else /* ENABLE_MDBG */
-
-void *malloc(size_t size)
-{
-	void *p;
-	uint32_t exceptions = malloc_lock(&malloc_ctx);
-
-	p = raw_malloc(0, 0, size, &malloc_ctx);
-	malloc_unlock(&malloc_ctx, exceptions);
-	return p;
-}
-
-static void free_helper(void *ptr, bool wipe)
-{
-	uint32_t exceptions = malloc_lock(&malloc_ctx);
-
-	raw_free(ptr, &malloc_ctx, wipe);
-	malloc_unlock(&malloc_ctx, exceptions);
-}
-
-void *calloc(size_t nmemb, size_t size)
-{
-	void *p;
-	uint32_t exceptions = malloc_lock(&malloc_ctx);
-
-	p = raw_calloc(0, 0, nmemb, size, &malloc_ctx);
-	malloc_unlock(&malloc_ctx, exceptions);
-	return p;
-}
-
-static void *realloc_unlocked(struct malloc_ctx *ctx, void *ptr,
-			      size_t size)
-{
-	return raw_realloc(ptr, 0, 0, size, ctx);
-}
-
-void *realloc(void *ptr, size_t size)
-{
-	void *p;
-	uint32_t exceptions = malloc_lock(&malloc_ctx);
-
-	p = realloc_unlocked(&malloc_ctx, ptr, size);
-	malloc_unlock(&malloc_ctx, exceptions);
-	return p;
-}
-
+#undef memalign
 void *memalign(size_t alignment, size_t size)
 {
-	void *p;
-	uint32_t exceptions = malloc_lock(&malloc_ctx);
-
-	p = raw_memalign(0, 0, alignment, size, &malloc_ctx);
-	malloc_unlock(&malloc_ctx, exceptions);
-	return p;
+	return mem_alloc(MAF_NULL, NULL, alignment, 1, size, __FILE__,
+			 __LINE__);
 }
 
-static void *get_payload_start_size(void *ptr, size_t *size)
+#if __STDC_VERSION__ >= 201112L
+#undef aligned_alloc
+void *aligned_alloc(size_t alignment, size_t size)
 {
-	*size = bget_buf_size(ptr);
-	return ptr;
-}
+	if (size % alignment)
+		return NULL;
 
-#endif
+	return mem_alloc(MAF_NULL, NULL, alignment, 1, size, __FILE__,
+			 __LINE__);
+}
+#endif /* __STDC_VERSION__ */
 
 void free(void *ptr)
 {
-	free_helper(ptr, false);
+	free_flags(MAF_NULL, ptr);
 }
 
 void free_wipe(void *ptr)
 {
-	free_helper(ptr, true);
+	free_flags(MAF_FREE_WIPE, ptr);
 }
 
 static void gen_malloc_add_pool(struct malloc_ctx *ctx, void *buf, size_t len)
 {
-	void *p;
-	size_t l;
-	uint32_t exceptions;
-	uintptr_t start = (uintptr_t)buf;
-	uintptr_t end = start + len;
-	const size_t min_len = sizeof(struct bhead) + sizeof(struct bfhead);
+	uint32_t exceptions = malloc_lock(ctx);
 
-	start = ROUNDUP(start, SizeQuant);
-	end = ROUNDDOWN(end, SizeQuant);
-
-	if (start > end || (end - start) < min_len) {
-		DMSG("Skipping too small pool");
-		return;
-	}
-
-	/* First pool requires a bigger size */
-	if (!ctx->pool_len && (end - start) < MALLOC_INITIAL_POOL_MIN_SIZE) {
-		DMSG("Skipping too small initial pool");
-		return;
-	}
-
-	exceptions = malloc_lock(ctx);
-
-	tag_asan_free((void *)start, end - start);
-	bpool((void *)start, end - start, &ctx->poolset);
-	l = ctx->pool_len + 1;
-	p = realloc_unlocked(ctx, ctx->pool, sizeof(struct malloc_pool) * l);
-	assert(p);
-	ctx->pool = p;
-	ctx->pool[ctx->pool_len].buf = (void *)start;
-	ctx->pool[ctx->pool_len].len = end - start;
-#ifdef BufStats
-	ctx->mstats.size += ctx->pool[ctx->pool_len].len;
-#endif
-	ctx->pool_len = l;
+	raw_malloc_add_pool(ctx, buf, len);
 	malloc_unlock(ctx, exceptions);
 }
 
 static bool gen_malloc_buffer_is_within_alloced(struct malloc_ctx *ctx,
 						void *buf, size_t len)
 {
-	struct bpool_iterator itr;
-	void *b;
-	uint8_t *start_buf = strip_tag(buf);
-	uint8_t *end_buf = start_buf + len;
-	bool ret = false;
 	uint32_t exceptions = malloc_lock(ctx);
+	bool ret = false;
 
-	raw_malloc_validate_pools(ctx);
-
-	/* Check for wrapping */
-	if (start_buf > end_buf)
-		goto out;
-
-	BPOOL_FOREACH(ctx, &itr, &b) {
-		uint8_t *start_b;
-		uint8_t *end_b;
-		size_t s;
-
-		start_b = get_payload_start_size(b, &s);
-		end_b = start_b + s;
-
-		if (start_buf >= start_b && end_buf <= end_b) {
-			ret = true;
-			goto out;
-		}
-	}
-
-out:
+	ret = raw_malloc_buffer_is_within_alloced(ctx, buf, len);
 	malloc_unlock(ctx, exceptions);
 
 	return ret;
@@ -921,30 +785,10 @@ out:
 static bool gen_malloc_buffer_overlaps_heap(struct malloc_ctx *ctx,
 					    void *buf, size_t len)
 {
-	uintptr_t buf_start = (uintptr_t) buf;
-	uintptr_t buf_end = buf_start + len;
-	size_t n;
 	bool ret = false;
 	uint32_t exceptions = malloc_lock(ctx);
 
-	raw_malloc_validate_pools(ctx);
-
-	for (n = 0; n < ctx->pool_len; n++) {
-		uintptr_t pool_start = (uintptr_t)ctx->pool[n].buf;
-		uintptr_t pool_end = pool_start + ctx->pool[n].len;
-
-		if (buf_start > buf_end || pool_start > pool_end) {
-			ret = true;	/* Wrapping buffers, shouldn't happen */
-			goto out;
-		}
-
-		if (buf_end > pool_start || buf_start < pool_end) {
-			ret = true;
-			goto out;
-		}
-	}
-
-out:
+	ret = raw_malloc_buffer_overlaps_heap(ctx, buf, len);
 	malloc_unlock(ctx, exceptions);
 	return ret;
 }
@@ -963,13 +807,98 @@ void raw_malloc_init_ctx(struct malloc_ctx *ctx)
 
 void raw_malloc_add_pool(struct malloc_ctx *ctx, void *buf, size_t len)
 {
-	gen_malloc_add_pool(ctx, buf, len);
+	const size_t min_len = sizeof(struct bhead) + sizeof(struct bfhead);
+	uintptr_t start = (uintptr_t)buf;
+	uintptr_t end = start + len;
+	void *p = NULL;
+	size_t l = 0;
+
+	start = ROUNDUP(start, SizeQuant);
+	end = ROUNDDOWN(end, SizeQuant);
+
+	if (start > end || (end - start) < min_len) {
+		DMSG("Skipping too small pool");
+		return;
+	}
+
+	/* First pool requires a bigger size */
+	if (!ctx->pool_len && (end - start) < MALLOC_INITIAL_POOL_MIN_SIZE) {
+		DMSG("Skipping too small initial pool");
+		return;
+	}
+
+	tag_asan_free((void *)start, end - start);
+	bpool((void *)start, end - start, &ctx->poolset);
+	l = ctx->pool_len + 1;
+	p = realloc_unlocked(ctx, ctx->pool, sizeof(struct malloc_pool) * l);
+	assert(p);
+	ctx->pool = p;
+	ctx->pool[ctx->pool_len].buf = (void *)start;
+	ctx->pool[ctx->pool_len].len = end - start;
+#ifdef BufStats
+	ctx->mstats.size += ctx->pool[ctx->pool_len].len;
+#endif
+	ctx->pool_len = l;
+}
+
+bool raw_malloc_buffer_overlaps_heap(struct malloc_ctx *ctx,
+				     void *buf, size_t len)
+{
+	uintptr_t buf_start = (uintptr_t)strip_tag(buf);
+	uintptr_t buf_end = buf_start + len;
+	size_t n = 0;
+
+	raw_malloc_validate_pools(ctx);
+
+	for (n = 0; n < ctx->pool_len; n++) {
+		uintptr_t pool_start = (uintptr_t)strip_tag(ctx->pool[n].buf);
+		uintptr_t pool_end = pool_start + ctx->pool[n].len;
+
+		if (buf_start > buf_end || pool_start > pool_end)
+			return true;	/* Wrapping buffers, shouldn't happen */
+
+		if ((buf_start >= pool_start && buf_start < pool_end) ||
+		    (buf_end > pool_start && buf_end < pool_end))
+			return true;
+	}
+
+	return false;
+}
+
+bool raw_malloc_buffer_is_within_alloced(struct malloc_ctx *ctx,
+					 void *buf, size_t len)
+{
+	struct bpool_iterator itr = { };
+	void *b = NULL;
+	uint8_t *start_buf = strip_tag(buf);
+	uint8_t *end_buf = start_buf + len;
+
+	raw_malloc_validate_pools(ctx);
+
+	/* Check for wrapping */
+	if (start_buf > end_buf)
+		return false;
+
+	BPOOL_FOREACH(ctx, &itr, &b) {
+		uint8_t *start_b = NULL;
+		uint8_t *end_b = NULL;
+		size_t s = 0;
+
+		start_b = strip_tag(get_payload_start_size(b, &s));
+		end_b = start_b + s;
+		if (start_buf >= start_b && end_buf <= end_b)
+			return true;
+	}
+
+	return false;
 }
 
 #ifdef CFG_WITH_STATS
-void raw_malloc_get_stats(struct malloc_ctx *ctx, struct malloc_stats *stats)
+void raw_malloc_get_stats(struct malloc_ctx *ctx, struct pta_stats_alloc *stats)
 {
-	gen_malloc_get_stats(ctx, stats);
+	memcpy_unchecked(stats, &ctx->mstats, sizeof(*stats));
+	stats->allocated = ctx->poolset.totalloc;
+	stats->free2_sum = ctx->poolset.free2_sum;
 }
 #endif
 
@@ -988,95 +917,44 @@ bool malloc_buffer_overlaps_heap(void *buf, size_t len)
 	return gen_malloc_buffer_overlaps_heap(&malloc_ctx, buf, len);
 }
 
-#ifdef CFG_VIRTUALIZATION
+#ifdef CFG_NS_VIRTUALIZATION
 
 #ifndef ENABLE_MDBG
 
 void *nex_malloc(size_t size)
 {
-	void *p;
-	uint32_t exceptions = malloc_lock(&nex_malloc_ctx);
-
-	p = raw_malloc(0, 0, size, &nex_malloc_ctx);
-	malloc_unlock(&nex_malloc_ctx, exceptions);
-	return p;
+	return mem_alloc(MAF_NEX, NULL, 1, 1, size, __FILE__, __LINE__);
 }
 
 void *nex_calloc(size_t nmemb, size_t size)
 {
-	void *p;
-	uint32_t exceptions = malloc_lock(&nex_malloc_ctx);
-
-	p = raw_calloc(0, 0, nmemb, size, &nex_malloc_ctx);
-	malloc_unlock(&nex_malloc_ctx, exceptions);
-	return p;
+	return mem_alloc(MAF_NEX | MAF_ZERO_INIT, NULL, 1, nmemb, size,
+			 __FILE__, __LINE__);
 }
 
 void *nex_realloc(void *ptr, size_t size)
 {
-	void *p;
-	uint32_t exceptions = malloc_lock(&nex_malloc_ctx);
-
-	p = realloc_unlocked(&nex_malloc_ctx, ptr, size);
-	malloc_unlock(&nex_malloc_ctx, exceptions);
-	return p;
+	return mem_alloc(MAF_NEX, ptr, 1, 1, size, __FILE__, __LINE__);
 }
 
 void *nex_memalign(size_t alignment, size_t size)
 {
-	void *p;
-	uint32_t exceptions = malloc_lock(&nex_malloc_ctx);
-
-	p = raw_memalign(0, 0, alignment, size, &nex_malloc_ctx);
-	malloc_unlock(&nex_malloc_ctx, exceptions);
-	return p;
-}
-
-void nex_free(void *ptr)
-{
-	uint32_t exceptions = malloc_lock(&nex_malloc_ctx);
-
-	raw_free(ptr, &nex_malloc_ctx, false /* !wipe */);
-	malloc_unlock(&nex_malloc_ctx, exceptions);
+	return mem_alloc(MAF_NEX, NULL, alignment, 1, size, __FILE__, __LINE__);
 }
 
 #else  /* ENABLE_MDBG */
-
-void *nex_mdbg_malloc(const char *fname, int lineno, size_t size)
-{
-	return gen_mdbg_malloc(&nex_malloc_ctx, fname, lineno, size);
-}
-
-void *nex_mdbg_calloc(const char *fname, int lineno, size_t nmemb, size_t size)
-{
-	return gen_mdbg_calloc(&nex_malloc_ctx, fname, lineno, nmemb, size);
-}
-
-void *nex_mdbg_realloc(const char *fname, int lineno, void *ptr, size_t size)
-{
-	return gen_mdbg_realloc(&nex_malloc_ctx, fname, lineno, ptr, size);
-}
-
-void *nex_mdbg_memalign(const char *fname, int lineno, size_t alignment,
-		size_t size)
-{
-	return gen_mdbg_memalign(&nex_malloc_ctx, fname, lineno, alignment, size);
-}
 
 void nex_mdbg_check(int bufdump)
 {
 	gen_mdbg_check(&nex_malloc_ctx, bufdump);
 }
 
+#endif	/* ENABLE_MDBG */
+
 void nex_free(void *ptr)
 {
-	uint32_t exceptions = malloc_lock(&nex_malloc_ctx);
-
-	gen_mdbg_free(&nex_malloc_ctx, ptr, false /* !wipe */);
-	malloc_unlock(&nex_malloc_ctx, exceptions);
+	free_flags(MAF_NEX, ptr);
 }
-
-#endif	/* ENABLE_MDBG */
 
 void nex_malloc_add_pool(void *buf, size_t len)
 {
@@ -1100,7 +978,7 @@ void nex_malloc_reset_stats(void)
 	gen_malloc_reset_stats(&nex_malloc_ctx);
 }
 
-void nex_malloc_get_stats(struct malloc_stats *stats)
+void nex_malloc_get_stats(struct pta_stats_alloc *stats)
 {
 	gen_malloc_get_stats(&nex_malloc_ctx, stats);
 }

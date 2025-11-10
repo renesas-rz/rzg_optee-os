@@ -84,7 +84,7 @@ static void atmel_trng_reset(void)
 static TEE_Result trng_node_probe(const void *fdt, int node,
 				  const void *compat_data __unused)
 {
-	int status = _fdt_get_status(fdt, node);
+	int status = fdt_get_status(fdt, node);
 	size_t size = 0;
 	struct clk *clk = NULL;
 	TEE_Result res = TEE_ERROR_GENERIC;
@@ -98,7 +98,7 @@ static TEE_Result trng_node_probe(const void *fdt, int node,
 	if (res)
 		return res;
 
-	if (dt_map_dev(fdt, node, &trng_base, &size) < 0)
+	if (dt_map_dev(fdt, node, &trng_base, &size, DT_MAP_AUTO) < 0)
 		return TEE_ERROR_GENERIC;
 
 	clk_enable(clk);
@@ -110,6 +110,7 @@ static TEE_Result trng_node_probe(const void *fdt, int node,
 
 static const struct dt_device_match atmel_trng_match_table[] = {
 	{ .compatible = "atmel,at91sam9g45-trng" },
+	{ .compatible = "microchip,sama7g5-trng" },
 	{ }
 };
 

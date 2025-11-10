@@ -3,8 +3,8 @@
  * Copyright (c) 2015-2021, Linaro Limited
  */
 
-#ifndef KERNEL_ABORT_H
-#define KERNEL_ABORT_H
+#ifndef __KERNEL_ABORT_H
+#define __KERNEL_ABORT_H
 
 #define ABORT_TYPE_UNDEF		0
 #define ABORT_TYPE_PREFETCH		1
@@ -27,10 +27,18 @@ struct abort_info {
 
 /* Print abort info to the console */
 void abort_print(struct abort_info *ai);
+
 /* Print abort info + stack dump to the console */
 void abort_print_error(struct abort_info *ai);
 
 void abort_handler(uint32_t abort_type, struct thread_abort_regs *regs);
+
+/*
+ * Platform specific handler for external abort exceptions.
+ * CFG_EXTERNAL_ABORT_PLAT_HANDLER must be enabled to have the platform handler
+ * be called.
+ */
+void plat_external_abort_handler(struct abort_info *ai);
 
 bool abort_is_user_exception(struct abort_info *ai);
 
@@ -40,5 +48,5 @@ bool abort_is_write_fault(struct abort_info *ai);
 void abort_print_current_ts(void);
 
 #endif /*__ASSEMBLER__*/
-#endif /*KERNEL_ABORT_H*/
+#endif /*__KERNEL_ABORT_H*/
 

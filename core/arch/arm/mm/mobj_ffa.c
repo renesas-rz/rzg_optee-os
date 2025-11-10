@@ -5,25 +5,85 @@
 
 #include <assert.h>
 #include <bitstring.h>
+#include <config.h>
 #include <ffa.h>
 #include <initcall.h>
-#include <keep.h>
 #include <kernel/refcount.h>
 #include <kernel/spinlock.h>
 #include <kernel/thread_spmc.h>
+#include <kernel/virtualization.h>
 #include <mm/mobj.h>
 #include <sys/queue.h>
 
+/*
+ * Life cycle of struct mobj_ffa
+ *
+ * SPMC at S-EL1 (CFG_CORE_SEL1_SPMC=y)
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * During FFA_MEM_SHARE allocated in mobj_ffa_sel1_spmc_new() and finally
+ * added to the inactive list at the end of add_mem_share() once
+ * successfully filled in.
+ *	registered_by_cookie = false
+ *	mobj.refs.val = 0
+ *	inactive_refs = 0
+ *
+ * During FFA_MEM_RECLAIM reclaimed/freed using
+ * mobj_ffa_sel1_spmc_reclaim().  This will always succeed if the normal
+ * world is only calling this when all other threads are done with the
+ * shared memory object. However, there are some conditions that must be
+ * met to make sure that this is the case:
+ *	mobj not in the active list, else -> return TEE_ERROR_BUSY
+ *	mobj not in inactive list, else -> return TEE_ERROR_ITEM_NOT_FOUND
+ *	mobj inactive_refs is 0, else -> return TEE_ERROR_BUSY
+ *
+ * mobj is activated using mobj_ffa_get_by_cookie() which unless the mobj
+ * is active already:
+ * - move the mobj into the active list
+ * - if not registered_by_cookie ->
+ *	set registered_by_cookie and increase inactive_refs
+ * - set mobj.refc.val to 1
+ * - increase inactive_refs
+ *
+ * A previously activated mobj is made ready for reclaim using
+ * mobj_ffa_unregister_by_cookie() which only succeeds if the mobj is in
+ * the inactive list and registered_by_cookie is set and then:
+ * - clears registered_by_cookie
+ * - decreases inactive_refs
+ *
+ * Each successful call to mobj_ffa_get_by_cookie() must be matched by a
+ * call to mobj_put(). If the mobj.refc.val reaches 0 it's
+ * - moved to the inactive list
+ * - inactive_refs is decreased
+ *
+ * SPMC at S-EL2/EL3 (CFG_CORE_SEL1_SPMC=n)
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * mobj is activated/allocated using mobj_ffa_get_by_cookie() which if
+ * already active only is
+ * - increasing mobj.refc.val and inactive_refs
+ * if found in inactive list is
+ * - setting mobj.refc.val to 1
+ * - increasing inactive_refs
+ * - moved into active list
+ * if not found is created using thread_spmc_populate_mobj_from_rx() and
+ * then:
+ * - setting mobj.refc.val to 1
+ * - increasing inactive_refs
+ * - moved into active list
+ *
+ * A previously activated mobj is relinquished using
+ * mobj_ffa_unregister_by_cookie() which only succeeds if the mobj is in
+ * the inactive list and inactive_refs is 1
+ */
 struct mobj_ffa {
 	struct mobj mobj;
 	SLIST_ENTRY(mobj_ffa) link;
 	uint64_t cookie;
 	tee_mm_entry_t *mm;
 	struct refcount mapcount;
+	unsigned int inactive_refs;
 	uint16_t page_offset;
 #ifdef CFG_CORE_SEL1_SPMC
 	bool registered_by_cookie;
-	bool unregistered_by_cookie;
 #endif
 	paddr_t pages[];
 };
@@ -31,8 +91,19 @@ struct mobj_ffa {
 SLIST_HEAD(mobj_ffa_head, mobj_ffa);
 
 #ifdef CFG_CORE_SEL1_SPMC
-#define NUM_SHMS	64
-static bitstr_t bit_decl(shm_bits, NUM_SHMS);
+#ifdef CFG_NS_VIRTUALIZATION
+static bitstr_t *get_shm_bits(void)
+{
+	return virt_get_shm_bits();
+}
+#else
+static bitstr_t bit_decl(__shm_bits, SPMC_CORE_SEL1_MAX_SHM_COUNT);
+
+static bitstr_t *get_shm_bits(void)
+{
+	return __shm_bits;
+}
+#endif
 #endif
 
 static struct mobj_ffa_head shm_head = SLIST_HEAD_INITIALIZER(shm_head);
@@ -41,7 +112,7 @@ static struct mobj_ffa_head shm_inactive_head =
 
 static unsigned int shm_lock = SPINLOCK_UNLOCK;
 
-const struct mobj_ops mobj_ffa_ops;
+static const struct mobj_ops mobj_ffa_ops;
 
 static struct mobj_ffa *to_mobj_ffa(struct mobj *mobj)
 {
@@ -79,31 +150,52 @@ static struct mobj_ffa *ffa_new(unsigned int num_pages)
 	mf->mobj.size = num_pages * SMALL_PAGE_SIZE;
 	mf->mobj.phys_granule = SMALL_PAGE_SIZE;
 	refcount_set(&mf->mobj.refc, 0);
+	mf->inactive_refs = 0;
 
 	return mf;
 }
 
 #ifdef CFG_CORE_SEL1_SPMC
-struct mobj_ffa *mobj_ffa_sel1_spmc_new(unsigned int num_pages)
+struct mobj_ffa *mobj_ffa_sel1_spmc_new(uint64_t cookie,
+					unsigned int num_pages)
 {
 	struct mobj_ffa *mf = NULL;
+	bitstr_t *shm_bits = NULL;
 	uint32_t exceptions = 0;
 	int i = 0;
 
-	mf = ffa_new(num_pages);
-	if (!mf)
-		return NULL;
+	if (cookie != OPTEE_MSG_FMEM_INVALID_GLOBAL_ID) {
+		if (!(cookie & FFA_MEMORY_HANDLE_HYPERVISOR_BIT))
+			return NULL;
+		if (virt_add_cookie_to_current_guest(cookie))
+			return NULL;
+	}
 
+	mf = ffa_new(num_pages);
+	if (!mf) {
+		if (cookie != OPTEE_MSG_FMEM_INVALID_GLOBAL_ID)
+			virt_remove_cookie(cookie);
+		return NULL;
+	}
+
+	if (cookie != OPTEE_MSG_FMEM_INVALID_GLOBAL_ID) {
+		mf->cookie = cookie;
+		return mf;
+	}
+
+	shm_bits = get_shm_bits();
 	exceptions = cpu_spin_lock_xsave(&shm_lock);
-	bit_ffc(shm_bits, NUM_SHMS, &i);
+	bit_ffc(shm_bits, SPMC_CORE_SEL1_MAX_SHM_COUNT, &i);
 	if (i != -1) {
 		bit_set(shm_bits, i);
+		mf->cookie = i;
+		mf->cookie |= FFA_MEMORY_HANDLE_NON_SECURE_BIT;
 		/*
-		 * Setting bit 44 to use one of the upper 32 bits too for
-		 * testing.
+		 * Encode the partition ID into the handle so we know which
+		 * partition to switch to when reclaiming a handle.
 		 */
-		mf->cookie = i | FFA_MEMORY_HANDLE_NONE_SECURE_BIT;
-
+		mf->cookie |= SHIFT_U64(virt_get_current_guest_id(),
+					FFA_MEMORY_HANDLE_PRTN_SHIFT);
 	}
 	cpu_spin_unlock_xrestore(&shm_lock, exceptions);
 
@@ -118,7 +210,7 @@ struct mobj_ffa *mobj_ffa_sel1_spmc_new(unsigned int num_pages)
 
 static size_t get_page_count(struct mobj_ffa *mf)
 {
-	return ROUNDUP(mf->mobj.size, SMALL_PAGE_SIZE) / SMALL_PAGE_SIZE;
+	return ROUNDUP_DIV(mf->mobj.size, SMALL_PAGE_SIZE);
 }
 
 static bool cmp_cookie(struct mobj_ffa *mf, uint64_t cookie)
@@ -176,17 +268,27 @@ static struct mobj_ffa *find_in_list(struct mobj_ffa_head *head,
 #if defined(CFG_CORE_SEL1_SPMC)
 void mobj_ffa_sel1_spmc_delete(struct mobj_ffa *mf)
 {
-	int i = mf->cookie & ~BIT64(44);
-	uint32_t exceptions = 0;
 
-	assert(i >= 0 && i < NUM_SHMS);
+	if (!IS_ENABLED(CFG_NS_VIRTUALIZATION) ||
+	    !(mf->cookie & FFA_MEMORY_HANDLE_HYPERVISOR_BIT)) {
+		uint64_t mask = FFA_MEMORY_HANDLE_NON_SECURE_BIT;
+		bitstr_t *shm_bits = get_shm_bits();
+		uint32_t exceptions = 0;
+		int64_t i = 0;
 
-	exceptions = cpu_spin_lock_xsave(&shm_lock);
-	assert(bit_test(shm_bits, i));
-	bit_clear(shm_bits, i);
+		if (IS_ENABLED(CFG_NS_VIRTUALIZATION))
+			mask |= SHIFT_U64(FFA_MEMORY_HANDLE_PRTN_MASK,
+					  FFA_MEMORY_HANDLE_PRTN_SHIFT);
+		i = mf->cookie & ~mask;
+		assert(i >= 0 && i < SPMC_CORE_SEL1_MAX_SHM_COUNT);
+
+		exceptions = cpu_spin_lock_xsave(&shm_lock);
+		assert(bit_test(shm_bits, i));
+		bit_clear(shm_bits, i);
+		cpu_spin_unlock_xrestore(&shm_lock, exceptions);
+	}
+
 	assert(!mf->mm);
-	cpu_spin_unlock_xrestore(&shm_lock, exceptions);
-
 	free(mf);
 }
 #else /* !defined(CFG_CORE_SEL1_SPMC) */
@@ -216,7 +318,8 @@ TEE_Result mobj_ffa_add_pages_at(struct mobj_ffa *mf, unsigned int *idx,
 	if (ADD_OVERFLOW(*idx, num_pages, &n) || n > tot_page_count)
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	if (!core_pbuf_is(CORE_MEM_NON_SEC, pa, num_pages * SMALL_PAGE_SIZE))
+	if (!IS_ENABLED(CFG_CORE_SEL2_SPMC) &&
+	    !core_pbuf_is(CORE_MEM_NON_SEC, pa, num_pages * SMALL_PAGE_SIZE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	for (n = 0; n < num_pages; n++)
@@ -284,8 +387,9 @@ TEE_Result mobj_ffa_sel1_spmc_reclaim(uint64_t cookie)
 	 * If the mobj has been registered via mobj_ffa_get_by_cookie()
 	 * but not unregistered yet with mobj_ffa_unregister_by_cookie().
 	 */
-	if (mf->registered_by_cookie && !mf->unregistered_by_cookie) {
-		DMSG("cookie %#"PRIx64" busy", cookie);
+	if (mf->inactive_refs) {
+		DMSG("cookie %#"PRIx64" busy inactive_refs %u",
+		     cookie, mf->inactive_refs);
 		res = TEE_ERROR_BUSY;
 		goto out;
 	}
@@ -295,8 +399,10 @@ TEE_Result mobj_ffa_sel1_spmc_reclaim(uint64_t cookie)
 	res = TEE_SUCCESS;
 out:
 	cpu_spin_unlock_xrestore(&shm_lock, exceptions);
-	if (!res)
+	if (!res) {
 		mobj_ffa_sel1_spmc_delete(mf);
+		virt_remove_cookie(cookie);
+	}
 	return res;
 }
 #endif /*CFG_CORE_SEL1_SPMC*/
@@ -315,8 +421,8 @@ TEE_Result mobj_ffa_unregister_by_cookie(uint64_t cookie)
 	 * unregistered.
 	 */
 	if (mf) {
-		DMSG("cookie %#"PRIx64" busy refc %u",
-		     cookie, refcount_val(&mf->mobj.refc));
+		EMSG("cookie %#"PRIx64" busy refc %u:%u",
+		     cookie, refcount_val(&mf->mobj.refc), mf->inactive_refs);
 		res = TEE_ERROR_BUSY;
 		goto out;
 	}
@@ -324,15 +430,35 @@ TEE_Result mobj_ffa_unregister_by_cookie(uint64_t cookie)
 	/*
 	 * If the mobj isn't found or if it already has been unregistered.
 	 */
-#if defined(CFG_CORE_SEL1_SPMC)
-	if (!mf || mf->unregistered_by_cookie) {
+	if (!mf) {
+		EMSG("cookie %#"PRIx64" not found", cookie);
 		res = TEE_ERROR_ITEM_NOT_FOUND;
 		goto out;
 	}
-	mf->unregistered_by_cookie = true;
-#else
-	if (!mf) {
+#if defined(CFG_CORE_SEL1_SPMC)
+	if (!mf->registered_by_cookie) {
+		/*
+		 * This is expected behaviour if the normal world has
+		 * registered the memory but OP-TEE has not yet used the
+		 * corresponding cookie with mobj_ffa_get_by_cookie(). It
+		 * can be non-trivial for the normal world to predict if
+		 * the cookie really has been used or not. So even if we
+		 * return it as an error it will be ignored by
+		 * handle_unregister_shm().
+		 */
+		EMSG("cookie %#"PRIx64" not registered refs %u:%u",
+		     cookie, refcount_val(&mf->mobj.refc), mf->inactive_refs);
 		res = TEE_ERROR_ITEM_NOT_FOUND;
+		goto out;
+	}
+	assert(mf->inactive_refs);
+	mf->inactive_refs--;
+	mf->registered_by_cookie = false;
+#else
+	if (mf->inactive_refs) {
+		EMSG("cookie %#"PRIx64" busy refc %u:%u",
+		     cookie, refcount_val(&mf->mobj.refc), mf->inactive_refs);
+		res = TEE_ERROR_BUSY;
 		goto out;
 	}
 	mf = pop_from_list(&shm_inactive_head, cmp_cookie, cookie);
@@ -366,9 +492,11 @@ struct mobj *mobj_ffa_get_by_cookie(uint64_t cookie,
 				 * found it. Let's reinitialize it.
 				 */
 				refcount_set(&mf->mobj.refc, 1);
+				mf->inactive_refs++;
 			}
-			DMSG("cookie %#"PRIx64" active: refc %d",
-			     cookie, refcount_val(&mf->mobj.refc));
+			DMSG("cookie %#"PRIx64" active: refc %u:%u",
+			     cookie, refcount_val(&mf->mobj.refc),
+			     mf->inactive_refs);
 		} else {
 			EMSG("cookie %#"PRIx64" mismatching internal_offs got %#"PRIx16" expected %#x",
 			     cookie, mf->page_offset, internal_offs);
@@ -381,19 +509,22 @@ struct mobj *mobj_ffa_get_by_cookie(uint64_t cookie,
 		if (mf) {
 			DMSG("cookie %#"PRIx64" resurrecting", cookie);
 		} else {
-			EMSG("Populating mobj from rx buffer, cookie %#"PRIx64,
+			DMSG("Populating mobj from rx buffer, cookie %#"PRIx64,
 			     cookie);
 			mf = thread_spmc_populate_mobj_from_rx(cookie);
 		}
 #endif
 		if (mf) {
 #if defined(CFG_CORE_SEL1_SPMC)
-			mf->unregistered_by_cookie = false;
-			mf->registered_by_cookie = true;
+			if (!mf->registered_by_cookie) {
+				mf->inactive_refs++;
+				mf->registered_by_cookie = true;
+			}
 #endif
 			assert(refcount_val(&mf->mobj.refc) == 0);
 			refcount_set(&mf->mobj.refc, 1);
 			refcount_set(&mf->mapcount, 0);
+			mf->inactive_refs++;
 
 			/*
 			 * mf->page_offset is offset into the first page.
@@ -456,7 +587,6 @@ static TEE_Result ffa_get_pa(struct mobj *mobj, size_t offset,
 
 	return TEE_SUCCESS;
 }
-DECLARE_KEEP_PAGER(ffa_get_pa);
 
 static size_t ffa_get_phys_offs(struct mobj *mobj,
 				size_t granule __maybe_unused)
@@ -492,12 +622,25 @@ static void ffa_inactivate(struct mobj *mobj)
 		goto out;
 	}
 
-	DMSG("cookie %#"PRIx64, mf->cookie);
-	if (!pop_from_list(&shm_head, cmp_ptr, (vaddr_t)mf))
-		panic();
-	unmap_helper(mf);
-	SLIST_INSERT_HEAD(&shm_inactive_head, mf, link);
+	/*
+	 * pop_from_list() can fail to find the mobj if we had just
+	 * decreased the refcount to 0 in mobj_put() and was going to
+	 * acquire the shm_lock but another thread found this mobj and
+	 * reinitialized the refcount to 1. Then before we got cpu time the
+	 * other thread called mobj_put() and deactivated the mobj again.
+	 *
+	 * However, we still have the inactive count that guarantees
+	 * that the mobj can't be freed until it reaches 0.
+	 * At this point the mobj is in the inactive list.
+	 */
+	if (pop_from_list(&shm_head, cmp_ptr, (vaddr_t)mf)) {
+		unmap_helper(mf);
+		SLIST_INSERT_HEAD(&shm_inactive_head, mf, link);
+	}
 out:
+	if (!mf->inactive_refs)
+		panic();
+	mf->inactive_refs--;
 	cpu_spin_unlock_xrestore(&shm_lock, exceptions);
 }
 
@@ -551,7 +694,7 @@ static TEE_Result ffa_inc_map(struct mobj *mobj)
 	 */
 	if (!mf->mm) {
 		sz = ROUNDUP(mobj->size + mf->page_offset, SMALL_PAGE_SIZE);
-		mf->mm = tee_mm_alloc(&tee_mm_shm, sz);
+		mf->mm = tee_mm_alloc(&core_virt_shm_pool, sz);
 		if (!mf->mm) {
 			res = TEE_ERROR_OUT_OF_MEMORY;
 			goto out;
@@ -599,7 +742,7 @@ static TEE_Result mapped_shm_init(void)
 	if (!pool_start || !pool_end)
 		panic("Can't find region for shmem pool");
 
-	if (!tee_mm_init(&tee_mm_shm, pool_start, pool_end - pool_start,
+	if (!tee_mm_init(&core_virt_shm_pool, pool_start, pool_end - pool_start,
 			 SMALL_PAGE_SHIFT,
 			 TEE_MM_POOL_NO_FLAGS))
 		panic("Could not create shmem pool");
@@ -609,12 +752,7 @@ static TEE_Result mapped_shm_init(void)
 	return TEE_SUCCESS;
 }
 
-/*
- * Note: this variable is weak just to ease breaking its dependency chain
- * when added to the unpaged area.
- */
-const struct mobj_ops mobj_ffa_ops
-__weak __relrodata_unpaged("mobj_ffa_ops") = {
+static const struct mobj_ops mobj_ffa_ops = {
 	.get_pa = ffa_get_pa,
 	.get_phys_offs = ffa_get_phys_offs,
 	.get_va = ffa_get_va,

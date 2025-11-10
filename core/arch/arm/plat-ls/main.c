@@ -50,7 +50,6 @@
 #include <kernel/tee_common_otp.h>
 #include <mm/core_mmu.h>
 
-static struct gic_data gic_data;
 #ifdef CFG_PL011
 static struct pl011_data console_data;
 #else
@@ -113,7 +112,7 @@ void plat_primary_init_early(void)
 }
 #endif
 
-void console_init(void)
+void plat_console_init(void)
 {
 #ifdef CFG_PL011
 	/*
@@ -142,20 +141,13 @@ static TEE_Result get_gic_base_addr_from_dt(paddr_t *gic_addr)
 		gic_offset = fdt_path_offset(fdt,
 					     "/interrupt-controller@6000000");
 
-	if (gic_offset > 0) {
-		paddr = _fdt_reg_base_address(fdt, gic_offset);
-		if (paddr == DT_INFO_INVALID_REG) {
-			EMSG("GIC: Unable to get base addr from DT");
-			return TEE_ERROR_ITEM_NOT_FOUND;
-		}
-
-		size = _fdt_reg_size(fdt, gic_offset);
-		if (size == DT_INFO_INVALID_REG_SIZE) {
-			EMSG("GIC: Unable to get size of base addr from DT");
-			return TEE_ERROR_ITEM_NOT_FOUND;
-		}
-	} else {
+	if (gic_offset < 0) {
 		EMSG("Unable to get gic offset node");
+		return TEE_ERROR_ITEM_NOT_FOUND;
+	}
+
+	if (fdt_reg_info(fdt, gic_offset, &paddr, &size)) {
+		EMSG("GIC: Unable to get base addr or size from DT");
 		return TEE_ERROR_ITEM_NOT_FOUND;
 	}
 
@@ -200,7 +192,7 @@ static void get_gic_offset(uint32_t *offsetc, uint32_t *offsetd)
 #endif
 }
 
-void main_init_gic(void)
+void boot_primary_init_intc(void)
 {
 	paddr_t gic_base = 0;
 	uint32_t gicc_offset = 0;
@@ -213,19 +205,10 @@ void main_init_gic(void)
 	gic_base = GIC_BASE;
 #endif
 	get_gic_offset(&gicc_offset, &gicd_offset);
-
-#if defined(CFG_WITH_ARM_TRUSTED_FW)
-	/* On ARMv8, GIC configuration is initialized in ARM-TF */
-	gic_init_base_addr(&gic_data, gic_base + gicc_offset,
-			   gic_base + gicd_offset);
-#else
-	/* Initialize GIC */
-	gic_init(&gic_data, gic_base + gicc_offset, gic_base + gicd_offset);
-#endif
-	itr_init(&gic_data.chip);
+	gic_init(gic_base + gicc_offset, gic_base + gicd_offset);
 }
 
-void main_secondary_init_gic(void)
+void boot_secondary_init_intc(void)
 {
-	gic_cpu_init(&gic_data);
+	gic_init_per_cpu();
 }

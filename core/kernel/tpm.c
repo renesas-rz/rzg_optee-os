@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /*
- * Copyright (c) 2020-2022, ARM Limited. All rights reserved.
+ * Copyright (c) 2020-2023, ARM Limited. All rights reserved.
+ * Copyright (c) 2025, NVIDIA Corporation & AFFILIATES.
  */
 
 #include <compiler.h>
@@ -45,13 +46,16 @@ static int read_dt_tpm_log_info(void *fdt, int node, paddr_t *buf,
 	if (!property  || len_prop != sizeof(uint32_t) * 2)
 		return -1;
 
-	log_addr = fdt32_to_cpu(property[1]);
+	log_addr = reg_pair_to_64(fdt32_to_cpu(property[0]),
+				  fdt32_to_cpu(property[1]));
 
-	err = fdt_setprop(fdt, node, dt_tpm_event_log_addr, &zero_addr,
-			  sizeof(uint32_t) * 2);
-	if (err < 0) {
-		EMSG("Error setting property DTB to zero\n");
-		return err;
+	if (!IS_ENABLED(CFG_CORE_FFA)) {
+		err = fdt_setprop(fdt, node, dt_tpm_event_log_addr, &zero_addr,
+				  sizeof(uint32_t) * 2);
+		if (err < 0) {
+			EMSG("Error setting property DTB to zero");
+			return err;
+		}
 	}
 
 	/*
@@ -112,7 +116,7 @@ TEE_Result tpm_get_event_log(void *buf, size_t *size)
 	}
 
 	if (buf_size < tpm_log_size) {
-		EMSG("TPM: Not enough space for the log: %zu, %lu",
+		EMSG("TPM: Not enough space for the log: %zu, %zu",
 		     buf_size, tpm_log_size);
 		return TEE_ERROR_SHORT_BUFFER;
 	}

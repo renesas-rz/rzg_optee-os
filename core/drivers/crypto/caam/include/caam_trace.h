@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: BSD-2-Clause */
 /*
- * Copyright 2019-2021 NXP
+ * Copyright 2019-2021, 2023-2024 NXP
  *
  * Brief   CAAM driver trace include file.
  *         Definition of the internal driver trace macros.
@@ -40,6 +40,10 @@
 #define DBG_TRACE_ECC    BIT32(12) /* ECC trace */
 #define DBG_TRACE_DH	 BIT32(13) /* DH trace */
 #define DBG_TRACE_DSA	 BIT32(14) /* DSA trace */
+#define DBG_TRACE_MP	 BIT32(15) /* MP trace */
+#define DBG_TRACE_SM	 BIT32(16) /* Secure Memory trace */
+#define DBG_TRACE_KEY	 BIT32(17) /* KEY trace */
+#define DBG_TRACE_AE	 BIT32(18) /* AE trace */
 
 /* HAL */
 #if CAAM_DBG_TRACE(HAL)
@@ -238,7 +242,7 @@
 #if CAAM_DBG_DESC(DSA)
 #define DSA_DUMPDESC(desc)                                                     \
 	do {                                                                   \
-		MP_TRACE("DSA Descriptor");                                    \
+		DSA_TRACE("DSA Descriptor");                                   \
 		DRV_DUMPDESC(desc);                                            \
 	} while (0)
 #else
@@ -253,6 +257,52 @@
 #define DSA_TRACE(...)
 #define DSA_DUMPDESC(desc)
 #define DSA_DUMPBUF(...)
+#endif
+
+/* MP */
+#if CAAM_DBG_TRACE(MP)
+#define MP_TRACE DRV_TRACE
+#if CAAM_DBG_DESC(MP)
+#define MP_DUMPDESC(desc)                                                      \
+	do {                                                                   \
+		MP_TRACE("MP Descriptor");                                     \
+		DRV_DUMPDESC(desc);                                            \
+	} while (0)
+#else
+#define MP_DUMPDESC(desc)
+#endif
+#if CAAM_DBG_BUF(MP)
+#define MP_DUMPBUF DRV_DUMPBUF
+#else
+#define MP_DUMPBUF(...)
+#endif
+#else
+#define MP_TRACE(...) do { } while (0)
+#define MP_DUMPDESC(desc)
+#define MP_DUMPBUF(...)
+#endif
+
+/* KEY */
+#if CAAM_DBG_TRACE(KEY)
+#define KEY_TRACE DRV_TRACE
+#if CAAM_DBG_DESC(KEY)
+#define KEY_DUMPDESC(desc)			\
+	do {					\
+		KEY_TRACE("KEY Descriptor");	\
+		DRV_DUMPDESC(desc);		\
+	} while (0)
+#else
+#define KEY_DUMPDESC(desc)
+#endif
+#if CAAM_DBG_BUF(KEY)
+#define KEY_DUMPBUF DRV_DUMPBUF
+#else
+#define KEY_DUMPBUF(...)
+#endif
+#else
+#define KEY_TRACE(...) do { } while (0)
+#define KEY_DUMPDESC(desc) do { } while (0)
+#define KEY_DUMPBUF(...) do { } while (0)
 #endif
 
 #if (TRACE_LEVEL >= TRACE_DEBUG)
@@ -296,6 +346,36 @@
 #define BLOB_TRACE(...)
 #define BLOB_DUMPDESC(desc)
 #define BLOB_DUMPBUF(...)
+#endif
+
+/* Secure Memory */
+#if CAAM_DBG_TRACE(SM)
+#define SM_TRACE DRV_TRACE
+#else
+#define SM_TRACE(...)
+#endif
+
+/* Cipher AE */
+#if CAAM_DBG_TRACE(AE)
+#define AE_TRACE DRV_TRACE
+#if CAAM_DBG_DESC(AE)
+#define AE_DUMPDESC(desc)                                              \
+	do {                                                           \
+		AE_TRACE("AE Descriptor");                             \
+		DRV_DUMPDESC(desc);                                    \
+	} while (0)
+#else
+#define AE_DUMPDESC(...)
+#endif
+#if CAAM_DBG_BUF(AE)
+#define AE_DUMPBUF DRV_DUMPBUF
+#else
+#define AE_DUMPBUF(...)
+#endif
+#else
+#define AE_TRACE(...)
+#define AE_DUMPDESC(...)
+#define AE_DUMPBUF(...)
 #endif
 
 #endif /* CAAM_TRACE_H__ */

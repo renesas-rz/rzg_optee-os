@@ -1,7 +1,15 @@
-.cproject
-cscope.*
-tags
-TAGS
-out
-.project
-*.swp
+/compile_commands.json
+/cscope.*
+/tags
+/TAGS
+/out
+/.project
+# Ignore all dot files and folder
+.*
+# But not those
+!.clang-format
+!.checkpatch.conf
+!.gitattributes
+!.gitignore
+!.github
+!.devcontainer

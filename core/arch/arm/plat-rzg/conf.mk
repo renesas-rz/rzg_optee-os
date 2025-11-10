@@ -28,7 +28,6 @@ $(call force,CFG_CORE_CLUSTER_SHIFT,1)
 endif
 ifeq ($(PLATFORM_FLAVOR),hihope_rzg2n)
 $(call force,CFG_TEE_CORE_NB_CORE,2)
-PMIC_ROHM_BD9571 ?= 0
 endif
 ifeq ($(PLATFORM_FLAVOR),hihope_rzg2h)
 $(call force,CFG_TEE_CORE_NB_CORE,8)
@@ -42,14 +41,3 @@ supported-ta-targets = ta_arm64
 endif
 
 CFG_DT ?= y
-RZG_DRAM_ECC ?= 0
-RZG_ECC_FULL ?= 0
-
-CFG_RZG_SPI_DRV ?= y
-
-CFG_RZG_SEC_IP_DRV ?= n
-ifeq ($(CFG_RZG_SEC_IP_DRV),y)
-$(call force,CFG_WITH_SOFTWARE_PRNG,n)
-endif
-
-CFG_MMAP_REGIONS ?= 15

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BSD-2-Clause
 /*
- * Copyright (c) 2014, Linaro Limited
+ * Copyright (c) 2014-2023, Linaro Limited
  */
 
 #include <crypto/crypto.h>
@@ -99,13 +99,13 @@ static void tee_ltc_reg_algs(void)
 	register_cipher(&des_desc);
 	register_cipher(&des3_desc);
 #endif
-#if defined(_CFG_CORE_LTC_MD5)
+#if defined(_CFG_CORE_LTC_MD5_DESC)
 	register_hash(&md5_desc);
 #endif
-#if defined(_CFG_CORE_LTC_SHA1)
+#if defined(_CFG_CORE_LTC_SHA1) || defined(_CFG_CORE_LTC_SHA1_DESC)
 	register_hash(&sha1_desc);
 #endif
-#if defined(_CFG_CORE_LTC_SHA224)
+#if defined(_CFG_CORE_LTC_SHA224) || defined(_CFG_CORE_LTC_SHA224_DESC)
 	register_hash(&sha224_desc);
 #endif
 #if defined(_CFG_CORE_LTC_SHA256) || defined(_CFG_CORE_LTC_SHA256_DESC)
@@ -116,6 +116,18 @@ static void tee_ltc_reg_algs(void)
 #endif
 #if defined(_CFG_CORE_LTC_SHA512) || defined(_CFG_CORE_LTC_SHA512_DESC)
 	register_hash(&sha512_desc);
+#endif
+#if defined(_CFG_CORE_LTC_SHA3_224) || defined(_CFG_CORE_LTC_SHA3_224_DESC)
+	register_hash(&sha3_224_desc);
+#endif
+#if defined(_CFG_CORE_LTC_SHA3_256) || defined(_CFG_CORE_LTC_SHA3_256_DESC)
+	register_hash(&sha3_256_desc);
+#endif
+#if defined(_CFG_CORE_LTC_SHA3_384) || defined(_CFG_CORE_LTC_SHA3_384_DESC)
+	register_hash(&sha3_384_desc);
+#endif
+#if defined(_CFG_CORE_LTC_SHA3_512) || defined(_CFG_CORE_LTC_SHA3_512_DESC)
+	register_hash(&sha3_512_desc);
 #endif
 #if defined(_CFG_CORE_LTC_ACIPHER) || defined(_CFG_CORE_LTC_EC25519)
 	register_prng(&prng_crypto_desc);

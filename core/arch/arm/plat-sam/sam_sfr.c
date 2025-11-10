@@ -7,11 +7,12 @@
 
 #include <io.h>
 #include <kernel/dt.h>
+#include <kernel/dt_driver.h>
 #include <matrix.h>
 #include <mm/core_memprot.h>
 #include <mm/core_mmu.h>
 #include <sam_sfr.h>
-#include <sama5d2.h>
+#include <platform_config.h>
 #include <types_ext.h>
 
 register_phys_mem_pgdir(MEM_AREA_IO_SEC, SFR_BASE, CORE_MMU_PGDIR_SIZE);
@@ -42,7 +43,7 @@ void atmel_sfr_set_usb_suspend(bool set)
 static TEE_Result atmel_sfr_probe(const void *fdt, int node,
 				  const void *compat_data __unused)
 {
-	if (_fdt_get_status(fdt, node) == DT_STATUS_OK_SEC)
+	if (fdt_get_status(fdt, node) == DT_STATUS_OK_SEC)
 		matrix_configure_periph_secure(AT91C_ID_SFR);
 
 	return TEE_SUCCESS;

@@ -14,6 +14,10 @@ CFG_DRAM_BASE ?= 0x40000000
 # default DRAM size 1 GiB
 CFG_DRAM_SIZE ?= 0x40000000
 
+# When need to create a virtual memory pool for mapping other
+# physical address, enable the config to increase MAX_XLAT_TABLES.
+CFG_MTK_RESERVED_VA ?= n
+
 ifeq ($(PLATFORM_FLAVOR),mt8173)
 # 2**1 = 2 cores per cluster
 $(call force,CFG_TEE_CORE_NB_CORE,4)
@@ -51,6 +55,42 @@ $(call force,CFG_ARM_GICV3,y)
 $(call force,CFG_GIC,y)
 CFG_TZDRAM_START ?= 0x4fd00000
 CFG_TZDRAM_SIZE ?=  0x00300000
+CFG_SHMEM_START ?= ($(CFG_TZDRAM_START) + $(CFG_TZDRAM_SIZE))
+CFG_SHMEM_SIZE ?= 0x00200000
+endif
+
+ifeq ($(PLATFORM_FLAVOR),mt8195)
+$(call force,CFG_TEE_CORE_NB_CORE,8)
+$(call force,CFG_CORE_CLUSTER_SHIFT,2)
+$(call force,CFG_ARM_GICV3,y)
+$(call force,CFG_GIC,y)
+$(call force,CFG_CORE_ARM64_PA_BITS,36)
+CFG_TZDRAM_START ?= 0x43200000
+CFG_TZDRAM_SIZE ?=  0x00a00000
+CFG_SHMEM_START ?= ($(CFG_TZDRAM_START) + $(CFG_TZDRAM_SIZE))
+CFG_SHMEM_SIZE ?= 0x00200000
+endif
+
+ifeq ($(PLATFORM_FLAVOR),mt8188)
+$(call force,CFG_TEE_CORE_NB_CORE,8)
+$(call force,CFG_CORE_CLUSTER_SHIFT,2)
+$(call force,CFG_ARM_GICV3,y)
+$(call force,CFG_GIC,y)
+$(call force,CFG_CORE_ARM64_PA_BITS,36)
+CFG_TZDRAM_START ?= 0x43200000
+CFG_TZDRAM_SIZE ?=  0x00a00000
+CFG_SHMEM_START ?= ($(CFG_TZDRAM_START) + $(CFG_TZDRAM_SIZE))
+CFG_SHMEM_SIZE ?= 0x00200000
+endif
+
+ifeq ($(PLATFORM_FLAVOR),mt7988)
+$(call force,CFG_TEE_CORE_NB_CORE,4)
+$(call force,CFG_CORE_CLUSTER_SHIFT,1)
+$(call force,CFG_ARM_GICV3,y)
+$(call force,CFG_GIC,y)
+$(call force,CFG_WITH_SOFTWARE_PRNG,y)
+CFG_TZDRAM_START ?= 0x43041000
+CFG_TZDRAM_SIZE ?=  0x04ff000
 CFG_SHMEM_START ?= ($(CFG_TZDRAM_START) + $(CFG_TZDRAM_SIZE))
 CFG_SHMEM_SIZE ?= 0x00200000
 endif
