@@ -16,10 +16,10 @@ static void read_chipid(uint8_t *chipid)
 {
 	uint32_t i;
 	uint32_t read_data;
-	uint32_t read_num = CHIPID_SIZE / REGISTER_SIZE;
-	uint8_t password[CHIPID_SIZE] = {0};
+	uint32_t read_num = OTP_UNIQUE_ID_SIZE / REGISTER_SIZE;
+	uint8_t password[OTP_UNIQUE_ID_SIZE] = {0};
 
-	r_otp_read(CHIPID_BASE, (uint32_t *)&password[0], read_num);
+	r_otp_read(OTP_UNIQUE_ID_ADDR, (uint32_t *)&password[0], read_num);
 
 	for (i = 0U; i < read_num; i++) {
 		(void)memcpy(&read_data, &password[i * REGISTER_SIZE], REGISTER_SIZE);
@@ -30,7 +30,7 @@ static void read_chipid(uint8_t *chipid)
 
 static TEE_Result huk_kdf(uint8_t *huk, size_t huk_length)
 {
-	uint8_t password[CHIPID_SIZE] = {0};
+	uint8_t password[OTP_UNIQUE_ID_SIZE] = {0};
 
 	uint8_t salt[] = {0x76, 0x6A, 0xEF, 0x5C, 0x39, 0xEF, 0x6C, 0x26, 0x41, 0x6C, 0x46, 0x68, 0x05, 0x43, 0x06, 0xC0};
 
