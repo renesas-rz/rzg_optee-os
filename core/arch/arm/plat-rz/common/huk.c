@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /*
- * Copyright (c) 2021-2025, Renesas Electronics Corporation
+ * Copyright (c) 2021-2026, Renesas Electronics Corporation
  */
 
 #include <trace.h>
@@ -14,7 +14,7 @@
 
 #define REGISTER_SIZE	(sizeof(uint32_t))
 
-static void read_chipid(uint8_t *chipid)
+void __weak sys_get_chip_id(uint8_t *chipid)
 {
 	uint32_t i;
 	vaddr_t  addr_va;
@@ -39,7 +39,7 @@ static TEE_Result huk_kdf(uint8_t *huk, size_t huk_length)
 
 	uint32_t iteration_count = 1000;
 
-	read_chipid(password);
+	sys_get_chip_id(password);
 
 	return tee_cryp_pbkdf2(TEE_ALG_HMAC_SHA256, password, sizeof(password), salt, sizeof(salt), iteration_count,
 				huk, huk_length);

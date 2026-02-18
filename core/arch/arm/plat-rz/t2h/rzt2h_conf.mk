@@ -13,6 +13,7 @@ $(call force,CFG_ARM_GICV3,y)
 $(call force,CFG_RZ_XSPI,y)
 $(call force,CFG_RZ_OTP_PUCCINI,y)
 $(call force,CFG_RZ_MBXSEM,y)
+$(call force,CFG_RZ_HUK,y)
 
 CFG_TEE_CORE_NB_CORE ?= 4
 CFG_NUM_THREADS ?= 4
@@ -36,4 +37,9 @@ endif
 
 ifeq ($(CFG_RZ_RSIP),y)
 CFG_WITH_SOFTWARE_PRNG ?= n
+endif
+
+ifeq ($(CFG_RZ_OTP_PUCCINI),y)
+CFG_OTP_ADDR_MIN ?= 0x00E5
+CFG_OTP_ADDR_MAX ?= 0x03FF
 endif

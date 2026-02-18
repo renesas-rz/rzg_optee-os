@@ -1,4 +1,4 @@
 global-incdirs-y += .
-srcs-y += main.c huk.c
+srcs-y += main.c
 
 subdirs-y += drivers

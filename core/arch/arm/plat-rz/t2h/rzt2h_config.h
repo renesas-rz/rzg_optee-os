@@ -51,7 +51,7 @@
 #define TEE_SHMEM_SIZE		0x00100000
 
 /* OTP mapping */
-#define OTP_UNIQUE_ID_ADDR		U(0x00E5)
-#define OTP_UNIQUE_ID_SIZE		(8)
+#define CHIPID_BASE		U(0x00E5)
+#define CHIPID_SIZE		(8)
 
 #endif /*RZT2H_CONFIG_H*/
