@@ -1,10 +1,10 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Copyright (c) 2024, Renesas Electronics Corporation
+ * Copyright (c) 2024-2026, Renesas Electronics Corporation
  */
 
-#ifndef RZT2H_CONFIG_H
-#define RZT2H_CONFIG_H
+#ifndef PLATFORM_CONFIG_H
+#define PLATFORM_CONFIG_H
 
 #include <mm/generic_ram_layout.h>
 
@@ -54,4 +54,4 @@
 #define OTP_UNIQUE_ID_ADDR		U(0x00E5)
 #define OTP_UNIQUE_ID_SIZE		(8)
 
-#endif /*RZT2H_CONFIG_H*/
+#endif /* PLATFORM_CONFIG_H */

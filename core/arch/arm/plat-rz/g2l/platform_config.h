@@ -1,10 +1,10 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Copyright (c) 2021-2025, Renesas Electronics Corporation
+ * Copyright (c) 2021-2026, Renesas Electronics Corporation
  */
 
-#ifndef RZG2L_CONFIG_H
-#define RZG2L_CONFIG_H
+#ifndef PLATFORM_CONFIG_H
+#define PLATFORM_CONFIG_H
 
 #include <mm/generic_ram_layout.h>
 
@@ -83,4 +83,4 @@
 #define TEE_SHMEM_START		(TZDRAM_BASE + TZDRAM_SIZE)
 #define TEE_SHMEM_SIZE		0x100000
 
-#endif /*RZG2L_CONFIG_H*/
+#endif /* PLATFORM_CONFIG_H */
