@@ -101,7 +101,7 @@ bool r_otp_read(uint32_t addr, uint32_t *p_value, uint32_t count)
 
 static TEE_Result otp_init(void)
 {
-	otp_base = (vaddr_t)phys_to_virt_io(OTP_BASE, OTP_REG_SIZE);
+	otp_base = (vaddr_t)phys_to_virt_io(OTP_BASE, OTP_SIZE);
 
 	return TEE_SUCCESS;
 }

@@ -22,7 +22,7 @@ static TEE_Result RSIP_Init(void)
 {
 	fsp_err_t err;
 
-	gp_sce = (uint32_t *)phys_to_virt_io(SCE_REG_BASE, SCE_REG_SIZE);
+	gp_sce = (uint32_t *)phys_to_virt_io(SCE_BASE, SCE_SIZE);
 
 	err = R_RSIP_Open(&rsip_instance_ctrl, &rsip_cfg);
 	if (FSP_SUCCESS != err) {

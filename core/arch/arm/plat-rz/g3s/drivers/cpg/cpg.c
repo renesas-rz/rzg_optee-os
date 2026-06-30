@@ -102,7 +102,7 @@ void cpg_xspi_stop(void)
 
 static TEE_Result cpg_init(void)
 {
-	cpg_base = (vaddr_t)phys_to_virt_io(CPG_REG_BASE, CPG_REG_SIZE);
+	cpg_base = (vaddr_t)phys_to_virt_io(CPG_BASE, CPG_SIZE);
 
 	return TEE_SUCCESS;
 }

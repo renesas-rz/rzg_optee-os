@@ -252,7 +252,7 @@ int spi_multi_setup(void)
 
 static TEE_Result spi_multi_init(void)
 {
-	spi_multi_base = (vaddr_t)phys_to_virt_io(SPI_MULTI_BASE, SPI_MULTI_SIZE);
+	spi_multi_base = (vaddr_t)phys_to_virt_io(SPI_BASE, SPI_SIZE);
 
 	return TEE_SUCCESS;
 }

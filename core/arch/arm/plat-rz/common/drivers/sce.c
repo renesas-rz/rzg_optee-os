@@ -22,7 +22,7 @@ static TEE_Result SCE_Init(void)
 
 	int32_t retry_cnt = 3;
 
-	gp_sce = (uint32_t *)phys_to_virt_io(SCE_REG_BASE, SCE_REG_SIZE);
+	gp_sce = (uint32_t *)phys_to_virt_io(SCE_BASE, SCE_SIZE);
 
 	while (0 < retry_cnt) {
 		err = g_sce_protected_on_sce.open(&sce_instance_ctrl, &sce_cfg);

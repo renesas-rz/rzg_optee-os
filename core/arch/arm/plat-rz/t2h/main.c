@@ -11,12 +11,12 @@
 #include <platform_config.h>
 
 register_phys_mem(MEM_AREA_IO_NSEC, CONSOLE_UART_BASE, (SMALL_PAGE_SIZE * 2));
-register_phys_mem(MEM_AREA_IO_NSEC, XSPI_REG_BASE_0, XSPI_REG_SIZE);
-register_phys_mem(MEM_AREA_IO_NSEC, XSPI_REG_BASE_1, XSPI_REG_SIZE);
+register_phys_mem(MEM_AREA_IO_NSEC, SPI_0_BASE, SPI_SIZE);
+register_phys_mem(MEM_AREA_IO_NSEC, SPI_1_BASE, SPI_SIZE);
 register_phys_mem(MEM_AREA_IO_NSEC, MBXSEM_BASE, MBXSEM_SIZE);
 register_phys_mem(MEM_AREA_IO_NSEC, SYS_BASE, (SYS_SIZE << 1));
-register_phys_mem(MEM_AREA_IO_SEC, SCE_REG_BASE, SCE_REG_SIZE);
-register_phys_mem(MEM_AREA_IO_SEC, OTP_BASE, OTP_REG_SIZE);
+register_phys_mem(MEM_AREA_IO_SEC, SCE_BASE, SCE_SIZE);
+register_phys_mem(MEM_AREA_IO_SEC, OTP_BASE, OTP_SIZE);
 register_phys_mem(MEM_AREA_IO_NSEC, (SYS_BASE + 0x01000000U), (SYS_SIZE << 1));
 register_phys_mem(MEM_AREA_IO_NSEC, GICD_BASE, (GIC_DIST_REG_SIZE << 5));
 register_phys_mem_pgdir(MEM_AREA_IO_SEC, SPI_FLASH_BASE_0, SPI_FLASH_SIZE);

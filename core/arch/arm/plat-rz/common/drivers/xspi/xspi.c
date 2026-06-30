@@ -38,8 +38,8 @@
 
 #define XSPI_COMMAND_TIMEOUT		(100000u)
 
-#if defined(XSPI_REG_BASE)
-#define XSPI_REG_BASE_0			(XSPI_REG_BASE)
+#if defined(SPI_BASE)
+#define SPI_0_BASE			(SPI_BASE)
 #endif
 
 vaddr_t xspi_base;
@@ -279,9 +279,9 @@ int xspi_setup(uint8_t ch)
 
 static TEE_Result xspi_init(void)
 {
-	xspi_regs[0] = (vaddr_t)phys_to_virt_io(XSPI_REG_BASE_0, XSPI_REG_SIZE);
-#if defined(XSPI_REG_BASE_1)
-	xspi_regs[1] = (vaddr_t)phys_to_virt_io(XSPI_REG_BASE_1, XSPI_REG_SIZE);
+	xspi_regs[0] = (vaddr_t)phys_to_virt_io(SPI_0_BASE, SPI_SIZE);
+#if defined(SPI_1_BASE)
+	xspi_regs[1] = (vaddr_t)phys_to_virt_io(SPI_1_BASE, SPI_SIZE);
 #endif
 
 	return TEE_SUCCESS;
