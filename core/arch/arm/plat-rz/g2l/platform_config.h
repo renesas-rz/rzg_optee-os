@@ -11,9 +11,15 @@
 /* Make stacks aligned to data cache line length */
 #define STACK_ALIGNMENT		64
 
-#define GICD_BASE			0x11900000U
+#define GIC_BASE			0x11900000U
+#define GIC_SIZE			CORE_MMU_PGDIR_SIZE
 
 #define CONSOLE_UART_BASE	0x1004B800U
+#define UART_BASE			ROUNDDOWN(CONSOLE_UART_BASE, SMALL_PAGE_SIZE)
+#define UART_SIZE			(SMALL_PAGE_SIZE << 1)
+
+#define SCE_BASE			0x11850000
+#define SCE_SIZE			0x00010000
 
 #define OTP_BASE			0x11860000U
 #define OTP_SIZE			0x00010000
@@ -27,9 +33,6 @@
 #define SPI_SIZE			0x00020000
 #define SPI_FLASH_BASE		0x20000000U
 #define SPI_FLASH_SIZE		0x10000000
-
-#define SCE_BASE			0x11850000
-#define SCE_SIZE			0x10000
 
 #if defined(PLATFORM_FLAVOR_g2l_dev13_1)
 /* DDR 512Mbyte x2 */
