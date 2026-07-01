@@ -44,8 +44,6 @@
 /* DDR 1Gbyte x2 */
 #define NSEC_DDR_0_BASE		0x47E00000U
 #define NSEC_DDR_0_SIZE		0x38200000
-#define NSEC_DDR_1_BASE		0xC0000000U
-#define NSEC_DDR_1_SIZE		0x40000000
 
 #else
 #error "Unknown platform flavor"
