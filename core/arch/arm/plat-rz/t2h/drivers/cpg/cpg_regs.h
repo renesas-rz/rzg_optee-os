@@ -6,10 +6,14 @@
 #ifndef __CPG_REGS_H__
 #define __CPG_REGS_H__
 
-#define CPG_CLKON_SPI				(0x0550)	/* Clock ON / OFF register SPI */
-#define CPG_CLKMON_SPI				(0x06D0)	/* Clock monitor register SPI */
-#define CPG_RST_SPI				(0x0850)	/* Reset ON / OFF register SPI */
-#define CPG_RSTMON_SPI				(0x09D0)	/* Reset monitor register SPI */
-#define CPG_BUS_MCPU1_MSTOP			(0x0B64)	/* MSTOP registerBUS_MCPU1 */
+#include <util.h>
 
-#endif	/* __CPG_REGS_H__ */
+#define CPG_MRCTLA_OFFSET           UL(0x0240)
+#define CPG_MRCTLA_XSPI0            BIT(4)
+#define CPG_MRCTLA_XSPI1            BIT(5)
+
+#define CPG_MSTPCRA_OFFSET          UL(0x0300)
+#define CPG_MSTPCRA_XSPI0           BIT(4)
+#define CPG_MSTPCRA_XSPI1           BIT(5)
+
+#endif /* __CPG_REGS_H__ */

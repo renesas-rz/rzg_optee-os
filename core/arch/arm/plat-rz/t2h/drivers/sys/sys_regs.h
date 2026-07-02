@@ -6,46 +6,32 @@
 #ifndef __SYS_REGS_H__
 #define __SYS_REGS_H__
 
-#include <rzt2h_config.h>				/* Get the System base address */
+#include <util.h>
 
-#define MRCTLA							(0x00000240)
-#define MSTPCRA							(0x00000300)
+#define SYS_PRCRN_OFFSET            UL(0x4200)
+#define SYS_PRCRS_OFFSET            UL(0x6000)
 
-#define MD_MON							(0x00004100)
-#define PRCRN							(0x00004200)
+#define SYS_PRCR_CGC                BIT(0)
+#define SYS_PRCR_PWR                BIT(1)
+#define SYS_PRCR_GPIO               BIT(2)
+#define SYS_PRCR_SYSCTRL            BIT(3)
 
-#define SSTPCR6							(0x00000208)
+#define SYS_PRCR_MASK               UL(SYS_PRCR_CGC | SYS_PRCR_PWR | SYS_PRCR_GPIO | SYS_PRCR_SYSCTRL)
+#define SYS_PRCR_KEY_CODE           UL(0xA500)
 
-#define PRCRS							(0x00006000)
+#define SYS_SSTPCR0_OFFSET          UL(0x1200)
+#define SYS_SSTPCR1_OFFSET          UL(0x1204)
+#define SYS_SSTPCR4_OFFSET          UL(0x0200)
+#define SYS_SSTPCR5_OFFSET          UL(0x0204)
+#define SYS_SSTPCR6_OFFSET          UL(0x0208)
+#define SYS_SSTPCR7_OFFSET          UL(0x020C)
 
-#define XSPI0CS0_END_ADD					(0x00013004)
-#define XSPI1CS1_END_ADD					(0x00013104)
+#define SYS_SSTPCR6_XSPI0_REQ       BIT(0)
+#define SYS_SSTPCR6_XSPI0_ACK       BIT(1)
+#define SYS_SSTPCR6_XSPI1_REQ       BIT(4)
+#define SYS_SSTPCR6_XSPI1_ACK       BIT(5)
 
-/* xSPI0 */
-#define MRCTLA_MRCTLA04						UL(4)
-/* xSPI1 */
-#define MRCTLA_MRCTLA05						UL(5)
+#define SYS_CS0ENDAD_XSPI0_OFFSET   UL(0x3004)
+#define SYS_CS0ENDAD_XSPI1_OFFSET   UL(0x3104)
 
-#define PRCRx_CLOCK_GEN						UL(1)
-#define PRCRx_LOW_POWER						UL(2)
-#define PRCRx_GPIO						UL(4)
-#define PRCRx_SYS_CTRL						UL(8)
-
-/* xSPI0 */
-#define MSTPCRA_MSTPCRA04					UL(4)
-#define MSTPCRA_MSTPCRA04_MSK				(0x00000001U << MSTPCRA_MSTPCRA04)
-/* xSPI1 */
-#define MSTPCRA_MSTPCRA05					UL(5)
-#define MSTPCRA_MSTPCRA05_MSK				(0x00000001U << MSTPCRA_MSTPCRA05)
-
-/* xSPI */
-#define SSTPCR6_XSPI0_REQ					UL(0)
-#define SSTPCR6_XSPI0_REQ_MSK				(0x00000001U << SSTPCR6_XSPI0_REQ)
-#define SSTPCR6_XSPI0_ACK					UL(1)
-#define SSTPCR6_XSPI0_ACK_MSK				(0x00000001U << SSTPCR6_XSPI0_ACK)
-#define SSTPCR6_XSPI1_REQ					UL(4)
-#define SSTPCR6_XSPI1_REQ_MSK				(0x00000001U << SSTPCR6_XSPI1_REQ)
-#define SSTPCR6_XSPI1_ACK					UL(5)
-#define SSTPCR6_XSPI1_ACK_MSK				(0x00000001U << SSTPCR6_XSPI1_ACK)
-
-#endif	/* __SYS_REGS_H__ */
+#endif /* __SYS_REGS_H__ */

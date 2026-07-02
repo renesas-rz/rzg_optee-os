@@ -6,24 +6,16 @@
 #ifndef __SYS_H__
 #define __SYS_H__
 
-#include <stdint.h>
-#include <types_ext.h>
+void sys_lock_cgc(void);
+void sys_unlock_cgc(void);
+void sys_lock_pwr(void);
+void sys_unlock_pwr(void);
+void sys_lock_sysctrl(void);
+void sys_unlock_sysctrl(void);
 
-enum boot_mode_t {
-	SYS_BOOT_MODE_XSPI0_x1,
-	SYS_BOOT_MODE_XSPI0_x8,
-	SYS_BOOT_MODE_XSPI1_x1,
-	SYS_BOOT_MODE_ESD,
-	SYS_BOOT_MODE_EMMC,
-	SYS_BOOT_MODE_MAX,
-};
+void sys_start_slave_xspi0(void);
+void sys_stop_slave_xspi0(void);
+void sys_start_slave_xspi1(void);
+void sys_stop_slave_xspi1(void);
 
-extern vaddr_t sys_base;
-extern vaddr_t sys_safety_base;
-
-void sys_base_unlock(uint32_t unlock_mask);
-void sys_base_lock(uint32_t lock_mask);
-void sys_safetybase_unlock(uint32_t unlock_mask);
-void sys_safetybase_lock(uint32_t lock_mask);
-
-#endif	/* __SYS_H__ */
+#endif /* __SYS_H__ */

@@ -3,75 +3,140 @@
  * Copyright (c) 2023-2025, Renesas Electronics Corporation
  */
 
+#include <stdint.h>
+#include <stddef.h>
+#include <assert.h>
+#include <initcall.h>
+#include <io.h>
+#include <mm/core_memprot.h>
 #include <sys.h>
 #include <sys_regs.h>
-#include <initcall.h>
-#include <mm/core_memprot.h>
-#include <io.h>
-#include <kernel/panic.h>
 #include <mbxsem.h>
+#include <platform_config.h>
 
-vaddr_t sys_base;
-vaddr_t sys_ns_base;
-vaddr_t sys_safety_base;
+static vaddr_t sys_base;
+static vaddr_t sys_base_safety;
 
-void sys_base_unlock(uint32_t unlock_mask)
+static void sys_prcr_lock(vaddr_t base, uint32_t offset, uint32_t mask)
 {
-	uint32_t prcrn;
+	uint32_t value;
 
-	/* Unlock PRCRN bit(s) in given mask */
-	prcrn = io_read32(sys_ns_base + PRCRN) & 0x0000000FU;
-	io_write32(sys_ns_base + PRCRN, (prcrn | 0x0000A500U | unlock_mask));
+	value = io_read32(base + offset) & SYS_PRCR_MASK;
+	value |= mask;
+	io_write32(base + offset, value | SYS_PRCR_KEY_CODE);
 }
 
-void sys_base_lock(uint32_t lock_mask)
+static void sys_prcr_unlock(vaddr_t base, uint32_t offset, uint32_t mask)
 {
-	uint32_t prcrn;
+	uint32_t value;
 
-	/* Lock PRCRN bit(s) in given mask */
-	prcrn = io_read32(sys_ns_base + PRCRN) & 0x0000000FU & (~lock_mask);
-	io_write32(sys_ns_base + PRCRN, (prcrn | 0x0000A500U));
+	value = io_read32(base + offset) & SYS_PRCR_MASK;
+	value &= ~mask;
+	io_write32(base + offset, value | SYS_PRCR_KEY_CODE);
 }
 
-void sys_safetybase_unlock(uint32_t unlock_mask)
+static void sys_start_slave(uint32_t offset, uint32_t req_mask, uint32_t ack_mask)
 {
-	uint32_t prcrs;
+	uint32_t value;
 
-	/* Unlock PRCRS bit(s) in given mask */
-	prcrs = io_read32(sys_safety_base + PRCRS) & 0x0000000FU;
-	io_write32(sys_safety_base + PRCRS, (prcrs  | 0x0000A500U | unlock_mask));
+	sys_unlock_sysctrl();
+
+	value = io_read32(sys_base_safety + offset);
+	value &= ~req_mask;
+	io_write32(sys_base_safety + offset, value);
+
+	sys_lock_sysctrl();
+
+	while (0U != (io_read32(sys_base_safety + offset) & ack_mask));
 }
 
-void sys_safetybase_lock(uint32_t lock_mask)
+static void sys_stop_slave(uint32_t offset, uint32_t req_mask, uint32_t ack_mask)
 {
-	uint32_t prcrs;
+	uint32_t value;
 
-	/* Lock PRCRS bit(s) in given mask */
-	prcrs = io_read32(sys_safety_base + PRCRS) & 0x0000000FU & (~lock_mask);
-	io_write32(sys_safety_base + PRCRS, (prcrs | 0x0000A500U));
+	sys_unlock_sysctrl();
+
+	value = io_read32(sys_base_safety + offset);
+	value |= req_mask;
+	io_write32(sys_base_safety + offset, value);
+
+	sys_lock_sysctrl();
+
+	while (0U == (io_read32(sys_base_safety + offset) & ack_mask));
 }
 
-void sys_set_end_address(void)
+void sys_lock_cgc(void)
 {
-	/* Hardware Semaphore lock */
-	mbxsem_wait_regprotect();
+	sys_prcr_lock(sys_base, SYS_PRCRN_OFFSET, SYS_PRCR_CGC);
+	sys_prcr_lock(sys_base_safety, SYS_PRCRS_OFFSET, SYS_PRCR_CGC);
+}
 
-	sys_base_unlock(PRCRx_SYS_CTRL);
-	io_write32(sys_base + XSPI0CS0_END_ADD, (0x47FFFFFFU));
-	io_write32(sys_base + XSPI1CS1_END_ADD, (0x57FFFFFFU));
-	sys_base_lock(PRCRx_SYS_CTRL);
+void sys_unlock_cgc(void)
+{
+	sys_prcr_unlock(sys_base, SYS_PRCRN_OFFSET, SYS_PRCR_CGC);
+	sys_prcr_unlock(sys_base_safety, SYS_PRCRS_OFFSET, SYS_PRCR_CGC);
+}
 
-	/* Hardware Semaphore unlock */
-	mbxsem_post_regprotect();
+void sys_lock_pwr(void)
+{
+	sys_prcr_lock(sys_base, SYS_PRCRN_OFFSET, SYS_PRCR_PWR);
+	sys_prcr_lock(sys_base_safety, SYS_PRCRS_OFFSET, SYS_PRCR_PWR);
+}
+
+void sys_unlock_pwr(void)
+{
+	sys_prcr_unlock(sys_base, SYS_PRCRN_OFFSET, SYS_PRCR_PWR);
+	sys_prcr_unlock(sys_base_safety, SYS_PRCRS_OFFSET, SYS_PRCR_PWR);
+}
+
+void sys_lock_sysctrl(void)
+{
+	sys_prcr_lock(sys_base, SYS_PRCRN_OFFSET, SYS_PRCR_SYSCTRL);
+	sys_prcr_lock(sys_base_safety, SYS_PRCRS_OFFSET, SYS_PRCR_SYSCTRL);
+}
+
+void sys_unlock_sysctrl(void)
+{
+	sys_prcr_unlock(sys_base, SYS_PRCRN_OFFSET, SYS_PRCR_SYSCTRL);
+	sys_prcr_unlock(sys_base_safety, SYS_PRCRS_OFFSET, SYS_PRCR_SYSCTRL);
+}
+
+void sys_start_slave_xspi0(void)
+{
+	sys_start_slave(SYS_SSTPCR6_OFFSET, SYS_SSTPCR6_XSPI0_REQ, SYS_SSTPCR6_XSPI0_ACK);
+}
+
+void sys_stop_slave_xspi0(void)
+{
+	sys_stop_slave(SYS_SSTPCR6_OFFSET, SYS_SSTPCR6_XSPI0_REQ, SYS_SSTPCR6_XSPI0_ACK);
+}
+
+void sys_start_slave_xspi1(void)
+{
+	sys_start_slave(SYS_SSTPCR6_OFFSET, SYS_SSTPCR6_XSPI1_REQ, SYS_SSTPCR6_XSPI1_ACK);
+}
+
+void sys_stop_slave_xspi1(void)
+{
+	sys_stop_slave(SYS_SSTPCR6_OFFSET, SYS_SSTPCR6_XSPI1_REQ, SYS_SSTPCR6_XSPI1_ACK);
 }
 
 static TEE_Result sys_init(void)
 {
-	sys_base = (vaddr_t)phys_to_virt_io(SYS_BASE, SYS_SIZE);
-	sys_ns_base = (vaddr_t)phys_to_virt_io(SYS_NS_BASE, SYS_NS_SIZE);
-	sys_safety_base = (vaddr_t)phys_to_virt_io(SYS_SAFETY_BASE, SYS_SAFETY_SIZE);
+	sys_base = (vaddr_t)phys_to_virt_io(SYS_NS_BASE, SYS_NS_SIZE);
+	sys_base_safety = (vaddr_t)phys_to_virt_io(SYS_SAFETY_BASE, SYS_SAFETY_SIZE);
+	assert(sys_base && sys_base_safety);
 
-	sys_set_end_address();
+	mbxsem_wait_regprotect();
+
+	sys_unlock_sysctrl();
+
+	io_write32(sys_base + SYS_CS0ENDAD_XSPI0_OFFSET, 0x47FFFFFFU);
+	io_write32(sys_base + SYS_CS0ENDAD_XSPI1_OFFSET, 0x57FFFFFFU);
+
+	sys_lock_sysctrl();
+
+	mbxsem_post_regprotect();
 
 	return TEE_SUCCESS;
 }
