@@ -4,4 +4,6 @@ global-incdirs-$(CFG_RZ_TSIP) += include/sce
 
 subdirs-$(CFG_RZ_RSIP) += rsip
 subdirs-$(CFG_RZ_TSIP) += sce
-srcs-y += pta_flash.c
+
+CFG_RZ_FLASH ?= y
+srcs-$(CFG_RZ_FLASH) += pta_flash.c
