@@ -23,6 +23,8 @@
 
 #define OTP_BASE			0x810C0000U
 #define OTP_SIZE			0x00004000
+#define CHIPID_ADDR			0x00E5U
+#define CHIPID_SIZE			8
 
 #define SPI_0_BASE			0x801C0000U
 #define SPI_1_BASE			0x801C1000U
@@ -58,9 +60,5 @@
 
 #define TEE_SHMEM_START		(TZDRAM_BASE + TZDRAM_SIZE)
 #define TEE_SHMEM_SIZE		0x00100000
-
-/* OTP mapping */
-#define OTP_UNIQUE_ID_ADDR		U(0x00E5)
-#define OTP_UNIQUE_ID_SIZE		(8)
 
 #endif /* PLATFORM_CONFIG_H */

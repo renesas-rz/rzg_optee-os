@@ -1,48 +1,34 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /*
- * Copyright (c) 2024, Renesas Electronics Corporation
+ * Copyright (c) 2025-2026, Renesas Electronics Corporation
  */
 
-#include <trace.h>
-#include <kernel/tee_common_otp.h>
-#include <tee/tee_cryp_pbkdf2.h>
-
-#include "platform_config.h"
+#include <stdint.h>
+#include <assert.h>
+#include <string_ext.h>
+#include <tee_api_types.h>
 #include <otp_drv.h>
+#include <platform_config.h>
 
-#define REGISTER_SIZE	(sizeof(uint32_t))
-
-static void read_chipid(uint8_t *chipid)
+TEE_Result huk_read_root_material(uint8_t *buf, size_t *len)
 {
-	uint32_t i;
-	uint32_t read_data;
-	uint32_t read_num = OTP_UNIQUE_ID_SIZE / REGISTER_SIZE;
-	uint8_t password[OTP_UNIQUE_ID_SIZE] = {0};
+	size_t read_len;
+	uint32_t chipid[CHIPID_SIZE / sizeof(uint32_t)];
 
-	r_otp_read(OTP_UNIQUE_ID_ADDR, (uint32_t *)&password[0], read_num);
+	assert(buf && len);
 
-	for (i = 0U; i < read_num; i++) {
-		(void)memcpy(&read_data, &password[i * REGISTER_SIZE], REGISTER_SIZE);
-		read_data = TEE_U32_TO_BIG_ENDIAN(read_data);
-		(void)memcpy(&chipid[i * REGISTER_SIZE], &read_data, REGISTER_SIZE);
-	}
-}
+	read_len = MIN(*len, sizeof(chipid));
 
-static TEE_Result huk_kdf(uint8_t *huk, size_t huk_length)
-{
-	uint8_t password[OTP_UNIQUE_ID_SIZE] = {0};
+	memset(buf, 0, *len);
 
-	uint8_t salt[] = {0x76, 0x6A, 0xEF, 0x5C, 0x39, 0xEF, 0x6C, 0x26, 0x41, 0x6C, 0x46, 0x68, 0x05, 0x43, 0x06, 0xC0};
+	if (!r_otp_read(CHIPID_ADDR, chipid, ARRAY_SIZE(chipid)))
+		return TEE_ERROR_GENERIC;
 
-	uint32_t iteration_count = 1000;
+	memcpy(buf, chipid, read_len);
 
-	read_chipid(password);
+	memzero_explicit(chipid, sizeof(chipid));
 
-	return tee_cryp_pbkdf2(TEE_ALG_HMAC_SHA256, password, sizeof(password), salt, sizeof(salt), iteration_count,
-				huk, huk_length);
-}
+	*len = read_len;
 
-TEE_Result tee_otp_get_hw_unique_key(struct tee_hw_unique_key *hwkey)
-{
-	return huk_kdf(hwkey->data, sizeof(hwkey->data));
+	return TEE_SUCCESS;
 }
