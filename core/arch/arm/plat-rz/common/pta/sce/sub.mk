@@ -1,5 +1,3 @@
-global-incdirs-y += include
-
 srcs-$(CFG_RZ_TSIP) += \
 					pta_sce.c \
 					pta_sce_ecc.c \

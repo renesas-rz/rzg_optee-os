@@ -1,6 +1,5 @@
-srcs-$(CFG_RZ_HUK) += huk.c
-srcs-$(CFG_RZ_TSIP) += hw_rng_tsip.c
-srcs-$(CFG_RZ_RSIP) += hw_rng_rsip.c
+global-incdirs-y += include include/drivers
+global-incdirs-$(CFG_RZ_TSIP) += include/drivers/sce
+global-incdirs-$(CFG_RZ_RSIP) += include/drivers/rsip
 
-subdirs-y += drivers
-subdirs-y += pta
+subdirs-y += crypto flash drivers pta
