@@ -12,8 +12,8 @@
 
 register_phys_mem(MEM_AREA_IO_SEC, SCE_BASE, SCE_SIZE);
 register_phys_mem(MEM_AREA_IO_SEC, OTP_BASE, OTP_SIZE);
-register_phys_mem(MEM_AREA_IO_NSEC, SYS_BASE, (SYS_SIZE << 1));
-register_phys_mem(MEM_AREA_IO_NSEC, (SYS_BASE + 0x01000000U), (SYS_SIZE << 1));
+register_phys_mem(MEM_AREA_IO_NSEC, PERI_BASE, PERI_SIZE);
+register_phys_mem(MEM_AREA_IO_NSEC, PERI_BASE_SAFETY, PERI_SIZE_SAFETY);
 register_phys_mem(MEM_AREA_IO_NSEC, SPI_0_BASE, SPI_SIZE);
 register_phys_mem(MEM_AREA_IO_NSEC, SPI_1_BASE, SPI_SIZE);
 register_phys_mem(MEM_AREA_IO_NSEC, UART_BASE, UART_SIZE);

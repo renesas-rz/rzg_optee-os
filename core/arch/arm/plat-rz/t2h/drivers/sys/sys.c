@@ -123,8 +123,8 @@ void sys_stop_slave_xspi1(void)
 
 static TEE_Result sys_init(void)
 {
-	sys_base = (vaddr_t)phys_to_virt_io(SYS_NS_BASE, SYS_NS_SIZE);
-	sys_base_safety = (vaddr_t)phys_to_virt_io(SYS_SAFETY_BASE, SYS_SAFETY_SIZE);
+	sys_base = (vaddr_t)phys_to_virt_io(SYS_BASE, SYS_SIZE);
+	sys_base_safety = (vaddr_t)phys_to_virt_io(SYS_BASE_SAFETY, SYS_SIZE_SAFETY);
 	assert(sys_base && sys_base_safety);
 
 	mbxsem_wait_regprotect();
