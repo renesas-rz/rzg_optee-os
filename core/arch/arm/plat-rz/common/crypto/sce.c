@@ -9,14 +9,36 @@
 #include <io.h>
 #include <mm/core_memprot.h>
 #include <kernel/panic.h>
-
+#include <rng_support.h>
 #include <r_sce.h>
-#include "platform_config.h"
+#include <platform_config.h>
 
 static sce_cfg_t sce_cfg;
 static sce_instance_ctrl_t sce_instance_ctrl;
 
-static TEE_Result SCE_Init(void)
+TEE_Result hw_get_random_bytes(void *buf, size_t len)
+{
+	TEE_Result ret = TEE_ERROR_GENERIC;
+
+	size_t i = 0;
+	uint32_t rand[4];
+	const size_t rand_size = sizeof(rand);
+
+	for (i = 0; i < len; i += rand_size) {
+		fsp_err_t err = g_sce_protected_on_sce.randomNumberGenerate(rand);
+		if (err != FSP_SUCCESS)
+			return TEE_ERROR_BUSY;
+
+		memcpy((uint8_t *)buf + i, rand, MIN(rand_size, len - i));
+	}
+
+	if (i >= len)
+		ret = TEE_SUCCESS;
+
+	return ret;
+}
+
+static TEE_Result sce_init(void)
 {
 	fsp_err_t err;
 
@@ -44,4 +66,4 @@ static TEE_Result SCE_Init(void)
 	return TEE_SUCCESS;
 }
 
-service_init(SCE_Init);
+service_init(sce_init);

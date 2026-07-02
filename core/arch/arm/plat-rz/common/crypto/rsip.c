@@ -9,16 +9,40 @@
 #include <io.h>
 #include <mm/core_memprot.h>
 #include <kernel/panic.h>
-
+#include <rng_support.h>
 #include <r_rsip.h>
 #include <r_rsip_addr.h>
+#include <platform_config.h>
 
 rsip_cfg_t rsip_cfg;
 rsip_instance_ctrl_t rsip_instance_ctrl;
 
 volatile uint32_t *gp_sce;
 
-static TEE_Result RSIP_Init(void)
+TEE_Result hw_get_random_bytes(void *buf, size_t len)
+{
+	TEE_Result ret = TEE_ERROR_GENERIC;
+
+	size_t i = 0;
+	uint32_t rand[4];
+	const size_t rand_size = sizeof(rand);
+
+	for (i = 0; i < len; i += rand_size) {
+		fsp_err_t err = R_RSIP_RandomNumberGenerate(
+						&rsip_instance_ctrl, (uint8_t *const)rand);
+		if (err != FSP_SUCCESS)
+			return TEE_ERROR_BUSY;
+
+		memcpy((uint8_t *)buf + i, rand, MIN(rand_size, len - i));
+	}
+
+	if (i >= len)
+		ret = TEE_SUCCESS;
+
+	return ret;
+}
+
+static TEE_Result rsip_init(void)
 {
 	fsp_err_t err;
 
@@ -33,4 +57,4 @@ static TEE_Result RSIP_Init(void)
 	return TEE_SUCCESS;
 }
 
-service_init(RSIP_Init);
+service_init(rsip_init);
