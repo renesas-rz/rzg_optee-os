@@ -12,7 +12,7 @@
 #include <cpg.h>
 #include <sys.h>
 #include <xspi.h>
-#include <mbxsem.h>
+#include <hwsem.h>
 #include <cpg_regs.h>
 #include <platform_config.h>
 
@@ -153,22 +153,22 @@ static void cpg_module_stop_xspi1(void)
 
 void cpg_xspi_start(void)
 {
-	mbxsem_wait_regprotect();
+	sem_regprotect_lock();
 
 	cpg_module_start_xspi0();
 	cpg_module_start_xspi1();
 
-	mbxsem_post_regprotect();
+	sem_regprotect_unlock();
 }
 
 void cpg_xspi_stop(void)
 {
-	mbxsem_wait_regprotect();
+	sem_regprotect_lock();
 
 	cpg_module_stop_xspi0();
 	cpg_module_stop_xspi1();
 
-	mbxsem_post_regprotect();
+	sem_regprotect_unlock();
 }
 
 static TEE_Result cpg_init(void)

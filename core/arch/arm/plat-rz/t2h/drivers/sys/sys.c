@@ -11,7 +11,7 @@
 #include <mm/core_memprot.h>
 #include <sys.h>
 #include <sys_regs.h>
-#include <mbxsem.h>
+#include <hwsem.h>
 #include <platform_config.h>
 
 static vaddr_t sys_base;
@@ -127,7 +127,7 @@ static TEE_Result sys_init(void)
 	sys_base_safety = (vaddr_t)phys_to_virt_io(SYS_BASE_SAFETY, SYS_SIZE_SAFETY);
 	assert(sys_base && sys_base_safety);
 
-	mbxsem_wait_regprotect();
+	sem_regprotect_lock();
 
 	sys_unlock_sysctrl();
 
@@ -136,7 +136,7 @@ static TEE_Result sys_init(void)
 
 	sys_lock_sysctrl();
 
-	mbxsem_post_regprotect();
+	sem_regprotect_unlock();
 
 	return TEE_SUCCESS;
 }
