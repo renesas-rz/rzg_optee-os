@@ -1,140 +1,191 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /*
- * Copyright (c) 2023-2025, Renesas Electronics Corporation
+ * Copyright (c) 2023-2026, Renesas Electronics Corporation
  */
 
 #include <stdint.h>
-#include <io.h>
 #include <initcall.h>
+#include <io.h>
 #include <kernel/panic.h>
 #include <mm/core_memprot.h>
 #include <util.h>
 #include <xspi_regs.h>
+#include <xspi_reg_values.h>
 #include <xspi.h>
 
-#define XSPI_BMCFG_SET_VALUE		(0x00010001UL)
-#define XSPI_CMCFG0CS0_SET_VALUE	(0x00000008UL)
-#define XSPI_CMCFG1CS0_SET_VALUE	(0x00000300UL)
-#define XSPI_CMCFG2CS0_SET_VALUE	(0x00000200UL)
-#define XSPI_LIOCFGCS0_SET_VALUE	(0x00070000UL)
-#define XSPI_BMCTL0_SET_VALUE		(0x00000003UL)
-#define XSPI_CDTBUF0_SET_VALUE		(0x00000000UL)
-#define XSPI_INTC_SET_VALUE		(0x00000001UL)
+#define RDID		     (0)
+#define RSTEN		     (1)
+#define RESET		     (2)
+#define WTEN		     (3)
+#define ERASE		     (4)
+#define RDSTA		     (5)
+#define WRITE		     (6)
 
-#define XSPI_IN				(0u)
-#define XSPI_OUT			(1u)
+#define IN_DIR		     (0u)
+#define OUT_DIR		     (1u)
 
-#define RDID				(0)
-#define RSTEN				(1)
-#define RESET				(2)
-#define WTEN				(3)
-#define ERASE				(4)
-#define RDSTA				(5)
-#define WRITE				(6)
+#define DEVID_ID_MASK	     (0x00FFFFFFu)
+#define DEVICE_ID_BAD	     (0u)
+#define DEVICE_ID_ERROR	     (0x00FFFFFFu)
 
-#define DEVID_ID_MASK			(0x00FFFFFFu)
-#define DEVICE_ID_BAD			(0u)
-#define DEVICE_ID_ERROR			(0x00FFFFFFu)
+#define XSPI_COMMAND_TIMEOUT (100000u)
 
-#define XSPI_COMMAND_TIMEOUT		(100000u)
+struct xspi_dev {
+	paddr_t phys; /* Physical register base */
+	vaddr_t virt; /* Mapped virtual register base */
+	size_t	size; /* Register region size */
+};
 
-#if defined(SPI_BASE)
-#define SPI_0_BASE			(SPI_BASE)
-#endif
-
-vaddr_t xspi_base;
-
-struct st_xspi_cmd_t {
+struct xspi_cmd {
 	uint16_t instruction;
-	uint8_t	 direction : 3;		/* Direction */
-	uint8_t	 latency   : 5;		/* Latency (cycle) */
-	uint8_t	 data_size : 4;		/* Data size (byte) */
-	uint8_t	 addr_size : 4;		/* Address size (byte) */
-	uint8_t	 inst_size : 4;		/* Instruction size (byte) */
+	uint8_t	 direction : 3; /* Transfer direction */
+	uint8_t	 latency : 5; /* Dummy/latency cycles */
+	uint8_t	 data_size : 4; /* Data length in bytes */
+	uint8_t	 addr_size : 4; /* Address length in bytes */
+	uint8_t	 cmd_size : 4; /* Instruction length in bytes */
 };
 
-struct st_xspi_cmd_info_t {
-	uint8_t	 cmd_idx;
-	uint32_t addr;
-	uint32_t data;
+struct xspi_cmd_info {
+	uint8_t	 cmd_id; /* Command table index */
+	uint32_t addr; /* Target address */
+	uint32_t data; /* Write data */
 };
 
-static const struct st_xspi_cmd_t cmds[] = {
-/* {instruction,   direction,	latency,	data_size,	addr_size,	cmd_size}*/
-	{0x9F00u,		XSPI_IN,	0u,			3u,			0u,			1u},	/* RDID */
-	{0x6600u,		XSPI_OUT,	0u,			0u,			0u,			1u},	/* RSTEN */
-	{0x9900u,		XSPI_OUT,	0u,			0u,			0u,			1u},	/* RESET */
-	{0x0600u,		XSPI_OUT,	0u,			0u,			0u,			1u},	/* WTEN */
-	{0x2000u,		XSPI_OUT,	0u,			0u,			3u,			1u},	/* ERASE */
-	{0x0500u,		XSPI_IN,	0u,			1u,			0u,			1u},	/* RDSTA */
-	{0x0200u,		XSPI_OUT,	0u,			4u,			3u,			1u},	/* WRITE */
+/* Flash command definitions */
+static const struct xspi_cmd cmds[] = {
+	/* instruction, direction, latency, data_size, addr_size, cmd_size */
+	{ 0x9F00u, IN_DIR,  0u, 3u, 0u, 1u }, /* RDID */
+	{ 0x6600u, OUT_DIR, 0u, 0u, 0u, 1u }, /* RSTEN */
+	{ 0x9900u, OUT_DIR, 0u, 0u, 0u, 1u }, /* RESET */
+	{ 0x0600u, OUT_DIR, 0u, 0u, 0u, 1u }, /* WTEN */
+	{ 0x2000u, OUT_DIR, 0u, 0u, 3u, 1u }, /* ERASE */
+	{ 0x0500u, IN_DIR,  0u, 1u, 0u, 1u }, /* RDSTA */
+	{ 0x0200u, OUT_DIR, 0u, 4u, 3u, 1u }, /* WRITE */
 };
 
-static vaddr_t xspi_regs[2];
+/* Available XSPI controllers */
+static struct xspi_dev xspi_devices[] = {
+#ifdef SPI_BASE
+	{ .phys = SPI_BASE, .size = SPI_SIZE },
+#else
+#ifdef SPI_0_BASE
+	{ .phys = SPI_0_BASE, .size = SPI_SIZE },
+#endif
+#ifdef SPI_1_BASE
+	{ .phys = SPI_1_BASE, .size = SPI_SIZE },
+#endif
+#endif
+};
 
-static int xspi_single_command(const struct st_xspi_cmd_info_t * const p_cmd_info)
+static inline void xspi_io_write(const struct xspi_dev *dev, uint32_t reg,
+				 uint32_t value)
 {
-	uint32_t timeout;
+	io_write32(dev->virt + reg, value);
+}
 
-	xspi_io_write(XSPI_CDCTL0, xspi_io_read(XSPI_CDCTL0) & (~XSPI_CDCTL0_TRREQ_MSK));
+static inline uint32_t xspi_io_read(const struct xspi_dev *dev, uint32_t reg)
+{
+	return io_read32(dev->virt + reg);
+}
 
-	xspi_io_write(XSPI_CDTBUF0,	  (((uint32_t)cmds[p_cmd_info->cmd_idx].instruction) << XSPI_CDTBUF_CMD_OFFSET)
-								| (((uint32_t)cmds[p_cmd_info->cmd_idx].direction)   << XSPI_CDTBUF_TRTYPE_OFFSET)
-								| (((uint32_t)cmds[p_cmd_info->cmd_idx].latency)	 << XSPI_CDTBUF_LATE_OFFSET)
-								| (((uint32_t)cmds[p_cmd_info->cmd_idx].data_size)   << XSPI_CDTBUF_DATASIZE_OFFSET)
-								| (((uint32_t)cmds[p_cmd_info->cmd_idx].addr_size)   << XSPI_CDTBUF_ADDSIZE_OFFSET)
-								| (((uint32_t)cmds[p_cmd_info->cmd_idx].inst_size)   << XSPI_CDTBUF_CMDSIZE_OFFSET));
+/* Get XSPI controller from channel number */
+static struct xspi_dev *get_xspi_device(uint8_t ch)
+{
+	if (ch < ARRAY_SIZE(xspi_devices))
+		return &xspi_devices[ch];
 
-	xspi_io_write(XSPI_CDABUF0, p_cmd_info->addr);
+	return NULL;
+}
 
-	if (cmds[p_cmd_info->cmd_idx].direction == XSPI_OUT)
-		xspi_io_write(XSPI_CDD0BUF0, p_cmd_info->data);
+/* Execute a single manual command transaction */
+static int32_t xspi_single_command(const struct xspi_dev	    *dev,
+				   const struct xspi_cmd_info *const cmd_info)
+{
+	uint32_t timeout = XSPI_COMMAND_TIMEOUT;
 
-	xspi_io_write(XSPI_CDCTL0, xspi_io_read(XSPI_CDCTL0) | XSPI_CDCTL0_TRREQ_MSK);
+	const struct xspi_cmd *cmd = &cmds[cmd_info->cmd_id];
 
-	timeout = XSPI_COMMAND_TIMEOUT;
+	xspi_io_write(dev, XSPI_CDCTL0,
+		      xspi_io_read(dev, XSPI_CDCTL0) &
+			      (~XSPI_CDCTL0_TRREQ_MSK));
+
+	/* Configure command format */
+	xspi_io_write(
+		dev, XSPI_CDTBUF0,
+		(((uint32_t)cmd->instruction << XSPI_CDTBUF_CMD_OFFSET) |
+		 ((uint32_t)cmd->direction << XSPI_CDTBUF_TRTYPE_OFFSET) |
+		 ((uint32_t)cmd->latency << XSPI_CDTBUF_LATE_OFFSET) |
+		 ((uint32_t)cmd->data_size << XSPI_CDTBUF_DATASIZE_OFFSET) |
+		 ((uint32_t)cmd->addr_size << XSPI_CDTBUF_ADDSIZE_OFFSET) |
+		 ((uint32_t)cmd->cmd_size << XSPI_CDTBUF_CMDSIZE_OFFSET)));
+
+	/* Set command address */
+	xspi_io_write(dev, XSPI_CDABUF0, cmd_info->addr);
+
+	/* Set write data if required */
+	if (cmd->direction == OUT_DIR)
+		xspi_io_write(dev, XSPI_CDD0BUF0, cmd_info->data);
+
+	/* Start command transaction */
+	xspi_io_write(dev, XSPI_CDCTL0,
+		      xspi_io_read(dev, XSPI_CDCTL0) | XSPI_CDCTL0_TRREQ_MSK);
+
 	/* Wait for command to complete */
-	while ((0u == (xspi_io_read(XSPI_INTS) & XSPI_INTS_CMDCMP_MSK)) && (timeout > 0u)) {
+	while ((0u == (xspi_io_read(dev, XSPI_INTS) & XSPI_INTS_CMDCMP_MSK)) &&
+	       (timeout > 0u)) {
 		timeout--;
-		__asm__ ("nop");
+		__asm__("nop");
 		dsb();
 	}
 
-	xspi_io_write(XSPI_INTC, xspi_io_read(XSPI_INTC) | XSPI_INTC_CMDCMPC_MSK);
+	/* Clear completion status */
+	xspi_io_write(dev, XSPI_INTC,
+		      xspi_io_read(dev, XSPI_INTC) | XSPI_INTC_CMDCMPC_MSK);
 
-	return (timeout == 0u) ? XSPI_ERROR : XSPI_SUCCESS;
+	return (timeout == 0u) ? XSPI_ERR : XSPI_OK;
 }
 
-static int xspi_reset(void)
+/* Reset flash device */
+static int32_t xspi_reset(const struct xspi_dev *dev)
 {
-	int ret;
+	int32_t ret = XSPI_ERR;
 
 	/* Issue the reset command */
-	struct st_xspi_cmd_info_t cmd_rsten = {RSTEN, 0, 0};
-	struct st_xspi_cmd_info_t cmd_reset = {RESET, 0, 0};
+	struct xspi_cmd_info cmd_rsten = { RSTEN, 0, 0 };
+	struct xspi_cmd_info cmd_reset = { RESET, 0, 0 };
 
-	ret = xspi_single_command(&cmd_rsten);
-	if (ret == XSPI_SUCCESS)
-		ret = xspi_single_command(&cmd_reset);
+	ret = xspi_single_command(dev, &cmd_rsten);
+	if (ret == XSPI_OK)
+		ret = xspi_single_command(dev, &cmd_reset);
 
 	return ret;
 }
 
-static int xspi_read_identification(void)
+/*
+ * Wait until the flash device becomes operational.
+ * A valid device ID must be returned twice consecutively.
+ */
+static int32_t xspi_wait_flash_ready(const struct xspi_dev *dev)
 {
-	uint32_t id = DEVICE_ID_BAD;
-	uint32_t prev_id = DEVICE_ID_BAD;
-	int32_t count = 1000;
+	int32_t ret = XSPI_ERR;
 
-	struct st_xspi_cmd_info_t cmd_rdid = {RDID, 0, 0};
+	int32_t	 count	 = 1000;
+	uint32_t id	 = DEVICE_ID_BAD;
+	uint32_t prev_id = DEVICE_ID_BAD;
+
+	struct xspi_cmd_info cmd_rdid = { RDID, 0, 0 };
 
 	while (count > 0) {
-		if (xspi_single_command(&cmd_rdid) == XSPI_SUCCESS) {
+		if (xspi_single_command(dev, &cmd_rdid) == XSPI_OK) {
 			/* Command success */
-			id = xspi_io_read(XSPI_CDD0BUF0) & DEVID_ID_MASK;
-			if ((id != DEVICE_ID_BAD) && (id != DEVICE_ID_ERROR) && (prev_id == id))
-				/* Hardware ID is valid and has been repeated on two consecutive reads so exit the while loop and then function */
+			id = xspi_io_read(dev, XSPI_CDD0BUF0) & DEVID_ID_MASK;
+
+			/* Hardware ID is valid and has been repeated on two consecutive reads so exit the while loop and then function */
+			if ((id != DEVICE_ID_BAD) && (id != DEVICE_ID_ERROR) &&
+			    (prev_id == id)) {
+				ret = XSPI_OK;
 				break;
+			}
 
 			prev_id = id;
 		}
@@ -142,98 +193,110 @@ static int xspi_read_identification(void)
 		count--;
 	}
 
-	return id;
+	return ret;
 }
 
-static int xspi_read_status(void)
+/* Read flash status register */
+static int32_t xspi_read_status(const struct xspi_dev *dev)
 {
 	volatile uint32_t status = 0xFFFFFFFF;
 
-	struct st_xspi_cmd_info_t cmd_rdsta = {RDSTA, 0, 0};
+	struct xspi_cmd_info cmd_rdsta = { RDSTA, 0, 0 };
 
-	if (xspi_single_command(&cmd_rdsta) == XSPI_SUCCESS)
+	if (xspi_single_command(dev, &cmd_rdsta) == XSPI_OK)
 		/* Command success */
-		status = xspi_io_read(XSPI_CDD0BUF0);
+		status = xspi_io_read(dev, XSPI_CDD0BUF0);
 
 	return status;
 }
 
-int xspi_erase(uint8_t ch, const uintptr_t addr, uint32_t byte_count)
+/* Erase flash sectors */
+int32_t xspi_erase(uint8_t ch, const uintptr_t addr, uint32_t byte_count)
 {
-	int ret = XSPI_SUCCESS;
-	uint32_t i;
+	int32_t ret = XSPI_ERR;
 
+	uint32_t i;
 	uint32_t count = DIV_ROUND_UP(byte_count, XSPI_WRITE_PROG_SIZE);
 
-	struct st_xspi_cmd_info_t cmd_wten = {WTEN, 0, 0};
-	struct st_xspi_cmd_info_t cmd_erase = {ERASE, addr, 0};
+	struct xspi_cmd_info cmd_wten  = { WTEN, 0, 0 };
+	struct xspi_cmd_info cmd_erase = { ERASE, addr, 0 };
 
 	volatile uint32_t status = 0xFFFFFFFF;
 
-	assert((ARRAY_SIZE(xspi_regs) > ch) && (0 != xspi_regs[ch]));
-
-	xspi_base = xspi_regs[ch];
+	struct xspi_dev *dev = get_xspi_device(ch);
+	assert(dev);
 
 	for (i = 0; i < count; i++) {
-		ret = xspi_single_command(&cmd_wten);
-		if (ret != XSPI_SUCCESS)
+		/* Enable write operation */
+		ret = xspi_single_command(dev, &cmd_wten);
+		if (ret != XSPI_OK)
 			return ret;
 
+		/* Wait for WEL bit */
 		do {
-			status = xspi_read_status();
+			status = xspi_read_status(dev);
 		} while (0 == (status & 0x02));
 
-		ret = xspi_single_command(&cmd_erase);
-		if (ret != XSPI_SUCCESS)
+		/* Erase one erase unit */
+		ret = xspi_single_command(dev, &cmd_erase);
+		if (ret != XSPI_OK)
 			return ret;
 
+		/* Wait until erase completes */
 		do {
-			status = xspi_read_status();
+			status = xspi_read_status(dev);
 		} while (0 != (status & 0x01));
 
-		cmd_erase.addr = cmd_erase.addr + 0x1000;
+		/* Advance to next erase unit */
+		cmd_erase.addr = cmd_erase.addr + XSPI_WRITE_PROG_SIZE;
 	}
 
 	return ret;
 }
 
-int xspi_write(uint8_t ch, const uintptr_t addr, uintptr_t data, uint32_t byte_count)
+/* Program flash data */
+int32_t xspi_write(uint8_t ch, const uintptr_t addr, uintptr_t data,
+		   uint32_t byte_count)
 {
-	int ret = XSPI_SUCCESS;
-	uint32_t i;
+	int32_t ret = XSPI_ERR;
 
-	uint32_t *src = (uint32_t *)data;
-	uint32_t count = byte_count / sizeof(uint32_t);
+	uint32_t  i;
+	uint32_t *src	= (uint32_t *)data;
+	uint32_t  count = byte_count / sizeof(uint32_t);
 
-	struct st_xspi_cmd_info_t cmd_wten = {WTEN, 0, 0};
-	struct st_xspi_cmd_info_t cmd_write = {WRITE, addr, 0};
+	struct xspi_cmd_info cmd_wten  = { WTEN, 0, 0 };
+	struct xspi_cmd_info cmd_write = { WRITE, addr, 0 };
 
 	volatile uint32_t status = 0xFFFFFFFF;
 
-	assert((ARRAY_SIZE(xspi_regs) > ch) && (0 != xspi_regs[ch]));
+	struct xspi_dev *dev = get_xspi_device(ch);
+	assert(dev);
 
-	xspi_base = xspi_regs[ch];
-
+	/* Erase target region before programming */
 	ret = xspi_erase(ch, addr, byte_count);
-	if (ret != XSPI_SUCCESS)
+	if (ret != XSPI_OK)
 		return ret;
 
 	for (i = 0; i < count; i++) {
-		ret = xspi_single_command(&cmd_wten);
-		if (ret != XSPI_SUCCESS)
+		/* Enable write operation */
+		ret = xspi_single_command(dev, &cmd_wten);
+		if (ret != XSPI_OK)
 			return ret;
 
+		/* Wait for WEL bit */
 		do {
-			status = xspi_read_status();
+			status = xspi_read_status(dev);
 		} while (0 == (status & 0x02));
 
 		cmd_write.data = src[i];
-		ret = xspi_single_command(&cmd_write);
-		if (ret != XSPI_SUCCESS)
+		/* Program one word */
+		ret = xspi_single_command(dev, &cmd_write);
+		if (ret != XSPI_OK)
 			return ret;
 
+		/* Wait until programming completes */
 		do {
-			status = xspi_read_status();
+			status = xspi_read_status(dev);
 		} while (0 != (status & 0x01));
 
 		cmd_write.addr += sizeof(uint32_t);
@@ -242,47 +305,53 @@ int xspi_write(uint8_t ch, const uintptr_t addr, uintptr_t data, uint32_t byte_c
 	return ret;
 }
 
-int xspi_dummy_read(uint8_t ch)
+/* Dummy read to ensure pending access completion */
+int32_t xspi_dummy_read(uint8_t ch)
 {
-	assert((ARRAY_SIZE(xspi_regs) > ch) && (0 != xspi_regs[ch]));
+	struct xspi_dev *dev = get_xspi_device(ch);
+	assert(dev);
 
-	xspi_base = xspi_regs[ch];
+	(void)xspi_io_read(dev, XSPI_WRAPCFG);
 
-	xspi_io_read(XSPI_WRAPCFG);
-
-	return 0;
+	return XSPI_OK;
 }
 
-int xspi_setup(uint8_t ch)
+/* Initialize controller and flash device */
+int32_t xspi_setup(uint8_t ch)
 {
-	int ret;
+	int32_t ret = XSPI_ERR;
 
-	assert((ARRAY_SIZE(xspi_regs) > ch) && (0 != xspi_regs[ch]));
+	struct xspi_dev *dev = get_xspi_device(ch);
+	assert(dev);
 
-	xspi_base = xspi_regs[ch];
+	/* Configure controller registers */
+	xspi_io_write(dev, XSPI_BMCFG, XSPI_BMCFG_SET_VALUE);
+	xspi_io_write(dev, XSPI_CMCFG0CS0, XSPI_CMCFG0CS0_SET_VALUE);
+	xspi_io_write(dev, XSPI_CMCFG1CS0, XSPI_CMCFG1CS0_SET_VALUE);
+	xspi_io_write(dev, XSPI_CMCFG2CS0, XSPI_CMCFG2CS0_SET_VALUE);
+	xspi_io_write(dev, XSPI_LIOCFGCS0, XSPI_LIOCFGCS0_SET_VALUE);
+	xspi_io_write(dev, XSPI_BMCTL0, XSPI_BMCTL0_SET_VALUE);
+	xspi_io_write(dev, XSPI_INTC, XSPI_INTC_SET_VALUE);
 
-	xspi_io_write(XSPI_BMCFG,		XSPI_BMCFG_SET_VALUE);
-	xspi_io_write(XSPI_CMCFG0CS0,	XSPI_CMCFG0CS0_SET_VALUE);
-	xspi_io_write(XSPI_CMCFG1CS0,	XSPI_CMCFG1CS0_SET_VALUE);
-	xspi_io_write(XSPI_CMCFG2CS0,	XSPI_CMCFG2CS0_SET_VALUE);
-	xspi_io_write(XSPI_LIOCFGCS0,	XSPI_LIOCFGCS0_SET_VALUE);
-	xspi_io_write(XSPI_BMCTL0,		XSPI_BMCTL0_SET_VALUE);
-	xspi_io_write(XSPI_INTC,		XSPI_INTC_SET_VALUE);
+	/* Reset flash device */
+	ret = xspi_reset(dev);
 
-	ret = xspi_reset();
-
-	if (ret == XSPI_SUCCESS)
-		ret = xspi_read_identification();
+	/* Wait until flash is ready */
+	if (ret == XSPI_OK)
+		ret = xspi_wait_flash_ready(dev);
 
 	return ret;
 }
 
 static TEE_Result xspi_init(void)
 {
-	xspi_regs[0] = (vaddr_t)phys_to_virt_io(SPI_0_BASE, SPI_SIZE);
-#if defined(SPI_1_BASE)
-	xspi_regs[1] = (vaddr_t)phys_to_virt_io(SPI_1_BASE, SPI_SIZE);
-#endif
+	for (size_t i = 0; i < ARRAY_SIZE(xspi_devices); i++) {
+		struct xspi_dev *dev = &xspi_devices[i];
+
+		dev->virt = (vaddr_t)phys_to_virt_io(dev->phys, dev->size);
+		if (!dev->virt)
+			return TEE_ERROR_GENERIC;
+	}
 
 	return TEE_SUCCESS;
 }

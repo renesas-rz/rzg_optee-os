@@ -20,10 +20,8 @@ register_phys_mem(MEM_AREA_IO_NSEC, UART_BASE, UART_SIZE);
 register_phys_mem(MEM_AREA_IO_NSEC, MBXSEM_BASE, MBXSEM_SIZE);
 
 register_phys_mem_pgdir(MEM_AREA_IO_NSEC, GIC_BASE, GIC_SIZE);
-register_phys_mem_pgdir(MEM_AREA_IO_SEC, SPI_FLASH_BASE_0, SPI_FLASH_SIZE);
-#if defined(SPI_FLASH_BASE_1)
-register_phys_mem_pgdir(MEM_AREA_IO_NSEC, SPI_FLASH_BASE_1, SPI_FLASH_SIZE);
-#endif
+register_phys_mem_pgdir(MEM_AREA_IO_SEC, SFLASH_0_BASE, SFLASH_0_SIZE);
+register_phys_mem_pgdir(MEM_AREA_IO_SEC, SFLASH_1_BASE, SFLASH_1_SIZE);
 
 register_dynamic_shm(NSEC_DDR_0_BASE, NSEC_DDR_0_SIZE);
 

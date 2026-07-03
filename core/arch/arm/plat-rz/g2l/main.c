@@ -17,7 +17,7 @@ register_phys_mem(MEM_AREA_IO_NSEC, SPI_BASE, SPI_SIZE);
 register_phys_mem(MEM_AREA_IO_NSEC, UART_BASE, UART_SIZE);
 
 register_phys_mem_pgdir(MEM_AREA_IO_NSEC, GIC_BASE, GIC_SIZE);
-register_phys_mem_pgdir(MEM_AREA_IO_NSEC, SPI_FLASH_BASE, SPI_FLASH_SIZE);
+register_phys_mem_pgdir(MEM_AREA_IO_NSEC, SFLASH_BASE, SFLASH_SIZE);
 
 register_dynamic_shm(NSEC_DDR_0_BASE, NSEC_DDR_0_SIZE);
 #ifdef NSEC_DDR_1_BASE
