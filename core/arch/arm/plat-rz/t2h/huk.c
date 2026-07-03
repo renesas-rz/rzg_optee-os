@@ -8,11 +8,12 @@
 #include <string_ext.h>
 #include <tee_api_types.h>
 #include <otp_drv.h>
+#include <huk.h>
 #include <platform_config.h>
 
 TEE_Result huk_read_root_material(uint8_t *buf, size_t *len)
 {
-	size_t read_len;
+	size_t	 read_len;
 	uint32_t chipid[CHIPID_SIZE / sizeof(uint32_t)];
 
 	assert(buf && len);
