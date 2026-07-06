@@ -10,7 +10,7 @@
 #include <mm/core_memprot.h>
 #include <tee_api_types.h>
 #include <tee/tee_cryp_pbkdf2.h>
-#include <huk.h>
+#include <otp_service.h>
 #include <platform_config.h>
 
 /*
@@ -19,29 +19,9 @@
  * Platforms may override this function to obtain root material
  * from OTP, Secure IP, or other device-specific sources.
  */
-__weak TEE_Result huk_read_root_material(uint8_t *buf, size_t *len)
+static TEE_Result huk_read_root_material(uint8_t *buf, size_t *len)
 {
-	size_t i;
-	size_t read_len;
-	vaddr_t addr;
-
-	assert(buf && len);
-	read_len = MIN(*len, (size_t)CHIPID_SIZE);
-
-	addr = (vaddr_t)phys_to_virt_io(CHIPID_BASE, CHIPID_SIZE);
-	assert(addr);
-
-	memset(buf, 0, *len);
-
-	for (i = 0; i < read_len; i += sizeof(uint32_t)) {
-		uint32_t value = TEE_U32_TO_BIG_ENDIAN(io_read32(addr + i));
-
-		memcpy(buf + i, &value, MIN(read_len - i, sizeof(value)));
-	}
-
-	*len = read_len;
-
-	return TEE_SUCCESS;
+	return otp_read_cpid(buf, len);
 }
 
 /*

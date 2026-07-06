@@ -8,13 +8,13 @@
 #include <string_ext.h>
 #include <tee_api_types.h>
 #include <otp_drv.h>
-#include <huk.h>
+#include <otp_service.h>
 #include <platform_config.h>
 
-TEE_Result huk_read_root_material(uint8_t *buf, size_t *len)
+TEE_Result otp_read_cpid(void *buf, size_t *len)
 {
 	size_t read_len;
-	uint32_t chipid[CHIPID_SIZE / sizeof(uint32_t)];
+	uint32_t chipid[OTPM_CPID_WORDS];
 
 	assert(buf && len);
 
@@ -22,7 +22,7 @@ TEE_Result huk_read_root_material(uint8_t *buf, size_t *len)
 
 	memset(buf, 0, *len);
 
-	if (!r_otp_read(CHIPID_ADDR, chipid, ARRAY_SIZE(chipid)))
+	if (!r_otp_read(OTPM_CPID_ADDR, chipid, ARRAY_SIZE(chipid)))
 		return TEE_ERROR_GENERIC;
 
 	memcpy(buf, chipid, read_len);

@@ -11,13 +11,32 @@
 #include "otp_regs.h"
 #include <trace.h>
 
-vaddr_t otp_base;
+#define OTP_MAP_MIN (OTPM_BASE)
+#define OTP_MAP_MAX ((OTPM_BASE + OTPM_WORDS) - 1)
 
-static bool r_otp_open(void);
-static void r_otp_close(void);
-static void r_otp_dummy_read(void);
+static vaddr_t otp_base;
 
-static bool r_otp_open(void)
+static inline void otp_io_write(uint32_t reg, uint32_t data)
+{
+	io_write32(otp_base + reg, data);
+}
+
+static inline uint32_t otp_io_read(uint32_t reg)
+{
+	return io_read32(otp_base + reg);
+}
+
+static void otp_dummy_read(void)
+{
+	while (1 != (otp_io_read(OTP_OTPSTR) & (1U << OTP_OTPSTR_CMD_RDY)))
+		; /* Polling */
+
+	otp_io_write(OTP_OTPADRRD, OTPM_DUMMY);
+
+	(void)otp_io_read(OTP_OTPDATARD);
+}
+
+static bool otp_open(void)
 {
 	bool ready = false;
 	bool ret = false;
@@ -51,10 +70,10 @@ static bool r_otp_open(void)
 	return ret;
 }
 
-static void r_otp_close(void)
+static void otp_close(void)
 {
 	/* Dummy read */
-	r_otp_dummy_read();
+	otp_dummy_read();
 
 	/* Switch off OTP PWR and ACCL bits */
 	otp_io_write(OTP_OTPPWR, 0U);
@@ -64,23 +83,13 @@ static void r_otp_close(void)
 		isb(); /* Not sure if this is necessary */
 }
 
-static void r_otp_dummy_read(void)
-{
-	while (1 != (otp_io_read(OTP_OTPSTR) & (1U << OTP_OTPSTR_CMD_RDY)))
-		; /* Polling */
-
-	otp_io_write(OTP_OTPADRRD, OTP_IP_DUMMY_READ_ADDR);
-
-	(void)otp_io_read(OTP_OTPDATARD);
-}
-
 bool r_otp_read(uint32_t addr, uint32_t *p_value, uint32_t count)
 {
 	bool ret = false;
 
-	if (true == r_otp_open()) {
-		if ((addr >= OTP_IP_ADDR_MIN) && (addr <= OTP_IP_ADDR_MAX) &&
-		    ((addr + count - 1U) <= OTP_IP_ADDR_MAX)) {
+	if (otp_open()) {
+		if ((addr >= OTP_MAP_MIN) && (addr <= OTP_MAP_MAX) &&
+		    ((addr + count - 1U) <= OTP_MAP_MAX)) {
 			/* Wait for OTP access enable */
 			while (1U != (otp_io_read(OTP_OTPSTR) &
 				      (1U << OTP_OTPSTR_CMD_RDY)))
@@ -103,7 +112,7 @@ bool r_otp_read(uint32_t addr, uint32_t *p_value, uint32_t count)
 				ret = true;
 		}
 
-		r_otp_close();
+		otp_close();
 	}
 
 	return ret;

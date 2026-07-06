@@ -1,3 +1,1 @@
-subdirs-y += sys
-subdirs-y += cpg
-subdirs-y += sem
+subdirs-y += sys cpg sem otp
