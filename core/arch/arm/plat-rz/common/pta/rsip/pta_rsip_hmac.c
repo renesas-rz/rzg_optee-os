@@ -12,7 +12,8 @@
 
 extern rsip_instance_ctrl_t rsip_instance_ctrl;
 
-static TEE_Result hmac_generateinit(uint32_t types, TEE_Param params[TEE_NUM_PARAMS],
+static TEE_Result hmac_generateinit(uint32_t types,
+				    TEE_Param params[TEE_NUM_PARAMS],
 				    rsip_byte_size_wrapped_key_t key_size)
 {
 	fsp_err_t err;
@@ -22,23 +23,25 @@ static TEE_Result hmac_generateinit(uint32_t types, TEE_Param params[TEE_NUM_PAR
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
 				     TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE))
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (rsip_hmac_handle_t *)params[0].memref.buffer;
-	if (!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, rsip_hmac_handle_t)) {
+	if (!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer,
+				  rsip_hmac_handle_t)) {
 		EMSG("handle err");
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
 
 	wrapped_key = (rsip_wrapped_key_t *)params[1].memref.buffer;
-	if (!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t) || (key_size > params[1].memref.size)) {
+	if (!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t) ||
+	    (key_size > params[1].memref.size)) {
 		EMSG("key err");
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
 
-	err = R_RSIP_HMAC_GenerateInit(&rsip_instance_ctrl, handle, wrapped_key);
+	err = R_RSIP_HMAC_GenerateInit(&rsip_instance_ctrl, handle,
+				       wrapped_key);
 	switch ((uint32_t)err) {
 	case FSP_SUCCESS:
 		break;
@@ -61,7 +64,8 @@ static TEE_Result hmac_generateinit(uint32_t types, TEE_Param params[TEE_NUM_PAR
 	return TEE_SUCCESS;
 }
 
-static TEE_Result hmac_generateupdate(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result hmac_generateupdate(uint32_t types,
+				      TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -71,12 +75,12 @@ static TEE_Result hmac_generateupdate(uint32_t types, TEE_Param params[TEE_NUM_P
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
 				     TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE))
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (rsip_hmac_handle_t *)params[0].memref.buffer;
-	if (!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, rsip_hmac_handle_t)) {
+	if (!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer,
+				  rsip_hmac_handle_t)) {
 		EMSG("handle err");
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
@@ -88,7 +92,8 @@ static TEE_Result hmac_generateupdate(uint32_t types, TEE_Param params[TEE_NUM_P
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
 
-	err = R_RSIP_HMAC_GenerateUpdate(&rsip_instance_ctrl, handle, message, message_length);
+	err = R_RSIP_HMAC_GenerateUpdate(&rsip_instance_ctrl, handle, message,
+					 message_length);
 	switch ((uint32_t)err) {
 	case FSP_SUCCESS:
 		break;
@@ -111,7 +116,9 @@ static TEE_Result hmac_generateupdate(uint32_t types, TEE_Param params[TEE_NUM_P
 	return TEE_SUCCESS;
 }
 
-static TEE_Result hmac_generatefinal(uint32_t types, TEE_Param params[TEE_NUM_PARAMS], uint32_t mac_size)
+static TEE_Result hmac_generatefinal(uint32_t types,
+				     TEE_Param params[TEE_NUM_PARAMS],
+				     uint32_t mac_size)
 {
 	fsp_err_t err;
 
@@ -120,18 +127,19 @@ static TEE_Result hmac_generatefinal(uint32_t types, TEE_Param params[TEE_NUM_PA
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
 				     TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE))
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (rsip_hmac_handle_t *)params[0].memref.buffer;
-	if (!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, rsip_hmac_handle_t)) {
+	if (!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer,
+				  rsip_hmac_handle_t)) {
 		EMSG("handle err");
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
 
 	mac = (uint8_t *)params[1].memref.buffer;
-	if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) || (mac_size > params[1].memref.size)) {
+	if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) ||
+	    (mac_size > params[1].memref.size)) {
 		EMSG("mac err");
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
@@ -161,7 +169,8 @@ static TEE_Result hmac_generatefinal(uint32_t types, TEE_Param params[TEE_NUM_PA
 	return TEE_SUCCESS;
 }
 
-static TEE_Result hmac_verifyinit(uint32_t types, TEE_Param params[TEE_NUM_PARAMS],
+static TEE_Result hmac_verifyinit(uint32_t types,
+				  TEE_Param params[TEE_NUM_PARAMS],
 				  rsip_byte_size_wrapped_key_t key_size)
 {
 	fsp_err_t err;
@@ -171,8 +180,7 @@ static TEE_Result hmac_verifyinit(uint32_t types, TEE_Param params[TEE_NUM_PARAM
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
 				     TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE))
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (rsip_hmac_handle_t *)params[0].memref.buffer;
@@ -182,7 +190,8 @@ static TEE_Result hmac_verifyinit(uint32_t types, TEE_Param params[TEE_NUM_PARAM
 	}
 
 	wrapped_key = (rsip_wrapped_key_t *)params[1].memref.buffer;
-	if (!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t) || (key_size > params[1].memref.size)) {
+	if (!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t) ||
+	    (key_size > params[1].memref.size)) {
 		EMSG("key err");
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
@@ -210,7 +219,8 @@ static TEE_Result hmac_verifyinit(uint32_t types, TEE_Param params[TEE_NUM_PARAM
 	return TEE_SUCCESS;
 }
 
-static TEE_Result hmac_verifyupdate(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result hmac_verifyupdate(uint32_t types,
+				    TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -220,8 +230,7 @@ static TEE_Result hmac_verifyupdate(uint32_t types, TEE_Param params[TEE_NUM_PAR
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
 				     TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE))
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (rsip_hmac_handle_t *)params[0].memref.buffer;
@@ -237,7 +246,8 @@ static TEE_Result hmac_verifyupdate(uint32_t types, TEE_Param params[TEE_NUM_PAR
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
 
-	err = R_RSIP_HMAC_VerifyUpdate(&rsip_instance_ctrl, handle, message, message_length);
+	err = R_RSIP_HMAC_VerifyUpdate(&rsip_instance_ctrl, handle, message,
+				       message_length);
 	switch ((uint32_t)err) {
 	case FSP_SUCCESS:
 		break;
@@ -260,7 +270,8 @@ static TEE_Result hmac_verifyupdate(uint32_t types, TEE_Param params[TEE_NUM_PAR
 	return TEE_SUCCESS;
 }
 
-static TEE_Result hmac_verifyfinal(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result hmac_verifyfinal(uint32_t types,
+				   TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -270,8 +281,7 @@ static TEE_Result hmac_verifyfinal(uint32_t types, TEE_Param params[TEE_NUM_PARA
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
 				     TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE))
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (rsip_hmac_handle_t *)params[0].memref.buffer;
@@ -287,7 +297,8 @@ static TEE_Result hmac_verifyfinal(uint32_t types, TEE_Param params[TEE_NUM_PARA
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
 
-	err = R_RSIP_HMAC_VerifyFinal(&rsip_instance_ctrl, handle, mac, mac_length);
+	err = R_RSIP_HMAC_VerifyFinal(&rsip_instance_ctrl, handle, mac,
+				      mac_length);
 	switch ((uint32_t)err) {
 	case FSP_SUCCESS:
 		break;
@@ -316,17 +327,20 @@ static TEE_Result hmac_verifyfinal(uint32_t types, TEE_Param params[TEE_NUM_PARA
 
 static TEE_Result invoke_command(void *session __unused, uint32_t cmd,
 				 uint32_t ptypes,
-		    TEE_Param params[TEE_NUM_PARAMS])
+				 TEE_Param params[TEE_NUM_PARAMS])
 {
-	EMSG(PTA_NAME" command %#"PRIx32" ptypes %#"PRIx32, cmd, ptypes);
+	EMSG(PTA_NAME " command %#" PRIx32 " ptypes %#" PRIx32, cmd, ptypes);
 
 	switch (cmd) {
 	case PTA_CMD_HMAC_SHA1_GenerateInit:
-		return hmac_generateinit(ptypes, params, RSIP_BYTE_SIZE_WRAPPED_KEY_HMAC_SHA1);
+		return hmac_generateinit(ptypes, params,
+					 RSIP_BYTE_SIZE_WRAPPED_KEY_HMAC_SHA1);
 	case PTA_CMD_HMAC_SHA224_GenerateInit:
-		return hmac_generateinit(ptypes, params, RSIP_BYTE_SIZE_WRAPPED_KEY_HMAC_SHA224);
+		return hmac_generateinit(
+			ptypes, params, RSIP_BYTE_SIZE_WRAPPED_KEY_HMAC_SHA224);
 	case PTA_CMD_HMAC_SHA256_GenerateInit:
-		return hmac_generateinit(ptypes, params, RSIP_BYTE_SIZE_WRAPPED_KEY_HMAC_SHA256);
+		return hmac_generateinit(
+			ptypes, params, RSIP_BYTE_SIZE_WRAPPED_KEY_HMAC_SHA256);
 
 	case PTA_CMD_HMAC_SHA1_GenerateUpdate:
 	case PTA_CMD_HMAC_SHA224_GenerateUpdate:
@@ -341,11 +355,14 @@ static TEE_Result invoke_command(void *session __unused, uint32_t cmd,
 		return hmac_generatefinal(ptypes, params, SHA256_MAC_SIZE);
 
 	case PTA_CMD_HMAC_SHA1_VerifyInit:
-		return hmac_verifyinit(ptypes, params, RSIP_BYTE_SIZE_WRAPPED_KEY_HMAC_SHA1);
+		return hmac_verifyinit(ptypes, params,
+				       RSIP_BYTE_SIZE_WRAPPED_KEY_HMAC_SHA1);
 	case PTA_CMD_HMAC_SHA224_VerifyInit:
-		return hmac_verifyinit(ptypes, params, RSIP_BYTE_SIZE_WRAPPED_KEY_HMAC_SHA224);
+		return hmac_verifyinit(ptypes, params,
+				       RSIP_BYTE_SIZE_WRAPPED_KEY_HMAC_SHA224);
 	case PTA_CMD_HMAC_SHA256_VerifyInit:
-		return hmac_verifyinit(ptypes, params, RSIP_BYTE_SIZE_WRAPPED_KEY_HMAC_SHA256);
+		return hmac_verifyinit(ptypes, params,
+				       RSIP_BYTE_SIZE_WRAPPED_KEY_HMAC_SHA256);
 
 	case PTA_CMD_HMAC_SHA1_VerifyUpdate:
 	case PTA_CMD_HMAC_SHA224_VerifyUpdate:

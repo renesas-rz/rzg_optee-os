@@ -17,13 +17,13 @@ static TEE_Result sha224_init(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
 	sce_sha_md5_handle_t *handle;
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE,
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE,
 				     TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (sce_sha_md5_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_sha_md5_handle_t) > params[0].memref.size))
+	if ((NULL == handle) ||
+	    (sizeof(sce_sha_md5_handle_t) > params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	err = g_sce_protected_on_sce.SHA224_Init(handle);
@@ -39,7 +39,8 @@ static TEE_Result sha224_init(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
 	return TEE_SUCCESS;
 }
 
-static TEE_Result sha224_update(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result sha224_update(uint32_t types,
+				TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -49,18 +50,19 @@ static TEE_Result sha224_update(uint32_t types, TEE_Param params[TEE_NUM_PARAMS]
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
 				     TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE))
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (sce_sha_md5_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_sha_md5_handle_t) != params[0].memref.size))
+	if ((NULL == handle) ||
+	    (sizeof(sce_sha_md5_handle_t) != params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	message = (uint8_t *)params[1].memref.buffer;
 	message_length = (uint32_t)params[1].memref.size;
 
-	err = g_sce_protected_on_sce.SHA224_Update(handle, message, message_length);
+	err = g_sce_protected_on_sce.SHA224_Update(handle, message,
+						   message_length);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -85,20 +87,22 @@ static TEE_Result sha224_final(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
 				     TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE))
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (sce_sha_md5_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_sha_md5_handle_t) != params[0].memref.size))
+	if ((NULL == handle) ||
+	    (sizeof(sce_sha_md5_handle_t) != params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	digest = (uint8_t *)params[1].memref.buffer;
 	digest_length = (uint32_t)params[1].memref.size;
-	if ((NULL == digest) || (HW_SCE_SHA224_HASH_LENGTH_BYTE_SIZE > digest_length))
+	if ((NULL == digest) ||
+	    (HW_SCE_SHA224_HASH_LENGTH_BYTE_SIZE > digest_length))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.SHA224_Final(handle, digest, &digest_length);
+	err = g_sce_protected_on_sce.SHA224_Final(handle, digest,
+						  &digest_length);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -122,13 +126,13 @@ static TEE_Result sha256_init(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
 	sce_sha_md5_handle_t *handle;
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE,
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE,
 				     TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (sce_sha_md5_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_sha_md5_handle_t) > params[0].memref.size))
+	if ((NULL == handle) ||
+	    (sizeof(sce_sha_md5_handle_t) > params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	err = g_sce_protected_on_sce.SHA256_Init(handle);
@@ -144,13 +148,14 @@ static TEE_Result sha256_init(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
 	return TEE_SUCCESS;
 }
 
-static TEE_Result sha256_update(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result sha256_update(uint32_t types,
+				TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
 	sce_sha_md5_handle_t *handle;
-	uint8_t              *message;
-	uint32_t               message_length;
+	uint8_t *message;
+	uint32_t message_length;
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
 				     TEE_PARAM_TYPE_MEMREF_INPUT,
@@ -160,13 +165,15 @@ static TEE_Result sha256_update(uint32_t types, TEE_Param params[TEE_NUM_PARAMS]
 	}
 
 	handle = (sce_sha_md5_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_sha_md5_handle_t) != params[0].memref.size))
+	if ((NULL == handle) ||
+	    (sizeof(sce_sha_md5_handle_t) != params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	message = (uint8_t *)params[1].memref.buffer;
 	message_length = (uint32_t)params[1].memref.size;
 
-	err = g_sce_protected_on_sce.SHA256_Update(handle, message, message_length);
+	err = g_sce_protected_on_sce.SHA256_Update(handle, message,
+						   message_length);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -186,8 +193,8 @@ static TEE_Result sha256_final(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
 	fsp_err_t err;
 
 	sce_sha_md5_handle_t *handle;
-	uint8_t              *digest;
-	uint32_t               digest_length;
+	uint8_t *digest;
+	uint32_t digest_length;
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
 				     TEE_PARAM_TYPE_MEMREF_INOUT,
@@ -197,15 +204,18 @@ static TEE_Result sha256_final(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
 	}
 
 	handle = (sce_sha_md5_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_sha_md5_handle_t) != params[0].memref.size))
+	if ((NULL == handle) ||
+	    (sizeof(sce_sha_md5_handle_t) != params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	digest = (uint8_t *)params[1].memref.buffer;
 	digest_length = (uint32_t)params[1].memref.size;
-	if ((NULL == digest) || (HW_SCE_SHA256_HASH_LENGTH_BYTE_SIZE > digest_length))
+	if ((NULL == digest) ||
+	    (HW_SCE_SHA256_HASH_LENGTH_BYTE_SIZE > digest_length))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.SHA256_Final(handle, digest, &digest_length);
+	err = g_sce_protected_on_sce.SHA256_Final(handle, digest,
+						  &digest_length);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -226,7 +236,7 @@ static TEE_Result invoke_command(void *session __unused, uint32_t cmd,
 				 uint32_t ptypes,
 				 TEE_Param params[TEE_NUM_PARAMS])
 {
-	DMSG(PTA_NAME" command %#"PRIx32" ptypes %#"PRIx32, cmd, ptypes);
+	DMSG(PTA_NAME " command %#" PRIx32 " ptypes %#" PRIx32, cmd, ptypes);
 
 	switch (cmd) {
 	case PTA_CMD_SHA224_Init:

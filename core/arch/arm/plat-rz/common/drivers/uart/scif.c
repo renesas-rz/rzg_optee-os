@@ -32,19 +32,19 @@
 #include <keep.h>
 #include <util.h>
 
-#define SCIF_SCSCR		(0x04)
-#define SCIF_SCFSR		(0x08)
-#define SCIF_SCFTDR		(0x06)
-#define SCIF_SCFCR		(0x0C)
-#define SCIF_SCFDR		(0x0E)
+#define SCIF_SCSCR (0x04)
+#define SCIF_SCFSR (0x08)
+#define SCIF_SCFTDR (0x06)
+#define SCIF_SCFCR (0x0C)
+#define SCIF_SCFDR (0x0E)
 
-#define SCSCR_TE		BIT(5)
-#define SCFSR_TDFE		BIT(5)
-#define SCFSR_TEND		BIT(6)
+#define SCSCR_TE BIT(5)
+#define SCFSR_TDFE BIT(5)
+#define SCFSR_TEND BIT(6)
 
-#define SCFDR_T_SHIFT		8
+#define SCFDR_T_SHIFT 8
 
-#define SCIF_TX_FIFO_SIZE	16
+#define SCIF_TX_FIFO_SIZE 16
 
 static vaddr_t chip_to_base(struct serial_chip *chip)
 {
@@ -68,7 +68,7 @@ static void scif_uart_putc(struct serial_chip *chip, int ch)
 
 	/* Wait until there is space in the FIFO */
 	while ((io_read16(base + SCIF_SCFDR) >> SCFDR_T_SHIFT) >=
-		SCIF_TX_FIFO_SIZE)
+	       SCIF_TX_FIFO_SIZE)
 		;
 	io_write8(base + SCIF_SCFTDR, ch);
 	io_clrbits16(base + SCIF_SCFSR, SCFSR_TEND | SCFSR_TDFE);

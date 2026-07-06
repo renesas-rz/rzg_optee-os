@@ -35,7 +35,8 @@ static void sys_prcr_unlock(vaddr_t base, uint32_t offset, uint32_t mask)
 	io_write32(base + offset, value | SYS_PRCR_KEY_CODE);
 }
 
-static void sys_start_slave(uint32_t offset, uint32_t req_mask, uint32_t ack_mask)
+static void sys_start_slave(uint32_t offset, uint32_t req_mask,
+			    uint32_t ack_mask)
 {
 	uint32_t value;
 
@@ -47,10 +48,12 @@ static void sys_start_slave(uint32_t offset, uint32_t req_mask, uint32_t ack_mas
 
 	sys_lock_sysctrl();
 
-	while (0U != (io_read32(sys_base_safety + offset) & ack_mask));
+	while (0U != (io_read32(sys_base_safety + offset) & ack_mask))
+		;
 }
 
-static void sys_stop_slave(uint32_t offset, uint32_t req_mask, uint32_t ack_mask)
+static void sys_stop_slave(uint32_t offset, uint32_t req_mask,
+			   uint32_t ack_mask)
 {
 	uint32_t value;
 
@@ -62,7 +65,8 @@ static void sys_stop_slave(uint32_t offset, uint32_t req_mask, uint32_t ack_mask
 
 	sys_lock_sysctrl();
 
-	while (0U == (io_read32(sys_base_safety + offset) & ack_mask));
+	while (0U == (io_read32(sys_base_safety + offset) & ack_mask))
+		;
 }
 
 void sys_lock_cgc(void)
@@ -103,28 +107,33 @@ void sys_unlock_sysctrl(void)
 
 void sys_start_slave_xspi0(void)
 {
-	sys_start_slave(SYS_SSTPCR6_OFFSET, SYS_SSTPCR6_XSPI0_REQ, SYS_SSTPCR6_XSPI0_ACK);
+	sys_start_slave(SYS_SSTPCR6_OFFSET, SYS_SSTPCR6_XSPI0_REQ,
+			SYS_SSTPCR6_XSPI0_ACK);
 }
 
 void sys_stop_slave_xspi0(void)
 {
-	sys_stop_slave(SYS_SSTPCR6_OFFSET, SYS_SSTPCR6_XSPI0_REQ, SYS_SSTPCR6_XSPI0_ACK);
+	sys_stop_slave(SYS_SSTPCR6_OFFSET, SYS_SSTPCR6_XSPI0_REQ,
+		       SYS_SSTPCR6_XSPI0_ACK);
 }
 
 void sys_start_slave_xspi1(void)
 {
-	sys_start_slave(SYS_SSTPCR6_OFFSET, SYS_SSTPCR6_XSPI1_REQ, SYS_SSTPCR6_XSPI1_ACK);
+	sys_start_slave(SYS_SSTPCR6_OFFSET, SYS_SSTPCR6_XSPI1_REQ,
+			SYS_SSTPCR6_XSPI1_ACK);
 }
 
 void sys_stop_slave_xspi1(void)
 {
-	sys_stop_slave(SYS_SSTPCR6_OFFSET, SYS_SSTPCR6_XSPI1_REQ, SYS_SSTPCR6_XSPI1_ACK);
+	sys_stop_slave(SYS_SSTPCR6_OFFSET, SYS_SSTPCR6_XSPI1_REQ,
+		       SYS_SSTPCR6_XSPI1_ACK);
 }
 
 static TEE_Result sys_init(void)
 {
 	sys_base = (vaddr_t)phys_to_virt_io(SYS_BASE, SYS_SIZE);
-	sys_base_safety = (vaddr_t)phys_to_virt_io(SYS_BASE_SAFETY, SYS_SIZE_SAFETY);
+	sys_base_safety =
+		(vaddr_t)phys_to_virt_io(SYS_BASE_SAFETY, SYS_SIZE_SAFETY);
 	assert(sys_base && sys_base_safety);
 
 	sem_regprotect_lock();

@@ -21,8 +21,8 @@
  */
 __weak TEE_Result huk_read_root_material(uint8_t *buf, size_t *len)
 {
-	size_t	i;
-	size_t	read_len;
+	size_t i;
+	size_t read_len;
 	vaddr_t addr;
 
 	assert(buf && len);
@@ -61,14 +61,14 @@ __weak TEE_Result huk_read_root_material(uint8_t *buf, size_t *len)
 static TEE_Result huk_kdf(uint8_t *huk, size_t huk_length)
 {
 	uint8_t password[HW_UNIQUE_KEY_LENGTH];
-	size_t	password_len = sizeof(password);
+	size_t password_len = sizeof(password);
 
 	static const uint32_t huk_pbkdf2_iteration_count = 1000U;
 
-	static const uint8_t huk_pbkdf2_salt[] = { 0x76, 0x6A, 0xEF, 0x5C,
-						   0x39, 0xEF, 0x6C, 0x26,
-						   0x41, 0x6C, 0x46, 0x68,
-						   0x05, 0x43, 0x06, 0xC0 };
+	static const uint8_t huk_pbkdf2_salt[] = {
+		0x76, 0x6A, 0xEF, 0x5C, 0x39, 0xEF, 0x6C, 0x26,
+		0x41, 0x6C, 0x46, 0x68, 0x05, 0x43, 0x06, 0xC0,
+	};
 
 	TEE_Result res = huk_read_root_material(password, &password_len);
 	if (res != TEE_SUCCESS)

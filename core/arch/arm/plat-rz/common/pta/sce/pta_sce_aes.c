@@ -10,7 +10,8 @@
 
 #define PTA_NAME "sce_aes.pta"
 
-static TEE_Result aes128ecb_encryptinit(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result aes128ecb_encryptinit(uint32_t types,
+					TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -19,16 +20,17 @@ static TEE_Result aes128ecb_encryptinit(uint32_t types, TEE_Param params[TEE_NUM
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
 				     TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE))
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (sce_aes_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_aes_handle_t) > params[0].memref.size))
+	if ((NULL == handle) ||
+	    (sizeof(sce_aes_handle_t) > params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	wrapped_key = (sce_aes_wrapped_key_t *)params[1].memref.buffer;
-	if ((NULL == wrapped_key) || (sizeof(sce_aes_wrapped_key_t) != params[1].memref.size))
+	if ((NULL == wrapped_key) ||
+	    (sizeof(sce_aes_wrapped_key_t) != params[1].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	err = g_sce_protected_on_sce.AES128ECB_EncryptInit(handle, wrapped_key);
@@ -48,7 +50,8 @@ static TEE_Result aes128ecb_encryptinit(uint32_t types, TEE_Param params[TEE_NUM
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes128ecb_encryptupdate(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result aes128ecb_encryptupdate(uint32_t types,
+					  TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -65,12 +68,14 @@ static TEE_Result aes128ecb_encryptupdate(uint32_t types, TEE_Param params[TEE_N
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (sce_aes_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_aes_handle_t) != params[0].memref.size))
+	if ((NULL == handle) ||
+	    (sizeof(sce_aes_handle_t) != params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	plain = (uint8_t *)params[1].memref.buffer;
 	plain_length = (uint32_t)params[1].memref.size;
-	if ((NULL == plain) || (0 != (plain_length % HW_SCE_AES_BLOCK_BYTE_SIZE)))
+	if ((NULL == plain) ||
+	    (0 != (plain_length % HW_SCE_AES_BLOCK_BYTE_SIZE)))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	cipher = (uint8_t *)params[2].memref.buffer;
@@ -78,7 +83,8 @@ static TEE_Result aes128ecb_encryptupdate(uint32_t types, TEE_Param params[TEE_N
 	if ((NULL == cipher) || (cipher_length < plain_length))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.AES128ECB_EncryptUpdate(handle, plain, cipher, plain_length);
+	err = g_sce_protected_on_sce.AES128ECB_EncryptUpdate(
+		handle, plain, cipher, plain_length);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -93,7 +99,8 @@ static TEE_Result aes128ecb_encryptupdate(uint32_t types, TEE_Param params[TEE_N
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes128ecb_encryptfinal(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result aes128ecb_encryptfinal(uint32_t types,
+					 TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -102,19 +109,20 @@ static TEE_Result aes128ecb_encryptfinal(uint32_t types, TEE_Param params[TEE_NU
 	uint32_t cipher_length;
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE,
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE,
 				     TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (sce_aes_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_aes_handle_t) != params[0].memref.size))
+	if ((NULL == handle) ||
+	    (sizeof(sce_aes_handle_t) != params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	cipher = NULL;      // nothing ever written here
-	cipher_length = 0;  // 0 always written here
+	cipher = NULL; // nothing ever written here
+	cipher_length = 0; // 0 always written here
 
-	err = g_sce_protected_on_sce.AES128ECB_EncryptFinal(handle, cipher, &cipher_length);
+	err = g_sce_protected_on_sce.AES128ECB_EncryptFinal(handle, cipher,
+							    &cipher_length);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -129,7 +137,8 @@ static TEE_Result aes128ecb_encryptfinal(uint32_t types, TEE_Param params[TEE_NU
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes128ecb_decryptinit(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result aes128ecb_decryptinit(uint32_t types,
+					TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -138,16 +147,17 @@ static TEE_Result aes128ecb_decryptinit(uint32_t types, TEE_Param params[TEE_NUM
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
 				     TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE))
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (sce_aes_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_aes_handle_t) > params[0].memref.size))
+	if ((NULL == handle) ||
+	    (sizeof(sce_aes_handle_t) > params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	wrapped_key = (sce_aes_wrapped_key_t *)params[1].memref.buffer;
-	if ((NULL == wrapped_key) || (sizeof(sce_aes_wrapped_key_t) != params[1].memref.size))
+	if ((NULL == wrapped_key) ||
+	    (sizeof(sce_aes_wrapped_key_t) != params[1].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	err = g_sce_protected_on_sce.AES128ECB_DecryptInit(handle, wrapped_key);
@@ -167,7 +177,8 @@ static TEE_Result aes128ecb_decryptinit(uint32_t types, TEE_Param params[TEE_NUM
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes128ecb_decryptupdate(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result aes128ecb_decryptupdate(uint32_t types,
+					  TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -184,12 +195,14 @@ static TEE_Result aes128ecb_decryptupdate(uint32_t types, TEE_Param params[TEE_N
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (sce_aes_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_aes_handle_t) != params[0].memref.size))
+	if ((NULL == handle) ||
+	    (sizeof(sce_aes_handle_t) != params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	cipher = (uint8_t *)params[1].memref.buffer;
 	cipher_length = (uint32_t)params[1].memref.size;
-	if ((NULL == cipher) || (0 != (cipher_length % HW_SCE_AES_BLOCK_BYTE_SIZE)))
+	if ((NULL == cipher) ||
+	    (0 != (cipher_length % HW_SCE_AES_BLOCK_BYTE_SIZE)))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	plain = (uint8_t *)params[2].memref.buffer;
@@ -197,7 +210,8 @@ static TEE_Result aes128ecb_decryptupdate(uint32_t types, TEE_Param params[TEE_N
 	if ((NULL == plain) || (plain_length < cipher_length))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.AES128ECB_DecryptUpdate(handle, cipher, plain, cipher_length);
+	err = g_sce_protected_on_sce.AES128ECB_DecryptUpdate(
+		handle, cipher, plain, cipher_length);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -212,7 +226,8 @@ static TEE_Result aes128ecb_decryptupdate(uint32_t types, TEE_Param params[TEE_N
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes128ecb_decryptfinal(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result aes128ecb_decryptfinal(uint32_t types,
+					 TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -221,19 +236,20 @@ static TEE_Result aes128ecb_decryptfinal(uint32_t types, TEE_Param params[TEE_NU
 	uint32_t plain_length;
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE,
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE,
 				     TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (sce_aes_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_aes_handle_t) != params[0].memref.size))
+	if ((NULL == handle) ||
+	    (sizeof(sce_aes_handle_t) != params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	plain = NULL;       // nothing ever written here
-	plain_length = 0;   // 0 always written here
+	plain = NULL; // nothing ever written here
+	plain_length = 0; // 0 always written here
 
-	err = g_sce_protected_on_sce.AES128ECB_DecryptFinal(handle, plain, &plain_length);
+	err = g_sce_protected_on_sce.AES128ECB_DecryptFinal(handle, plain,
+							    &plain_length);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -248,7 +264,8 @@ static TEE_Result aes128ecb_decryptfinal(uint32_t types, TEE_Param params[TEE_NU
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes256ecb_encryptinit(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result aes256ecb_encryptinit(uint32_t types,
+					TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -257,16 +274,17 @@ static TEE_Result aes256ecb_encryptinit(uint32_t types, TEE_Param params[TEE_NUM
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
 				     TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE))
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (sce_aes_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_aes_handle_t) > params[0].memref.size))
+	if ((NULL == handle) ||
+	    (sizeof(sce_aes_handle_t) > params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	wrapped_key = (sce_aes_wrapped_key_t *)params[1].memref.buffer;
-	if ((NULL == wrapped_key) || (sizeof(sce_aes_wrapped_key_t) != params[1].memref.size))
+	if ((NULL == wrapped_key) ||
+	    (sizeof(sce_aes_wrapped_key_t) != params[1].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	err = g_sce_protected_on_sce.AES256ECB_EncryptInit(handle, wrapped_key);
@@ -286,7 +304,8 @@ static TEE_Result aes256ecb_encryptinit(uint32_t types, TEE_Param params[TEE_NUM
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes256ecb_encryptupdate(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result aes256ecb_encryptupdate(uint32_t types,
+					  TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -303,12 +322,14 @@ static TEE_Result aes256ecb_encryptupdate(uint32_t types, TEE_Param params[TEE_N
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (sce_aes_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_aes_handle_t) != params[0].memref.size))
+	if ((NULL == handle) ||
+	    (sizeof(sce_aes_handle_t) != params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	plain = (uint8_t *)params[1].memref.buffer;
 	plain_length = (uint32_t)params[1].memref.size;
-	if ((NULL == plain) || (0 != (plain_length % HW_SCE_AES_BLOCK_BYTE_SIZE)))
+	if ((NULL == plain) ||
+	    (0 != (plain_length % HW_SCE_AES_BLOCK_BYTE_SIZE)))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	cipher = (uint8_t *)params[2].memref.buffer;
@@ -316,7 +337,8 @@ static TEE_Result aes256ecb_encryptupdate(uint32_t types, TEE_Param params[TEE_N
 	if ((NULL == cipher) || (cipher_length < plain_length))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.AES256ECB_EncryptUpdate(handle, plain, cipher, plain_length);
+	err = g_sce_protected_on_sce.AES256ECB_EncryptUpdate(
+		handle, plain, cipher, plain_length);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -331,7 +353,8 @@ static TEE_Result aes256ecb_encryptupdate(uint32_t types, TEE_Param params[TEE_N
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes256ecb_encryptfinal(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result aes256ecb_encryptfinal(uint32_t types,
+					 TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -340,19 +363,20 @@ static TEE_Result aes256ecb_encryptfinal(uint32_t types, TEE_Param params[TEE_NU
 	uint32_t cipher_length;
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE,
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE,
 				     TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (sce_aes_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_aes_handle_t) != params[0].memref.size))
+	if ((NULL == handle) ||
+	    (sizeof(sce_aes_handle_t) != params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	cipher = NULL;      // nothing ever written here
-	cipher_length = 0;  // 0 always written here
+	cipher = NULL; // nothing ever written here
+	cipher_length = 0; // 0 always written here
 
-	err = g_sce_protected_on_sce.AES256ECB_EncryptFinal(handle, cipher, &cipher_length);
+	err = g_sce_protected_on_sce.AES256ECB_EncryptFinal(handle, cipher,
+							    &cipher_length);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -367,7 +391,8 @@ static TEE_Result aes256ecb_encryptfinal(uint32_t types, TEE_Param params[TEE_NU
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes256ecb_decryptinit(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result aes256ecb_decryptinit(uint32_t types,
+					TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -376,16 +401,17 @@ static TEE_Result aes256ecb_decryptinit(uint32_t types, TEE_Param params[TEE_NUM
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
 				     TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE))
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (sce_aes_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_aes_handle_t) > params[0].memref.size))
+	if ((NULL == handle) ||
+	    (sizeof(sce_aes_handle_t) > params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	wrapped_key = (sce_aes_wrapped_key_t *)params[1].memref.buffer;
-	if ((NULL == wrapped_key) || (sizeof(sce_aes_wrapped_key_t) != params[1].memref.size))
+	if ((NULL == wrapped_key) ||
+	    (sizeof(sce_aes_wrapped_key_t) != params[1].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	err = g_sce_protected_on_sce.AES256ECB_DecryptInit(handle, wrapped_key);
@@ -405,7 +431,8 @@ static TEE_Result aes256ecb_decryptinit(uint32_t types, TEE_Param params[TEE_NUM
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes256ecb_decryptupdate(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result aes256ecb_decryptupdate(uint32_t types,
+					  TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -422,12 +449,14 @@ static TEE_Result aes256ecb_decryptupdate(uint32_t types, TEE_Param params[TEE_N
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (sce_aes_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_aes_handle_t) != params[0].memref.size))
+	if ((NULL == handle) ||
+	    (sizeof(sce_aes_handle_t) != params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	cipher = (uint8_t *)params[1].memref.buffer;
 	cipher_length = (uint32_t)params[1].memref.size;
-	if ((NULL == cipher) || (0 != (cipher_length % HW_SCE_AES_BLOCK_BYTE_SIZE)))
+	if ((NULL == cipher) ||
+	    (0 != (cipher_length % HW_SCE_AES_BLOCK_BYTE_SIZE)))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	plain = (uint8_t *)params[2].memref.buffer;
@@ -435,7 +464,8 @@ static TEE_Result aes256ecb_decryptupdate(uint32_t types, TEE_Param params[TEE_N
 	if ((NULL == plain) || (plain_length < cipher_length))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.AES256ECB_DecryptUpdate(handle, cipher, plain, cipher_length);
+	err = g_sce_protected_on_sce.AES256ECB_DecryptUpdate(
+		handle, cipher, plain, cipher_length);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -450,7 +480,8 @@ static TEE_Result aes256ecb_decryptupdate(uint32_t types, TEE_Param params[TEE_N
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes256ecb_decryptfinal(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result aes256ecb_decryptfinal(uint32_t types,
+					 TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -459,19 +490,20 @@ static TEE_Result aes256ecb_decryptfinal(uint32_t types, TEE_Param params[TEE_NU
 	uint32_t plain_length;
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE,
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE,
 				     TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (sce_aes_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_aes_handle_t) != params[0].memref.size))
+	if ((NULL == handle) ||
+	    (sizeof(sce_aes_handle_t) != params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	plain = NULL;       // nothing ever written here
-	plain_length = 0;   // 0 always written here
+	plain = NULL; // nothing ever written here
+	plain_length = 0; // 0 always written here
 
-	err = g_sce_protected_on_sce.AES256ECB_DecryptFinal(handle, plain, &plain_length);
+	err = g_sce_protected_on_sce.AES256ECB_DecryptFinal(handle, plain,
+							    &plain_length);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -486,7 +518,8 @@ static TEE_Result aes256ecb_decryptfinal(uint32_t types, TEE_Param params[TEE_NU
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes128cbc_encryptinit(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result aes128cbc_encryptinit(uint32_t types,
+					TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -501,18 +534,22 @@ static TEE_Result aes128cbc_encryptinit(uint32_t types, TEE_Param params[TEE_NUM
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (sce_aes_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_aes_handle_t) > params[0].memref.size))
+	if ((NULL == handle) ||
+	    (sizeof(sce_aes_handle_t) > params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	wrapped_key = (sce_aes_wrapped_key_t *)params[1].memref.buffer;
-	if ((NULL == wrapped_key) || (sizeof(sce_aes_wrapped_key_t) != params[1].memref.size))
+	if ((NULL == wrapped_key) ||
+	    (sizeof(sce_aes_wrapped_key_t) != params[1].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	initial_vector = (uint8_t *)params[2].memref.buffer;
-	if ((NULL == initial_vector) || (HW_SCE_AES_CBC_IV_BYTE_SIZE != params[2].memref.size))
+	if ((NULL == initial_vector) ||
+	    (HW_SCE_AES_CBC_IV_BYTE_SIZE != params[2].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.AES128CBC_EncryptInit(handle, wrapped_key, initial_vector);
+	err = g_sce_protected_on_sce.AES128CBC_EncryptInit(handle, wrapped_key,
+							   initial_vector);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -529,7 +566,8 @@ static TEE_Result aes128cbc_encryptinit(uint32_t types, TEE_Param params[TEE_NUM
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes128cbc_encryptupdate(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result aes128cbc_encryptupdate(uint32_t types,
+					  TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -546,12 +584,14 @@ static TEE_Result aes128cbc_encryptupdate(uint32_t types, TEE_Param params[TEE_N
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (sce_aes_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_aes_handle_t) != params[0].memref.size))
+	if ((NULL == handle) ||
+	    (sizeof(sce_aes_handle_t) != params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	plain = (uint8_t *)params[1].memref.buffer;
 	plain_length = (uint32_t)params[1].memref.size;
-	if ((NULL == plain) || (0 != (plain_length % HW_SCE_AES_BLOCK_BYTE_SIZE)))
+	if ((NULL == plain) ||
+	    (0 != (plain_length % HW_SCE_AES_BLOCK_BYTE_SIZE)))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	cipher = (uint8_t *)params[2].memref.buffer;
@@ -559,7 +599,8 @@ static TEE_Result aes128cbc_encryptupdate(uint32_t types, TEE_Param params[TEE_N
 	if ((NULL == cipher) || (cipher_length < plain_length))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.AES128CBC_EncryptUpdate(handle, plain, cipher, plain_length);
+	err = g_sce_protected_on_sce.AES128CBC_EncryptUpdate(
+		handle, plain, cipher, plain_length);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -574,7 +615,8 @@ static TEE_Result aes128cbc_encryptupdate(uint32_t types, TEE_Param params[TEE_N
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes128cbc_encryptfinal(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result aes128cbc_encryptfinal(uint32_t types,
+					 TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -583,19 +625,20 @@ static TEE_Result aes128cbc_encryptfinal(uint32_t types, TEE_Param params[TEE_NU
 	uint32_t cipher_length;
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE,
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE,
 				     TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (sce_aes_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_aes_handle_t) != params[0].memref.size))
+	if ((NULL == handle) ||
+	    (sizeof(sce_aes_handle_t) != params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	cipher = NULL;      // nothing ever written here
-	cipher_length = 0;  // 0 always written here
+	cipher = NULL; // nothing ever written here
+	cipher_length = 0; // 0 always written here
 
-	err = g_sce_protected_on_sce.AES128CBC_EncryptFinal(handle, cipher, &cipher_length);
+	err = g_sce_protected_on_sce.AES128CBC_EncryptFinal(handle, cipher,
+							    &cipher_length);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -610,7 +653,8 @@ static TEE_Result aes128cbc_encryptfinal(uint32_t types, TEE_Param params[TEE_NU
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes128cbc_decryptinit(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result aes128cbc_decryptinit(uint32_t types,
+					TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -625,142 +669,22 @@ static TEE_Result aes128cbc_decryptinit(uint32_t types, TEE_Param params[TEE_NUM
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (sce_aes_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_aes_handle_t) > params[0].memref.size))
+	if ((NULL == handle) ||
+	    (sizeof(sce_aes_handle_t) > params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	wrapped_key = (sce_aes_wrapped_key_t *)params[1].memref.buffer;
-	if ((NULL == wrapped_key) || (sizeof(sce_aes_wrapped_key_t) != params[1].memref.size))
+	if ((NULL == wrapped_key) ||
+	    (sizeof(sce_aes_wrapped_key_t) != params[1].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	initial_vector = (uint8_t *)params[2].memref.buffer;
-	if ((NULL == initial_vector) || (HW_SCE_AES_CBC_IV_BYTE_SIZE != params[2].memref.size))
+	if ((NULL == initial_vector) ||
+	    (HW_SCE_AES_CBC_IV_BYTE_SIZE != params[2].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.AES128CBC_DecryptInit(handle, wrapped_key, initial_vector);
-	switch (err) {
-	case FSP_SUCCESS:
-		break;
-	case  FSP_ERR_CRYPTO_SCE_RESOURCE_CONFLICT:
-		return TEE_ERROR_ACCESS_CONFLICT;
-	case FSP_ERR_CRYPTO_SCE_KEY_SET_FAIL:
-		return TEE_ERROR_BAD_PARAMETERS;
-	default: /* FSP_ERR_CRYPTO_SCE_FAIL */
-		return TEE_ERROR_GENERIC;
-	}
-
-	params[0].memref.size = sizeof(sce_aes_handle_t);
-
-	return TEE_SUCCESS;
-}
-
-static TEE_Result aes128cbc_decryptupdate(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
-{
-	fsp_err_t err;
-
-	sce_aes_handle_t *handle;
-	uint8_t *cipher;
-	uint8_t *plain;
-	uint32_t cipher_length;
-	uint32_t plain_length;
-
-	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE))
-		return TEE_ERROR_BAD_PARAMETERS;
-
-	handle = (sce_aes_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_aes_handle_t) != params[0].memref.size))
-		return TEE_ERROR_BAD_PARAMETERS;
-
-	cipher = (uint8_t *)params[1].memref.buffer;
-	cipher_length = (uint32_t)params[1].memref.size;
-	if ((NULL == cipher) || (0 != (cipher_length % HW_SCE_AES_BLOCK_BYTE_SIZE)))
-		return TEE_ERROR_BAD_PARAMETERS;
-
-	plain = (uint8_t *)params[2].memref.buffer;
-	plain_length = (uint32_t)params[2].memref.size;
-	if ((NULL == plain) || (plain_length < cipher_length))
-		return TEE_ERROR_BAD_PARAMETERS;
-
-	err = g_sce_protected_on_sce.AES128CBC_DecryptUpdate(handle, cipher, plain, cipher_length);
-	switch (err) {
-	case FSP_SUCCESS:
-		break;
-	case FSP_ERR_CRYPTO_SCE_PARAMETER:
-		return TEE_ERROR_BAD_PARAMETERS;
-	default: /*FSP_ERR_CRYPTO_SCE_PROHIBIT_FUNCTION */
-		return TEE_ERROR_BAD_STATE;
-	}
-
-	params[2].memref.size = cipher_length;
-
-	return TEE_SUCCESS;
-}
-
-static TEE_Result aes128cbc_decryptfinal(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
-{
-	fsp_err_t err;
-
-	sce_aes_handle_t *handle;
-	uint8_t *plain;
-	uint32_t plain_length;
-
-	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE))
-		return TEE_ERROR_BAD_PARAMETERS;
-
-	handle = (sce_aes_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_aes_handle_t) != params[0].memref.size))
-		return TEE_ERROR_BAD_PARAMETERS;
-
-	plain = NULL;       // nothing ever written here
-	plain_length = 0;   // 0 always written here
-
-	err = g_sce_protected_on_sce.AES128CBC_DecryptFinal(handle, plain, &plain_length);
-	switch (err) {
-	case FSP_SUCCESS:
-		break;
-	case FSP_ERR_CRYPTO_SCE_FAIL:
-		return TEE_ERROR_GENERIC;
-	case FSP_ERR_CRYPTO_SCE_PARAMETER:
-		return TEE_ERROR_BAD_PARAMETERS;
-	default: /* FSP_ERR_CRYPTO_SCE_PROHIBIT_FUNCTION */
-		return TEE_ERROR_BAD_STATE;
-	}
-
-	return TEE_SUCCESS;
-}
-
-static TEE_Result aes256cbc_encryptinit(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
-{
-	fsp_err_t err;
-
-	sce_aes_handle_t *handle;
-	sce_aes_wrapped_key_t *wrapped_key;
-	uint8_t *initial_vector;
-
-	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_NONE))
-		return TEE_ERROR_BAD_PARAMETERS;
-
-	handle = (sce_aes_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_aes_handle_t) > params[0].memref.size))
-		return TEE_ERROR_BAD_PARAMETERS;
-
-	wrapped_key = (sce_aes_wrapped_key_t *)params[1].memref.buffer;
-	if ((NULL == wrapped_key) || (sizeof(sce_aes_wrapped_key_t) != params[1].memref.size))
-		return TEE_ERROR_BAD_PARAMETERS;
-
-	initial_vector = (uint8_t *)params[2].memref.buffer;
-	if ((NULL == initial_vector) || (HW_SCE_AES_CBC_IV_BYTE_SIZE != params[2].memref.size))
-		return TEE_ERROR_BAD_PARAMETERS;
-
-	err = g_sce_protected_on_sce.AES256CBC_EncryptInit(handle, wrapped_key, initial_vector);
+	err = g_sce_protected_on_sce.AES128CBC_DecryptInit(handle, wrapped_key,
+							   initial_vector);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -777,7 +701,143 @@ static TEE_Result aes256cbc_encryptinit(uint32_t types, TEE_Param params[TEE_NUM
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes256cbc_encryptupdate(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result aes128cbc_decryptupdate(uint32_t types,
+					  TEE_Param params[TEE_NUM_PARAMS])
+{
+	fsp_err_t err;
+
+	sce_aes_handle_t *handle;
+	uint8_t *cipher;
+	uint8_t *plain;
+	uint32_t cipher_length;
+	uint32_t plain_length;
+
+	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
+				     TEE_PARAM_TYPE_MEMREF_INPUT,
+				     TEE_PARAM_TYPE_MEMREF_INOUT,
+				     TEE_PARAM_TYPE_NONE))
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	handle = (sce_aes_handle_t *)params[0].memref.buffer;
+	if ((NULL == handle) ||
+	    (sizeof(sce_aes_handle_t) != params[0].memref.size))
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	cipher = (uint8_t *)params[1].memref.buffer;
+	cipher_length = (uint32_t)params[1].memref.size;
+	if ((NULL == cipher) ||
+	    (0 != (cipher_length % HW_SCE_AES_BLOCK_BYTE_SIZE)))
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	plain = (uint8_t *)params[2].memref.buffer;
+	plain_length = (uint32_t)params[2].memref.size;
+	if ((NULL == plain) || (plain_length < cipher_length))
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	err = g_sce_protected_on_sce.AES128CBC_DecryptUpdate(
+		handle, cipher, plain, cipher_length);
+	switch (err) {
+	case FSP_SUCCESS:
+		break;
+	case FSP_ERR_CRYPTO_SCE_PARAMETER:
+		return TEE_ERROR_BAD_PARAMETERS;
+	default: /*FSP_ERR_CRYPTO_SCE_PROHIBIT_FUNCTION */
+		return TEE_ERROR_BAD_STATE;
+	}
+
+	params[2].memref.size = cipher_length;
+
+	return TEE_SUCCESS;
+}
+
+static TEE_Result aes128cbc_decryptfinal(uint32_t types,
+					 TEE_Param params[TEE_NUM_PARAMS])
+{
+	fsp_err_t err;
+
+	sce_aes_handle_t *handle;
+	uint8_t *plain;
+	uint32_t plain_length;
+
+	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE,
+				     TEE_PARAM_TYPE_NONE))
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	handle = (sce_aes_handle_t *)params[0].memref.buffer;
+	if ((NULL == handle) ||
+	    (sizeof(sce_aes_handle_t) != params[0].memref.size))
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	plain = NULL; // nothing ever written here
+	plain_length = 0; // 0 always written here
+
+	err = g_sce_protected_on_sce.AES128CBC_DecryptFinal(handle, plain,
+							    &plain_length);
+	switch (err) {
+	case FSP_SUCCESS:
+		break;
+	case FSP_ERR_CRYPTO_SCE_FAIL:
+		return TEE_ERROR_GENERIC;
+	case FSP_ERR_CRYPTO_SCE_PARAMETER:
+		return TEE_ERROR_BAD_PARAMETERS;
+	default: /* FSP_ERR_CRYPTO_SCE_PROHIBIT_FUNCTION */
+		return TEE_ERROR_BAD_STATE;
+	}
+
+	return TEE_SUCCESS;
+}
+
+static TEE_Result aes256cbc_encryptinit(uint32_t types,
+					TEE_Param params[TEE_NUM_PARAMS])
+{
+	fsp_err_t err;
+
+	sce_aes_handle_t *handle;
+	sce_aes_wrapped_key_t *wrapped_key;
+	uint8_t *initial_vector;
+
+	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
+				     TEE_PARAM_TYPE_MEMREF_INPUT,
+				     TEE_PARAM_TYPE_MEMREF_INPUT,
+				     TEE_PARAM_TYPE_NONE))
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	handle = (sce_aes_handle_t *)params[0].memref.buffer;
+	if ((NULL == handle) ||
+	    (sizeof(sce_aes_handle_t) > params[0].memref.size))
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	wrapped_key = (sce_aes_wrapped_key_t *)params[1].memref.buffer;
+	if ((NULL == wrapped_key) ||
+	    (sizeof(sce_aes_wrapped_key_t) != params[1].memref.size))
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	initial_vector = (uint8_t *)params[2].memref.buffer;
+	if ((NULL == initial_vector) ||
+	    (HW_SCE_AES_CBC_IV_BYTE_SIZE != params[2].memref.size))
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	err = g_sce_protected_on_sce.AES256CBC_EncryptInit(handle, wrapped_key,
+							   initial_vector);
+	switch (err) {
+	case FSP_SUCCESS:
+		break;
+	case FSP_ERR_CRYPTO_SCE_RESOURCE_CONFLICT:
+		return TEE_ERROR_ACCESS_CONFLICT;
+	case FSP_ERR_CRYPTO_SCE_KEY_SET_FAIL:
+		return TEE_ERROR_BAD_PARAMETERS;
+	default: /* FSP_ERR_CRYPTO_SCE_FAIL */
+		return TEE_ERROR_GENERIC;
+	}
+
+	params[0].memref.size = sizeof(sce_aes_handle_t);
+
+	return TEE_SUCCESS;
+}
+
+static TEE_Result aes256cbc_encryptupdate(uint32_t types,
+					  TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -794,12 +854,14 @@ static TEE_Result aes256cbc_encryptupdate(uint32_t types, TEE_Param params[TEE_N
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (sce_aes_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_aes_handle_t) != params[0].memref.size))
+	if ((NULL == handle) ||
+	    (sizeof(sce_aes_handle_t) != params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	plain = (uint8_t *)params[1].memref.buffer;
 	plain_length = (uint32_t)params[1].memref.size;
-	if ((NULL == plain) || (0 != (plain_length % HW_SCE_AES_BLOCK_BYTE_SIZE)))
+	if ((NULL == plain) ||
+	    (0 != (plain_length % HW_SCE_AES_BLOCK_BYTE_SIZE)))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	cipher = (uint8_t *)params[2].memref.buffer;
@@ -807,7 +869,8 @@ static TEE_Result aes256cbc_encryptupdate(uint32_t types, TEE_Param params[TEE_N
 	if ((NULL == cipher) || (cipher_length < plain_length))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.AES256CBC_EncryptUpdate(handle, plain, cipher, plain_length);
+	err = g_sce_protected_on_sce.AES256CBC_EncryptUpdate(
+		handle, plain, cipher, plain_length);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -822,7 +885,8 @@ static TEE_Result aes256cbc_encryptupdate(uint32_t types, TEE_Param params[TEE_N
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes256cbc_encryptfinal(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result aes256cbc_encryptfinal(uint32_t types,
+					 TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -831,19 +895,20 @@ static TEE_Result aes256cbc_encryptfinal(uint32_t types, TEE_Param params[TEE_NU
 	uint32_t cipher_length;
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE,
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE,
 				     TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (sce_aes_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_aes_handle_t) != params[0].memref.size))
+	if ((NULL == handle) ||
+	    (sizeof(sce_aes_handle_t) != params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	cipher = NULL;      // nothing ever written here
-	cipher_length = 0;  // 0 always written here
+	cipher = NULL; // nothing ever written here
+	cipher_length = 0; // 0 always written here
 
-	err = g_sce_protected_on_sce.AES256CBC_EncryptFinal(handle, cipher, &cipher_length);
+	err = g_sce_protected_on_sce.AES256CBC_EncryptFinal(handle, cipher,
+							    &cipher_length);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -858,7 +923,8 @@ static TEE_Result aes256cbc_encryptfinal(uint32_t types, TEE_Param params[TEE_NU
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes256cbc_decryptinit(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result aes256cbc_decryptinit(uint32_t types,
+					TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -873,18 +939,22 @@ static TEE_Result aes256cbc_decryptinit(uint32_t types, TEE_Param params[TEE_NUM
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (sce_aes_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_aes_handle_t) > params[0].memref.size))
+	if ((NULL == handle) ||
+	    (sizeof(sce_aes_handle_t) > params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	wrapped_key = (sce_aes_wrapped_key_t *)params[1].memref.buffer;
-	if ((NULL == wrapped_key) || (sizeof(sce_aes_wrapped_key_t) != params[1].memref.size))
+	if ((NULL == wrapped_key) ||
+	    (sizeof(sce_aes_wrapped_key_t) != params[1].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	initial_vector = (uint8_t *)params[2].memref.buffer;
-	if ((NULL == initial_vector) || (HW_SCE_AES_CBC_IV_BYTE_SIZE != params[2].memref.size))
+	if ((NULL == initial_vector) ||
+	    (HW_SCE_AES_CBC_IV_BYTE_SIZE != params[2].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.AES256CBC_DecryptInit(handle, wrapped_key, initial_vector);
+	err = g_sce_protected_on_sce.AES256CBC_DecryptInit(handle, wrapped_key,
+							   initial_vector);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -901,7 +971,8 @@ static TEE_Result aes256cbc_decryptinit(uint32_t types, TEE_Param params[TEE_NUM
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes256cbc_decryptupdate(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result aes256cbc_decryptupdate(uint32_t types,
+					  TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -918,12 +989,14 @@ static TEE_Result aes256cbc_decryptupdate(uint32_t types, TEE_Param params[TEE_N
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (sce_aes_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_aes_handle_t) != params[0].memref.size))
+	if ((NULL == handle) ||
+	    (sizeof(sce_aes_handle_t) != params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	cipher = (uint8_t *)params[1].memref.buffer;
 	cipher_length = (uint32_t)params[1].memref.size;
-	if ((NULL == cipher) || (0 != (cipher_length % HW_SCE_AES_BLOCK_BYTE_SIZE)))
+	if ((NULL == cipher) ||
+	    (0 != (cipher_length % HW_SCE_AES_BLOCK_BYTE_SIZE)))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	plain = (uint8_t *)params[2].memref.buffer;
@@ -931,7 +1004,8 @@ static TEE_Result aes256cbc_decryptupdate(uint32_t types, TEE_Param params[TEE_N
 	if ((NULL == plain) || (plain_length < cipher_length))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.AES256CBC_DecryptUpdate(handle, cipher, plain, cipher_length);
+	err = g_sce_protected_on_sce.AES256CBC_DecryptUpdate(
+		handle, cipher, plain, cipher_length);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -946,7 +1020,8 @@ static TEE_Result aes256cbc_decryptupdate(uint32_t types, TEE_Param params[TEE_N
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes256cbc_decryptfinal(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result aes256cbc_decryptfinal(uint32_t types,
+					 TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -955,19 +1030,20 @@ static TEE_Result aes256cbc_decryptfinal(uint32_t types, TEE_Param params[TEE_NU
 	uint32_t plain_length;
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE,
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE,
 				     TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (sce_aes_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_aes_handle_t) != params[0].memref.size))
+	if ((NULL == handle) ||
+	    (sizeof(sce_aes_handle_t) != params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	plain = NULL;       // nothing ever written here
-	plain_length = 0;   // 0 always written here
+	plain = NULL; // nothing ever written here
+	plain_length = 0; // 0 always written here
 
-	err = g_sce_protected_on_sce.AES256CBC_DecryptFinal(handle, plain, &plain_length);
+	err = g_sce_protected_on_sce.AES256CBC_DecryptFinal(handle, plain,
+							    &plain_length);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -982,7 +1058,8 @@ static TEE_Result aes256cbc_decryptfinal(uint32_t types, TEE_Param params[TEE_NU
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes128ctr_encryptinit(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result aes128ctr_encryptinit(uint32_t types,
+					TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -997,18 +1074,22 @@ static TEE_Result aes128ctr_encryptinit(uint32_t types, TEE_Param params[TEE_NUM
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (sce_aes_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_aes_handle_t) > params[0].memref.size))
+	if ((NULL == handle) ||
+	    (sizeof(sce_aes_handle_t) > params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	wrapped_key = (sce_aes_wrapped_key_t *)params[1].memref.buffer;
-	if ((NULL == wrapped_key) || (sizeof(sce_aes_wrapped_key_t) != params[1].memref.size))
+	if ((NULL == wrapped_key) ||
+	    (sizeof(sce_aes_wrapped_key_t) != params[1].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	initial_vector = (uint8_t *)params[2].memref.buffer;
-	if ((NULL == initial_vector) || (HW_SCE_AES_CBC_IV_BYTE_SIZE != params[2].memref.size))
+	if ((NULL == initial_vector) ||
+	    (HW_SCE_AES_CBC_IV_BYTE_SIZE != params[2].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.AES128CTR_EncryptInit(handle, wrapped_key, initial_vector);
+	err = g_sce_protected_on_sce.AES128CTR_EncryptInit(handle, wrapped_key,
+							   initial_vector);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -1025,7 +1106,8 @@ static TEE_Result aes128ctr_encryptinit(uint32_t types, TEE_Param params[TEE_NUM
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes128ctr_encryptupdate(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result aes128ctr_encryptupdate(uint32_t types,
+					  TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -1042,12 +1124,14 @@ static TEE_Result aes128ctr_encryptupdate(uint32_t types, TEE_Param params[TEE_N
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (sce_aes_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_aes_handle_t) != params[0].memref.size))
+	if ((NULL == handle) ||
+	    (sizeof(sce_aes_handle_t) != params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	plain = (uint8_t *)params[1].memref.buffer;
 	plain_length = (uint32_t)params[1].memref.size;
-	if ((NULL == plain) || (0 != (plain_length % HW_SCE_AES_BLOCK_BYTE_SIZE)))
+	if ((NULL == plain) ||
+	    (0 != (plain_length % HW_SCE_AES_BLOCK_BYTE_SIZE)))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	cipher = (uint8_t *)params[2].memref.buffer;
@@ -1055,7 +1139,8 @@ static TEE_Result aes128ctr_encryptupdate(uint32_t types, TEE_Param params[TEE_N
 	if ((NULL == cipher) || (cipher_length < plain_length))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.AES128CTR_EncryptUpdate(handle, plain, cipher, plain_length);
+	err = g_sce_protected_on_sce.AES128CTR_EncryptUpdate(
+		handle, plain, cipher, plain_length);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -1070,7 +1155,8 @@ static TEE_Result aes128ctr_encryptupdate(uint32_t types, TEE_Param params[TEE_N
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes128ctr_encryptfinal(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result aes128ctr_encryptfinal(uint32_t types,
+					 TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -1079,19 +1165,20 @@ static TEE_Result aes128ctr_encryptfinal(uint32_t types, TEE_Param params[TEE_NU
 	uint32_t cipher_length;
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE,
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE,
 				     TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (sce_aes_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_aes_handle_t) != params[0].memref.size))
+	if ((NULL == handle) ||
+	    (sizeof(sce_aes_handle_t) != params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	cipher = NULL;      // nothing ever written here
-	cipher_length = 0;  // 0 always written here
+	cipher = NULL; // nothing ever written here
+	cipher_length = 0; // 0 always written here
 
-	err = g_sce_protected_on_sce.AES128CTR_EncryptFinal(handle, cipher, &cipher_length);
+	err = g_sce_protected_on_sce.AES128CTR_EncryptFinal(handle, cipher,
+							    &cipher_length);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -1106,7 +1193,8 @@ static TEE_Result aes128ctr_encryptfinal(uint32_t types, TEE_Param params[TEE_NU
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes128ctr_decryptinit(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result aes128ctr_decryptinit(uint32_t types,
+					TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -1121,18 +1209,22 @@ static TEE_Result aes128ctr_decryptinit(uint32_t types, TEE_Param params[TEE_NUM
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (sce_aes_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_aes_handle_t) > params[0].memref.size))
+	if ((NULL == handle) ||
+	    (sizeof(sce_aes_handle_t) > params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	wrapped_key = (sce_aes_wrapped_key_t *)params[1].memref.buffer;
-	if ((NULL == wrapped_key) || (sizeof(sce_aes_wrapped_key_t) != params[1].memref.size))
+	if ((NULL == wrapped_key) ||
+	    (sizeof(sce_aes_wrapped_key_t) != params[1].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	initial_vector = (uint8_t *)params[2].memref.buffer;
-	if ((NULL == initial_vector) || (HW_SCE_AES_CBC_IV_BYTE_SIZE != params[2].memref.size))
+	if ((NULL == initial_vector) ||
+	    (HW_SCE_AES_CBC_IV_BYTE_SIZE != params[2].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.AES128CTR_DecryptInit(handle, wrapped_key, initial_vector);
+	err = g_sce_protected_on_sce.AES128CTR_DecryptInit(handle, wrapped_key,
+							   initial_vector);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -1149,7 +1241,8 @@ static TEE_Result aes128ctr_decryptinit(uint32_t types, TEE_Param params[TEE_NUM
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes128ctr_decryptupdate(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result aes128ctr_decryptupdate(uint32_t types,
+					  TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -1166,12 +1259,14 @@ static TEE_Result aes128ctr_decryptupdate(uint32_t types, TEE_Param params[TEE_N
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (sce_aes_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_aes_handle_t) != params[0].memref.size))
+	if ((NULL == handle) ||
+	    (sizeof(sce_aes_handle_t) != params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	cipher = (uint8_t *)params[1].memref.buffer;
 	cipher_length = (uint32_t)params[1].memref.size;
-	if ((NULL == cipher) || (0 != (cipher_length % HW_SCE_AES_BLOCK_BYTE_SIZE)))
+	if ((NULL == cipher) ||
+	    (0 != (cipher_length % HW_SCE_AES_BLOCK_BYTE_SIZE)))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	plain = (uint8_t *)params[2].memref.buffer;
@@ -1179,7 +1274,8 @@ static TEE_Result aes128ctr_decryptupdate(uint32_t types, TEE_Param params[TEE_N
 	if ((NULL == plain) || (plain_length < cipher_length))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.AES128CTR_DecryptUpdate(handle, cipher, plain, cipher_length);
+	err = g_sce_protected_on_sce.AES128CTR_DecryptUpdate(
+		handle, cipher, plain, cipher_length);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -1194,7 +1290,8 @@ static TEE_Result aes128ctr_decryptupdate(uint32_t types, TEE_Param params[TEE_N
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes128ctr_decryptfinal(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result aes128ctr_decryptfinal(uint32_t types,
+					 TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -1203,19 +1300,20 @@ static TEE_Result aes128ctr_decryptfinal(uint32_t types, TEE_Param params[TEE_NU
 	uint32_t plain_length;
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE,
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE,
 				     TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (sce_aes_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_aes_handle_t) != params[0].memref.size))
+	if ((NULL == handle) ||
+	    (sizeof(sce_aes_handle_t) != params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	plain = NULL;       // nothing ever written here
-	plain_length = 0;   // 0 always written here
+	plain = NULL; // nothing ever written here
+	plain_length = 0; // 0 always written here
 
-	err = g_sce_protected_on_sce.AES128CTR_DecryptFinal(handle, plain, &plain_length);
+	err = g_sce_protected_on_sce.AES128CTR_DecryptFinal(handle, plain,
+							    &plain_length);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -1230,7 +1328,8 @@ static TEE_Result aes128ctr_decryptfinal(uint32_t types, TEE_Param params[TEE_NU
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes256ctr_encryptinit(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result aes256ctr_encryptinit(uint32_t types,
+					TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -1245,18 +1344,22 @@ static TEE_Result aes256ctr_encryptinit(uint32_t types, TEE_Param params[TEE_NUM
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (sce_aes_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_aes_handle_t) > params[0].memref.size))
+	if ((NULL == handle) ||
+	    (sizeof(sce_aes_handle_t) > params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	wrapped_key = (sce_aes_wrapped_key_t *)params[1].memref.buffer;
-	if ((NULL == wrapped_key) || (sizeof(sce_aes_wrapped_key_t) != params[1].memref.size))
+	if ((NULL == wrapped_key) ||
+	    (sizeof(sce_aes_wrapped_key_t) != params[1].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	initial_vector = (uint8_t *)params[2].memref.buffer;
-	if ((NULL == initial_vector) || (HW_SCE_AES_CBC_IV_BYTE_SIZE != params[2].memref.size))
+	if ((NULL == initial_vector) ||
+	    (HW_SCE_AES_CBC_IV_BYTE_SIZE != params[2].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.AES256CTR_EncryptInit(handle, wrapped_key, initial_vector);
+	err = g_sce_protected_on_sce.AES256CTR_EncryptInit(handle, wrapped_key,
+							   initial_vector);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -1273,7 +1376,8 @@ static TEE_Result aes256ctr_encryptinit(uint32_t types, TEE_Param params[TEE_NUM
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes256ctr_encryptupdate(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result aes256ctr_encryptupdate(uint32_t types,
+					  TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -1290,12 +1394,14 @@ static TEE_Result aes256ctr_encryptupdate(uint32_t types, TEE_Param params[TEE_N
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (sce_aes_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_aes_handle_t) != params[0].memref.size))
+	if ((NULL == handle) ||
+	    (sizeof(sce_aes_handle_t) != params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	plain = (uint8_t *)params[1].memref.buffer;
 	plain_length = (uint32_t)params[1].memref.size;
-	if ((NULL == plain) || (0 != (plain_length % HW_SCE_AES_BLOCK_BYTE_SIZE)))
+	if ((NULL == plain) ||
+	    (0 != (plain_length % HW_SCE_AES_BLOCK_BYTE_SIZE)))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	cipher = (uint8_t *)params[2].memref.buffer;
@@ -1303,7 +1409,8 @@ static TEE_Result aes256ctr_encryptupdate(uint32_t types, TEE_Param params[TEE_N
 	if ((NULL == cipher) || (cipher_length < plain_length))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.AES256CTR_EncryptUpdate(handle, plain, cipher, plain_length);
+	err = g_sce_protected_on_sce.AES256CTR_EncryptUpdate(
+		handle, plain, cipher, plain_length);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -1318,7 +1425,8 @@ static TEE_Result aes256ctr_encryptupdate(uint32_t types, TEE_Param params[TEE_N
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes256ctr_encryptfinal(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result aes256ctr_encryptfinal(uint32_t types,
+					 TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -1327,19 +1435,20 @@ static TEE_Result aes256ctr_encryptfinal(uint32_t types, TEE_Param params[TEE_NU
 	uint32_t cipher_length;
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE,
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE,
 				     TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (sce_aes_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_aes_handle_t) != params[0].memref.size))
+	if ((NULL == handle) ||
+	    (sizeof(sce_aes_handle_t) != params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	cipher = NULL;      // nothing ever written here
-	cipher_length = 0;  // 0 always written here
+	cipher = NULL; // nothing ever written here
+	cipher_length = 0; // 0 always written here
 
-	err = g_sce_protected_on_sce.AES256CTR_EncryptFinal(handle, cipher, &cipher_length);
+	err = g_sce_protected_on_sce.AES256CTR_EncryptFinal(handle, cipher,
+							    &cipher_length);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -1354,7 +1463,8 @@ static TEE_Result aes256ctr_encryptfinal(uint32_t types, TEE_Param params[TEE_NU
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes256ctr_decryptinit(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result aes256ctr_decryptinit(uint32_t types,
+					TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -1369,18 +1479,22 @@ static TEE_Result aes256ctr_decryptinit(uint32_t types, TEE_Param params[TEE_NUM
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (sce_aes_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_aes_handle_t) > params[0].memref.size))
+	if ((NULL == handle) ||
+	    (sizeof(sce_aes_handle_t) > params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	wrapped_key = (sce_aes_wrapped_key_t *)params[1].memref.buffer;
-	if ((NULL == wrapped_key) || (sizeof(sce_aes_wrapped_key_t) != params[1].memref.size))
+	if ((NULL == wrapped_key) ||
+	    (sizeof(sce_aes_wrapped_key_t) != params[1].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	initial_vector = (uint8_t *)params[2].memref.buffer;
-	if ((NULL == initial_vector) || (HW_SCE_AES_CBC_IV_BYTE_SIZE != params[2].memref.size))
+	if ((NULL == initial_vector) ||
+	    (HW_SCE_AES_CBC_IV_BYTE_SIZE != params[2].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.AES256CTR_DecryptInit(handle, wrapped_key, initial_vector);
+	err = g_sce_protected_on_sce.AES256CTR_DecryptInit(handle, wrapped_key,
+							   initial_vector);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -1397,7 +1511,8 @@ static TEE_Result aes256ctr_decryptinit(uint32_t types, TEE_Param params[TEE_NUM
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes256ctr_decryptupdate(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result aes256ctr_decryptupdate(uint32_t types,
+					  TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -1414,12 +1529,14 @@ static TEE_Result aes256ctr_decryptupdate(uint32_t types, TEE_Param params[TEE_N
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (sce_aes_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_aes_handle_t) != params[0].memref.size))
+	if ((NULL == handle) ||
+	    (sizeof(sce_aes_handle_t) != params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	cipher = (uint8_t *)params[1].memref.buffer;
 	cipher_length = (uint32_t)params[1].memref.size;
-	if ((NULL == cipher) || (0 != (cipher_length % HW_SCE_AES_BLOCK_BYTE_SIZE)))
+	if ((NULL == cipher) ||
+	    (0 != (cipher_length % HW_SCE_AES_BLOCK_BYTE_SIZE)))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	plain = (uint8_t *)params[2].memref.buffer;
@@ -1427,7 +1544,8 @@ static TEE_Result aes256ctr_decryptupdate(uint32_t types, TEE_Param params[TEE_N
 	if ((NULL == plain) || (plain_length < cipher_length))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.AES256CTR_DecryptUpdate(handle, cipher, plain, cipher_length);
+	err = g_sce_protected_on_sce.AES256CTR_DecryptUpdate(
+		handle, cipher, plain, cipher_length);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -1442,7 +1560,8 @@ static TEE_Result aes256ctr_decryptupdate(uint32_t types, TEE_Param params[TEE_N
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes256ctr_decryptfinal(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result aes256ctr_decryptfinal(uint32_t types,
+					 TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -1451,19 +1570,20 @@ static TEE_Result aes256ctr_decryptfinal(uint32_t types, TEE_Param params[TEE_NU
 	uint32_t plain_length;
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE,
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE,
 				     TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (sce_aes_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_aes_handle_t) != params[0].memref.size))
+	if ((NULL == handle) ||
+	    (sizeof(sce_aes_handle_t) != params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	plain = NULL;       // nothing ever written here
-	plain_length = 0;   // 0 always written here
+	plain = NULL; // nothing ever written here
+	plain_length = 0; // 0 always written here
 
-	err = g_sce_protected_on_sce.AES256CTR_DecryptFinal(handle, plain, &plain_length);
+	err = g_sce_protected_on_sce.AES256CTR_DecryptFinal(handle, plain,
+							    &plain_length);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -1478,7 +1598,8 @@ static TEE_Result aes256ctr_decryptfinal(uint32_t types, TEE_Param params[TEE_NU
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes128cmac_generateinit(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result aes128cmac_generateinit(uint32_t types,
+					  TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -1487,19 +1608,21 @@ static TEE_Result aes128cmac_generateinit(uint32_t types, TEE_Param params[TEE_N
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
 				     TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE))
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (sce_cmac_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_cmac_handle_t) > params[0].memref.size))
+	if ((NULL == handle) ||
+	    (sizeof(sce_cmac_handle_t) > params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	wrapped_key = (sce_aes_wrapped_key_t *)params[1].memref.buffer;
-	if ((NULL == wrapped_key) || (sizeof(sce_aes_wrapped_key_t) != params[1].memref.size))
+	if ((NULL == wrapped_key) ||
+	    (sizeof(sce_aes_wrapped_key_t) != params[1].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.AES128CMAC_GenerateInit(handle, wrapped_key);
+	err = g_sce_protected_on_sce.AES128CMAC_GenerateInit(handle,
+							     wrapped_key);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -1516,7 +1639,8 @@ static TEE_Result aes128cmac_generateinit(uint32_t types, TEE_Param params[TEE_N
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes128cmac_generateupdate(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result aes128cmac_generateupdate(uint32_t types,
+					    TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -1526,12 +1650,12 @@ static TEE_Result aes128cmac_generateupdate(uint32_t types, TEE_Param params[TEE
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
 				     TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE))
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (sce_cmac_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_cmac_handle_t) != params[0].memref.size))
+	if ((NULL == handle) ||
+	    (sizeof(sce_cmac_handle_t) != params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	message = (uint8_t *)params[1].memref.buffer;
@@ -1539,7 +1663,8 @@ static TEE_Result aes128cmac_generateupdate(uint32_t types, TEE_Param params[TEE
 	if (NULL == message)
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.AES128CMAC_GenerateUpdate(handle, message, message_length);
+	err = g_sce_protected_on_sce.AES128CMAC_GenerateUpdate(handle, message,
+							       message_length);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -1552,7 +1677,8 @@ static TEE_Result aes128cmac_generateupdate(uint32_t types, TEE_Param params[TEE
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes128cmac_generatefinal(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result aes128cmac_generatefinal(uint32_t types,
+					   TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -1562,12 +1688,12 @@ static TEE_Result aes128cmac_generatefinal(uint32_t types, TEE_Param params[TEE_
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
 				     TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE))
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (sce_cmac_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_cmac_handle_t) != params[0].memref.size))
+	if ((NULL == handle) ||
+	    (sizeof(sce_cmac_handle_t) != params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	mac = (uint8_t *)params[1].memref.buffer;
@@ -1594,7 +1720,8 @@ static TEE_Result aes128cmac_generatefinal(uint32_t types, TEE_Param params[TEE_
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes128cmac_verifyinit(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result aes128cmac_verifyinit(uint32_t types,
+					TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -1603,16 +1730,17 @@ static TEE_Result aes128cmac_verifyinit(uint32_t types, TEE_Param params[TEE_NUM
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
 				     TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE))
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (sce_cmac_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_cmac_handle_t) > params[0].memref.size))
+	if ((NULL == handle) ||
+	    (sizeof(sce_cmac_handle_t) > params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	wrapped_key = (sce_aes_wrapped_key_t *)params[1].memref.buffer;
-	if ((NULL == wrapped_key) || (sizeof(sce_aes_wrapped_key_t) != params[1].memref.size))
+	if ((NULL == wrapped_key) ||
+	    (sizeof(sce_aes_wrapped_key_t) != params[1].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	err = g_sce_protected_on_sce.AES128CMAC_VerifyInit(handle, wrapped_key);
@@ -1632,7 +1760,8 @@ static TEE_Result aes128cmac_verifyinit(uint32_t types, TEE_Param params[TEE_NUM
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes128cmac_verifyupdate(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result aes128cmac_verifyupdate(uint32_t types,
+					  TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -1642,12 +1771,12 @@ static TEE_Result aes128cmac_verifyupdate(uint32_t types, TEE_Param params[TEE_N
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
 				     TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE))
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (sce_cmac_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_cmac_handle_t) != params[0].memref.size))
+	if ((NULL == handle) ||
+	    (sizeof(sce_cmac_handle_t) != params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	message = (uint8_t *)params[1].memref.buffer;
@@ -1655,7 +1784,8 @@ static TEE_Result aes128cmac_verifyupdate(uint32_t types, TEE_Param params[TEE_N
 	if (NULL == message)
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.AES128CMAC_VerifyUpdate(handle, message, message_length);
+	err = g_sce_protected_on_sce.AES128CMAC_VerifyUpdate(handle, message,
+							     message_length);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -1668,7 +1798,8 @@ static TEE_Result aes128cmac_verifyupdate(uint32_t types, TEE_Param params[TEE_N
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes128cmac_verifyfinal(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result aes128cmac_verifyfinal(uint32_t types,
+					 TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -1678,20 +1809,22 @@ static TEE_Result aes128cmac_verifyfinal(uint32_t types, TEE_Param params[TEE_NU
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
 				     TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE))
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (sce_cmac_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_cmac_handle_t) != params[0].memref.size))
+	if ((NULL == handle) ||
+	    (sizeof(sce_cmac_handle_t) != params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	mac = (uint8_t *)params[1].memref.buffer;
 	mac_length = params[1].memref.size;
-	if ((NULL == mac) || (2 > mac_length) || (HW_SCE_AES_BLOCK_BYTE_SIZE < mac_length))
+	if ((NULL == mac) || (2 > mac_length) ||
+	    (HW_SCE_AES_BLOCK_BYTE_SIZE < mac_length))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.AES128CMAC_VerifyFinal(handle, mac, mac_length);
+	err = g_sce_protected_on_sce.AES128CMAC_VerifyFinal(handle, mac,
+							    mac_length);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -1708,7 +1841,8 @@ static TEE_Result aes128cmac_verifyfinal(uint32_t types, TEE_Param params[TEE_NU
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes256cmac_generateinit(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result aes256cmac_generateinit(uint32_t types,
+					  TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -1717,19 +1851,21 @@ static TEE_Result aes256cmac_generateinit(uint32_t types, TEE_Param params[TEE_N
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
 				     TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE))
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (sce_cmac_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_cmac_handle_t) > params[0].memref.size))
+	if ((NULL == handle) ||
+	    (sizeof(sce_cmac_handle_t) > params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	wrapped_key = (sce_aes_wrapped_key_t *)params[1].memref.buffer;
-	if ((NULL == wrapped_key) || (sizeof(sce_aes_wrapped_key_t) != params[1].memref.size))
+	if ((NULL == wrapped_key) ||
+	    (sizeof(sce_aes_wrapped_key_t) != params[1].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.AES256CMAC_GenerateInit(handle, wrapped_key);
+	err = g_sce_protected_on_sce.AES256CMAC_GenerateInit(handle,
+							     wrapped_key);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -1746,7 +1882,8 @@ static TEE_Result aes256cmac_generateinit(uint32_t types, TEE_Param params[TEE_N
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes256cmac_generateupdate(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result aes256cmac_generateupdate(uint32_t types,
+					    TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -1756,12 +1893,12 @@ static TEE_Result aes256cmac_generateupdate(uint32_t types, TEE_Param params[TEE
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
 				     TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE))
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (sce_cmac_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_cmac_handle_t) != params[0].memref.size))
+	if ((NULL == handle) ||
+	    (sizeof(sce_cmac_handle_t) != params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	message = (uint8_t *)params[1].memref.buffer;
@@ -1769,7 +1906,8 @@ static TEE_Result aes256cmac_generateupdate(uint32_t types, TEE_Param params[TEE
 	if (NULL == message)
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.AES256CMAC_GenerateUpdate(handle, message, message_length);
+	err = g_sce_protected_on_sce.AES256CMAC_GenerateUpdate(handle, message,
+							       message_length);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -1782,7 +1920,8 @@ static TEE_Result aes256cmac_generateupdate(uint32_t types, TEE_Param params[TEE
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes256cmac_generatefinal(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result aes256cmac_generatefinal(uint32_t types,
+					   TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -1792,12 +1931,12 @@ static TEE_Result aes256cmac_generatefinal(uint32_t types, TEE_Param params[TEE_
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
 				     TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE))
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (sce_cmac_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_cmac_handle_t) != params[0].memref.size))
+	if ((NULL == handle) ||
+	    (sizeof(sce_cmac_handle_t) != params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	mac = (uint8_t *)params[1].memref.buffer;
@@ -1824,7 +1963,8 @@ static TEE_Result aes256cmac_generatefinal(uint32_t types, TEE_Param params[TEE_
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes256cmac_verifyinit(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result aes256cmac_verifyinit(uint32_t types,
+					TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -1833,16 +1973,17 @@ static TEE_Result aes256cmac_verifyinit(uint32_t types, TEE_Param params[TEE_NUM
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
 				     TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE))
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (sce_cmac_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_cmac_handle_t) > params[0].memref.size))
+	if ((NULL == handle) ||
+	    (sizeof(sce_cmac_handle_t) > params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	wrapped_key = (sce_aes_wrapped_key_t *)params[1].memref.buffer;
-	if ((NULL == wrapped_key) || (sizeof(sce_aes_wrapped_key_t) != params[1].memref.size))
+	if ((NULL == wrapped_key) ||
+	    (sizeof(sce_aes_wrapped_key_t) != params[1].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	err = g_sce_protected_on_sce.AES256CMAC_VerifyInit(handle, wrapped_key);
@@ -1862,7 +2003,8 @@ static TEE_Result aes256cmac_verifyinit(uint32_t types, TEE_Param params[TEE_NUM
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes256cmac_verifyupdate(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result aes256cmac_verifyupdate(uint32_t types,
+					  TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -1872,12 +2014,12 @@ static TEE_Result aes256cmac_verifyupdate(uint32_t types, TEE_Param params[TEE_N
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
 				     TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE))
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (sce_cmac_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_cmac_handle_t) != params[0].memref.size))
+	if ((NULL == handle) ||
+	    (sizeof(sce_cmac_handle_t) != params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	message = (uint8_t *)params[1].memref.buffer;
@@ -1885,7 +2027,8 @@ static TEE_Result aes256cmac_verifyupdate(uint32_t types, TEE_Param params[TEE_N
 	if (NULL == message)
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.AES256CMAC_VerifyUpdate(handle, message, message_length);
+	err = g_sce_protected_on_sce.AES256CMAC_VerifyUpdate(handle, message,
+							     message_length);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -1898,7 +2041,8 @@ static TEE_Result aes256cmac_verifyupdate(uint32_t types, TEE_Param params[TEE_N
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes256cmac_verifyfinal(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result aes256cmac_verifyfinal(uint32_t types,
+					 TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -1908,20 +2052,22 @@ static TEE_Result aes256cmac_verifyfinal(uint32_t types, TEE_Param params[TEE_NU
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
 				     TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE))
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (sce_cmac_handle_t *)params[0].memref.buffer;
-	if ((NULL == handle) || (sizeof(sce_cmac_handle_t) != params[0].memref.size))
+	if ((NULL == handle) ||
+	    (sizeof(sce_cmac_handle_t) != params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	mac = (uint8_t *)params[1].memref.buffer;
 	mac_length = params[1].memref.size;
-	if ((NULL == mac) || (2 > mac_length) || (HW_SCE_AES_BLOCK_BYTE_SIZE < mac_length))
+	if ((NULL == mac) || (2 > mac_length) ||
+	    (HW_SCE_AES_BLOCK_BYTE_SIZE < mac_length))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.AES256CMAC_VerifyFinal(handle, mac, mac_length);
+	err = g_sce_protected_on_sce.AES256CMAC_VerifyFinal(handle, mac,
+							    mac_length);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -1938,12 +2084,11 @@ static TEE_Result aes256cmac_verifyfinal(uint32_t types, TEE_Param params[TEE_NU
 	return TEE_SUCCESS;
 }
 
-static TEE_Result invoke_command(void *session __unused,
-				 uint32_t cmd,
+static TEE_Result invoke_command(void *session __unused, uint32_t cmd,
 				 uint32_t ptypes,
 				 TEE_Param params[TEE_NUM_PARAMS])
 {
-	DMSG(PTA_NAME" command %#"PRIx32" ptypes %#"PRIx32, cmd, ptypes);
+	DMSG(PTA_NAME " command %#" PRIx32 " ptypes %#" PRIx32, cmd, ptypes);
 
 	switch (cmd) {
 	case PTA_CMD_AES128ECB_EncryptInit:
@@ -2047,9 +2192,6 @@ static TEE_Result invoke_command(void *session __unused,
 	}
 }
 
-pseudo_ta_register(.uuid = PTA_SCE_AES_UUID,
-		   .name = PTA_NAME,
+pseudo_ta_register(.uuid = PTA_SCE_AES_UUID, .name = PTA_NAME,
 		   .flags = PTA_DEFAULT_FLAGS | TA_FLAG_DEVICE_ENUM,
-		   .invoke_command_entry_point = invoke_command
-);
-
+		   .invoke_command_entry_point = invoke_command);

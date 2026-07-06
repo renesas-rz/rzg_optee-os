@@ -25,7 +25,8 @@ TEE_Result hw_get_random_bytes(void *buf, size_t len)
 	const size_t rand_size = sizeof(rand);
 
 	for (i = 0; i < len; i += rand_size) {
-		fsp_err_t err = g_sce_protected_on_sce.randomNumberGenerate(rand);
+		fsp_err_t err =
+			g_sce_protected_on_sce.randomNumberGenerate(rand);
 		if (err != FSP_SUCCESS)
 			return TEE_ERROR_BUSY;
 

@@ -8,14 +8,14 @@
 #include <keep.h>
 #include <util.h>
 
-#define SCIF_SCFTDR		(0x04)
-#define SCIF_SCCCR0		(0x08)
-#define SCIF_SCFTSR		(0x54)
+#define SCIF_SCFTDR (0x04)
+#define SCIF_SCCCR0 (0x08)
+#define SCIF_SCFTSR (0x54)
 
-#define SCCCR0_TE		BIT(4)
-#define SCCCR0_TEIE		BIT(21)
+#define SCCCR0_TE BIT(4)
+#define SCCCR0_TEIE BIT(21)
 
-#define SCIF_TX_FIFO_SIZE	16
+#define SCIF_TX_FIFO_SIZE 16
 
 static vaddr_t chip_to_base(struct serial_chip *chip)
 {

@@ -10,7 +10,9 @@
 
 #define PTA_NAME "sce_rsa.pta"
 
-static TEE_Result rsassa_pkcs1024_signaturegenerate(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result
+rsassa_pkcs1024_signaturegenerate(uint32_t types,
+				  TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -33,14 +35,19 @@ static TEE_Result rsassa_pkcs1024_signaturegenerate(uint32_t types, TEE_Param pa
 	signature.pdata = (uint8_t *)params[1].memref.buffer;
 	signature.data_length = params[1].memref.size;
 	signature.data_type = 0;
-	if ((NULL == signature.pdata) || (HW_SCE_RSA_1024_DATA_BYTE_SIZE > signature.data_length))
+	if ((NULL == signature.pdata) ||
+	    (HW_SCE_RSA_1024_DATA_BYTE_SIZE > signature.data_length))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	wrapped_key = (sce_rsa1024_private_wrapped_key_t *)params[2].memref.buffer;
-	if ((NULL == wrapped_key) || (sizeof(sce_rsa1024_private_wrapped_key_t) != params[2].memref.size))
+	wrapped_key =
+		(sce_rsa1024_private_wrapped_key_t *)params[2].memref.buffer;
+	if ((NULL == wrapped_key) ||
+	    (sizeof(sce_rsa1024_private_wrapped_key_t) !=
+	     params[2].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.RSASSA_PKCS1024_SignatureGenerate(&message_hash, &signature, wrapped_key, HW_SCE_RSA_HASH_SHA256);
+	err = g_sce_protected_on_sce.RSASSA_PKCS1024_SignatureGenerate(
+		&message_hash, &signature, wrapped_key, HW_SCE_RSA_HASH_SHA256);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -59,7 +66,9 @@ static TEE_Result rsassa_pkcs1024_signaturegenerate(uint32_t types, TEE_Param pa
 	return TEE_SUCCESS;
 }
 
-static TEE_Result rsassa_pkcs1024_signatureverify(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result
+rsassa_pkcs1024_signatureverify(uint32_t types,
+				TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -76,7 +85,8 @@ static TEE_Result rsassa_pkcs1024_signatureverify(uint32_t types, TEE_Param para
 	signature.pdata = (uint8_t *)params[0].memref.buffer;
 	signature.data_length = params[0].memref.size;
 	signature.data_type = 0;
-	if ((NULL == signature.pdata) || (HW_SCE_RSA_1024_DATA_BYTE_SIZE != signature.data_length))
+	if ((NULL == signature.pdata) ||
+	    (HW_SCE_RSA_1024_DATA_BYTE_SIZE != signature.data_length))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	message_hash.pdata = (uint8_t *)params[1].memref.buffer;
@@ -85,11 +95,14 @@ static TEE_Result rsassa_pkcs1024_signatureverify(uint32_t types, TEE_Param para
 	if ((NULL == message_hash.pdata) && (0 < message_hash.data_length))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	wrapped_key = (sce_rsa1024_public_wrapped_key_t *)params[2].memref.buffer;
-	if ((NULL == wrapped_key) || (sizeof(sce_rsa1024_public_wrapped_key_t) != params[2].memref.size))
+	wrapped_key =
+		(sce_rsa1024_public_wrapped_key_t *)params[2].memref.buffer;
+	if ((NULL == wrapped_key) ||
+	    (sizeof(sce_rsa1024_public_wrapped_key_t) != params[2].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.RSASSA_PKCS1024_SignatureVerify(&signature, &message_hash, wrapped_key, HW_SCE_RSA_HASH_SHA256);
+	err = g_sce_protected_on_sce.RSASSA_PKCS1024_SignatureVerify(
+		&signature, &message_hash, wrapped_key, HW_SCE_RSA_HASH_SHA256);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -108,7 +121,9 @@ static TEE_Result rsassa_pkcs1024_signatureverify(uint32_t types, TEE_Param para
 	return TEE_SUCCESS;
 }
 
-static TEE_Result rsassa_pkcs2048_signaturegenerate(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result
+rsassa_pkcs2048_signaturegenerate(uint32_t types,
+				  TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -131,14 +146,19 @@ static TEE_Result rsassa_pkcs2048_signaturegenerate(uint32_t types, TEE_Param pa
 	signature.pdata = (uint8_t *)params[1].memref.buffer;
 	signature.data_length = params[1].memref.size;
 	signature.data_type = 0;
-	if ((NULL == signature.pdata) || (HW_SCE_RSA_2048_DATA_BYTE_SIZE > signature.data_length))
+	if ((NULL == signature.pdata) ||
+	    (HW_SCE_RSA_2048_DATA_BYTE_SIZE > signature.data_length))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	wrapped_key = (sce_rsa2048_private_wrapped_key_t *)params[2].memref.buffer;
-	if ((NULL == wrapped_key) || (sizeof(sce_rsa2048_private_wrapped_key_t) != params[2].memref.size))
+	wrapped_key =
+		(sce_rsa2048_private_wrapped_key_t *)params[2].memref.buffer;
+	if ((NULL == wrapped_key) ||
+	    (sizeof(sce_rsa2048_private_wrapped_key_t) !=
+	     params[2].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.RSASSA_PKCS2048_SignatureGenerate(&message_hash, &signature, wrapped_key, HW_SCE_RSA_HASH_SHA256);
+	err = g_sce_protected_on_sce.RSASSA_PKCS2048_SignatureGenerate(
+		&message_hash, &signature, wrapped_key, HW_SCE_RSA_HASH_SHA256);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -157,7 +177,9 @@ static TEE_Result rsassa_pkcs2048_signaturegenerate(uint32_t types, TEE_Param pa
 	return TEE_SUCCESS;
 }
 
-static TEE_Result rsassa_pkcs2048_signatureverify(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result
+rsassa_pkcs2048_signatureverify(uint32_t types,
+				TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -174,7 +196,8 @@ static TEE_Result rsassa_pkcs2048_signatureverify(uint32_t types, TEE_Param para
 	signature.pdata = (uint8_t *)params[0].memref.buffer;
 	signature.data_length = params[0].memref.size;
 	signature.data_type = 0;
-	if ((NULL == signature.pdata) || (HW_SCE_RSA_2048_DATA_BYTE_SIZE != signature.data_length))
+	if ((NULL == signature.pdata) ||
+	    (HW_SCE_RSA_2048_DATA_BYTE_SIZE != signature.data_length))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	message_hash.pdata = (uint8_t *)params[1].memref.buffer;
@@ -183,11 +206,14 @@ static TEE_Result rsassa_pkcs2048_signatureverify(uint32_t types, TEE_Param para
 	if ((NULL == message_hash.pdata) && (0 < message_hash.data_length))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	wrapped_key = (sce_rsa2048_public_wrapped_key_t *)params[2].memref.buffer;
-	if ((NULL == wrapped_key) || (sizeof(sce_rsa2048_public_wrapped_key_t) != params[2].memref.size))
+	wrapped_key =
+		(sce_rsa2048_public_wrapped_key_t *)params[2].memref.buffer;
+	if ((NULL == wrapped_key) ||
+	    (sizeof(sce_rsa2048_public_wrapped_key_t) != params[2].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.RSASSA_PKCS2048_SignatureVerify(&signature, &message_hash, wrapped_key, HW_SCE_RSA_HASH_SHA256);
+	err = g_sce_protected_on_sce.RSASSA_PKCS2048_SignatureVerify(
+		&signature, &message_hash, wrapped_key, HW_SCE_RSA_HASH_SHA256);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -206,7 +232,9 @@ static TEE_Result rsassa_pkcs2048_signatureverify(uint32_t types, TEE_Param para
 	return TEE_SUCCESS;
 }
 
-static TEE_Result rsassa_pkcs4096_signatureverify(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result
+rsassa_pkcs4096_signatureverify(uint32_t types,
+				TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -223,7 +251,8 @@ static TEE_Result rsassa_pkcs4096_signatureverify(uint32_t types, TEE_Param para
 	signature.pdata = (uint8_t *)params[0].memref.buffer;
 	signature.data_length = params[0].memref.size;
 	signature.data_type = 0;
-	if ((NULL == signature.pdata) || (HW_SCE_RSA_4096_DATA_BYTE_SIZE != signature.data_length))
+	if ((NULL == signature.pdata) ||
+	    (HW_SCE_RSA_4096_DATA_BYTE_SIZE != signature.data_length))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	message_hash.pdata = (uint8_t *)params[1].memref.buffer;
@@ -232,11 +261,14 @@ static TEE_Result rsassa_pkcs4096_signatureverify(uint32_t types, TEE_Param para
 	if ((NULL == message_hash.pdata) && (0 < message_hash.data_length))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	wrapped_key = (sce_rsa4096_public_wrapped_key_t *)params[2].memref.buffer;
-	if ((NULL == wrapped_key) || (sizeof(sce_rsa4096_public_wrapped_key_t) != params[2].memref.size))
+	wrapped_key =
+		(sce_rsa4096_public_wrapped_key_t *)params[2].memref.buffer;
+	if ((NULL == wrapped_key) ||
+	    (sizeof(sce_rsa4096_public_wrapped_key_t) != params[2].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.RSASSA_PKCS4096_SignatureVerify(&signature, &message_hash, wrapped_key, HW_SCE_RSA_HASH_SHA256);
+	err = g_sce_protected_on_sce.RSASSA_PKCS4096_SignatureVerify(
+		&signature, &message_hash, wrapped_key, HW_SCE_RSA_HASH_SHA256);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -255,7 +287,8 @@ static TEE_Result rsassa_pkcs4096_signatureverify(uint32_t types, TEE_Param para
 	return TEE_SUCCESS;
 }
 
-static TEE_Result rsaes_pkcs1024_encrypt(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result rsaes_pkcs1024_encrypt(uint32_t types,
+					 TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -281,11 +314,14 @@ static TEE_Result rsaes_pkcs1024_encrypt(uint32_t types, TEE_Param params[TEE_NU
 	if (NULL == cipher.pdata)
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	wrapped_key = (sce_rsa1024_public_wrapped_key_t *)params[2].memref.buffer;
-	if ((NULL == wrapped_key) || (sizeof(sce_rsa1024_public_wrapped_key_t) != params[2].memref.size))
+	wrapped_key =
+		(sce_rsa1024_public_wrapped_key_t *)params[2].memref.buffer;
+	if ((NULL == wrapped_key) ||
+	    (sizeof(sce_rsa1024_public_wrapped_key_t) != params[2].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.RSAES_PKCS1024_Encrypt(&plain, &cipher, wrapped_key);
+	err = g_sce_protected_on_sce.RSAES_PKCS1024_Encrypt(&plain, &cipher,
+							    wrapped_key);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -302,7 +338,8 @@ static TEE_Result rsaes_pkcs1024_encrypt(uint32_t types, TEE_Param params[TEE_NU
 	return TEE_SUCCESS;
 }
 
-static TEE_Result rsaes_pkcs1024_decrypt(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result rsaes_pkcs1024_decrypt(uint32_t types,
+					 TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -328,11 +365,15 @@ static TEE_Result rsaes_pkcs1024_decrypt(uint32_t types, TEE_Param params[TEE_NU
 	if (NULL == plain.pdata)
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	wrapped_key = (sce_rsa1024_private_wrapped_key_t *)params[2].memref.buffer;
-	if ((NULL == wrapped_key) || (sizeof(sce_rsa1024_private_wrapped_key_t) != params[2].memref.size))
+	wrapped_key =
+		(sce_rsa1024_private_wrapped_key_t *)params[2].memref.buffer;
+	if ((NULL == wrapped_key) ||
+	    (sizeof(sce_rsa1024_private_wrapped_key_t) !=
+	     params[2].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.RSAES_PKCS1024_Decrypt(&cipher, &plain, wrapped_key);
+	err = g_sce_protected_on_sce.RSAES_PKCS1024_Decrypt(&cipher, &plain,
+							    wrapped_key);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -349,7 +390,8 @@ static TEE_Result rsaes_pkcs1024_decrypt(uint32_t types, TEE_Param params[TEE_NU
 	return TEE_SUCCESS;
 }
 
-static TEE_Result rsaes_pkcs2048_encrypt(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result rsaes_pkcs2048_encrypt(uint32_t types,
+					 TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -375,11 +417,14 @@ static TEE_Result rsaes_pkcs2048_encrypt(uint32_t types, TEE_Param params[TEE_NU
 	if (NULL == cipher.pdata)
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	wrapped_key = (sce_rsa2048_public_wrapped_key_t *)params[2].memref.buffer;
-	if ((NULL == wrapped_key) || (sizeof(sce_rsa2048_public_wrapped_key_t) != params[2].memref.size))
+	wrapped_key =
+		(sce_rsa2048_public_wrapped_key_t *)params[2].memref.buffer;
+	if ((NULL == wrapped_key) ||
+	    (sizeof(sce_rsa2048_public_wrapped_key_t) != params[2].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.RSAES_PKCS2048_Encrypt(&plain, &cipher, wrapped_key);
+	err = g_sce_protected_on_sce.RSAES_PKCS2048_Encrypt(&plain, &cipher,
+							    wrapped_key);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -396,7 +441,8 @@ static TEE_Result rsaes_pkcs2048_encrypt(uint32_t types, TEE_Param params[TEE_NU
 	return TEE_SUCCESS;
 }
 
-static TEE_Result rsaes_pkcs2048_decrypt(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result rsaes_pkcs2048_decrypt(uint32_t types,
+					 TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -422,11 +468,15 @@ static TEE_Result rsaes_pkcs2048_decrypt(uint32_t types, TEE_Param params[TEE_NU
 	if (NULL == plain.pdata)
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	wrapped_key = (sce_rsa2048_private_wrapped_key_t *)params[2].memref.buffer;
-	if ((NULL == wrapped_key) || (sizeof(sce_rsa2048_private_wrapped_key_t) != params[2].memref.size))
+	wrapped_key =
+		(sce_rsa2048_private_wrapped_key_t *)params[2].memref.buffer;
+	if ((NULL == wrapped_key) ||
+	    (sizeof(sce_rsa2048_private_wrapped_key_t) !=
+	     params[2].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.RSAES_PKCS2048_Decrypt(&cipher, &plain, wrapped_key);
+	err = g_sce_protected_on_sce.RSAES_PKCS2048_Decrypt(&cipher, &plain,
+							    wrapped_key);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -443,7 +493,8 @@ static TEE_Result rsaes_pkcs2048_decrypt(uint32_t types, TEE_Param params[TEE_NU
 	return TEE_SUCCESS;
 }
 
-static TEE_Result rsaes_pkcs4096_encrypt(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result rsaes_pkcs4096_encrypt(uint32_t types,
+					 TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -469,11 +520,14 @@ static TEE_Result rsaes_pkcs4096_encrypt(uint32_t types, TEE_Param params[TEE_NU
 	if (NULL == cipher.pdata)
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	wrapped_key = (sce_rsa4096_public_wrapped_key_t *)params[2].memref.buffer;
-	if ((NULL == wrapped_key) || (sizeof(sce_rsa4096_public_wrapped_key_t) != params[2].memref.size))
+	wrapped_key =
+		(sce_rsa4096_public_wrapped_key_t *)params[2].memref.buffer;
+	if ((NULL == wrapped_key) ||
+	    (sizeof(sce_rsa4096_public_wrapped_key_t) != params[2].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.RSAES_PKCS4096_Encrypt(&plain, &cipher, wrapped_key);
+	err = g_sce_protected_on_sce.RSAES_PKCS4096_Encrypt(&plain, &cipher,
+							    wrapped_key);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -494,7 +548,7 @@ static TEE_Result invoke_command(void *session __unused, uint32_t cmd,
 				 uint32_t ptypes,
 				 TEE_Param params[TEE_NUM_PARAMS])
 {
-	DMSG(PTA_NAME" command %#"PRIx32" ptypes %#"PRIx32, cmd, ptypes);
+	DMSG(PTA_NAME " command %#" PRIx32 " ptypes %#" PRIx32, cmd, ptypes);
 
 	switch (cmd) {
 	case PTA_CMD_RSASSA_PKCS1024_SignatureGenerate:

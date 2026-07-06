@@ -32,20 +32,21 @@ static uint32_t crc32calc(const uint8_t *data, uint32_t len)
 	return crc;
 }
 
-static TEE_Result aes128_wrappedkeygenerate(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result aes128_wrappedkeygenerate(uint32_t types,
+					    TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
 	sce_aes_wrapped_key_t *wrapped_key;
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE,
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE,
 				     TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	wrapped_key = (sce_aes_wrapped_key_t *)params[0].memref.buffer;
-	if ((NULL == wrapped_key) || (sizeof(sce_aes_wrapped_key_t) > params[0].memref.size))
+	if ((NULL == wrapped_key) ||
+	    (sizeof(sce_aes_wrapped_key_t) > params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	err = g_sce_protected_on_sce.AES128_WrappedKeyGenerate(wrapped_key);
@@ -61,20 +62,21 @@ static TEE_Result aes128_wrappedkeygenerate(uint32_t types, TEE_Param params[TEE
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes256_wrappedkeygenerate(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result aes256_wrappedkeygenerate(uint32_t types,
+					    TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
 	sce_aes_wrapped_key_t *wrapped_key;
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE,
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE,
 				     TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	wrapped_key = (sce_aes_wrapped_key_t *)params[0].memref.buffer;
-	if ((NULL == wrapped_key) || (sizeof(sce_aes_wrapped_key_t) > params[0].memref.size))
+	if ((NULL == wrapped_key) ||
+	    (sizeof(sce_aes_wrapped_key_t) > params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	err = g_sce_protected_on_sce.AES256_WrappedKeyGenerate(wrapped_key);
@@ -90,23 +92,26 @@ static TEE_Result aes256_wrappedkeygenerate(uint32_t types, TEE_Param params[TEE
 	return TEE_SUCCESS;
 }
 
-static TEE_Result rsa1024_wrappedkeypairgenerate(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result
+rsa1024_wrappedkeypairgenerate(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
 	sce_rsa1024_wrapped_pair_key_t *wrapped_pair_key;
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE,
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE,
 				     TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	wrapped_pair_key = (sce_rsa1024_wrapped_pair_key_t *)params[0].memref.buffer;
-	if ((NULL == wrapped_pair_key) || (sizeof(sce_rsa1024_wrapped_pair_key_t) > params[0].memref.size))
+	wrapped_pair_key =
+		(sce_rsa1024_wrapped_pair_key_t *)params[0].memref.buffer;
+	if ((NULL == wrapped_pair_key) ||
+	    (sizeof(sce_rsa1024_wrapped_pair_key_t) > params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.RSA1024_WrappedKeyPairGenerate(wrapped_pair_key);
+	err = g_sce_protected_on_sce.RSA1024_WrappedKeyPairGenerate(
+		wrapped_pair_key);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -121,23 +126,26 @@ static TEE_Result rsa1024_wrappedkeypairgenerate(uint32_t types, TEE_Param param
 	return TEE_SUCCESS;
 }
 
-static TEE_Result rsa2048_wrappedkeypairgenerate(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result
+rsa2048_wrappedkeypairgenerate(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
 	sce_rsa2048_wrapped_pair_key_t *wrapped_pair_key;
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE,
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE,
 				     TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	wrapped_pair_key = (sce_rsa2048_wrapped_pair_key_t *)params[0].memref.buffer;
-	if ((NULL == wrapped_pair_key) || (sizeof(sce_rsa2048_wrapped_pair_key_t) > params[0].memref.size))
+	wrapped_pair_key =
+		(sce_rsa2048_wrapped_pair_key_t *)params[0].memref.buffer;
+	if ((NULL == wrapped_pair_key) ||
+	    (sizeof(sce_rsa2048_wrapped_pair_key_t) > params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.RSA2048_WrappedKeyPairGenerate(wrapped_pair_key);
+	err = g_sce_protected_on_sce.RSA2048_WrappedKeyPairGenerate(
+		wrapped_pair_key);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -152,23 +160,27 @@ static TEE_Result rsa2048_wrappedkeypairgenerate(uint32_t types, TEE_Param param
 	return TEE_SUCCESS;
 }
 
-static TEE_Result ecc_secp192r1_wrappedkeypairgenerate(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result
+ecc_secp192r1_wrappedkeypairgenerate(uint32_t types,
+				     TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
 	sce_ecc_wrapped_pair_key_t *wrapped_pair_key;
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE,
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE,
 				     TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	wrapped_pair_key = (sce_ecc_wrapped_pair_key_t *)params[0].memref.buffer;
-	if ((NULL == wrapped_pair_key) || (sizeof(sce_ecc_wrapped_pair_key_t) > params[0].memref.size))
+	wrapped_pair_key =
+		(sce_ecc_wrapped_pair_key_t *)params[0].memref.buffer;
+	if ((NULL == wrapped_pair_key) ||
+	    (sizeof(sce_ecc_wrapped_pair_key_t) > params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.ECC_secp192r1_WrappedKeyPairGenerate(wrapped_pair_key);
+	err = g_sce_protected_on_sce.ECC_secp192r1_WrappedKeyPairGenerate(
+		wrapped_pair_key);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -183,23 +195,27 @@ static TEE_Result ecc_secp192r1_wrappedkeypairgenerate(uint32_t types, TEE_Param
 	return TEE_SUCCESS;
 }
 
-static TEE_Result ecc_secp224r1_wrappedkeypairgenerate(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result
+ecc_secp224r1_wrappedkeypairgenerate(uint32_t types,
+				     TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
 	sce_ecc_wrapped_pair_key_t *wrapped_pair_key;
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE,
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE,
 				     TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	wrapped_pair_key = (sce_ecc_wrapped_pair_key_t *)params[0].memref.buffer;
-	if ((NULL == wrapped_pair_key) || (sizeof(sce_ecc_wrapped_pair_key_t) > params[0].memref.size))
+	wrapped_pair_key =
+		(sce_ecc_wrapped_pair_key_t *)params[0].memref.buffer;
+	if ((NULL == wrapped_pair_key) ||
+	    (sizeof(sce_ecc_wrapped_pair_key_t) > params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.ECC_secp224r1_WrappedKeyPairGenerate(wrapped_pair_key);
+	err = g_sce_protected_on_sce.ECC_secp224r1_WrappedKeyPairGenerate(
+		wrapped_pair_key);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -214,23 +230,27 @@ static TEE_Result ecc_secp224r1_wrappedkeypairgenerate(uint32_t types, TEE_Param
 	return TEE_SUCCESS;
 }
 
-static TEE_Result ecc_secp256r1_wrappedkeypairgenerate(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result
+ecc_secp256r1_wrappedkeypairgenerate(uint32_t types,
+				     TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
 	sce_ecc_wrapped_pair_key_t *wrapped_pair_key;
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE,
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE,
 				     TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	wrapped_pair_key = (sce_ecc_wrapped_pair_key_t *)params[0].memref.buffer;
-	if ((NULL == wrapped_pair_key) || (sizeof(sce_ecc_wrapped_pair_key_t) > params[0].memref.size))
+	wrapped_pair_key =
+		(sce_ecc_wrapped_pair_key_t *)params[0].memref.buffer;
+	if ((NULL == wrapped_pair_key) ||
+	    (sizeof(sce_ecc_wrapped_pair_key_t) > params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.ECC_secp256r1_WrappedKeyPairGenerate(wrapped_pair_key);
+	err = g_sce_protected_on_sce.ECC_secp256r1_WrappedKeyPairGenerate(
+		wrapped_pair_key);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -245,23 +265,27 @@ static TEE_Result ecc_secp256r1_wrappedkeypairgenerate(uint32_t types, TEE_Param
 	return TEE_SUCCESS;
 }
 
-static TEE_Result ecc_brainpoolp512r1_wrappedkeypairgenerate(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result
+ecc_brainpoolp512r1_wrappedkeypairgenerate(uint32_t types,
+					   TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
 	sce_ecc_wrapped_pair_key_t *wrapped_pair_key;
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE,
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE,
 				     TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	wrapped_pair_key = (sce_ecc_wrapped_pair_key_t *)params[0].memref.buffer;
-	if ((NULL == wrapped_pair_key) || (sizeof(sce_ecc_wrapped_pair_key_t) > params[0].memref.size))
+	wrapped_pair_key =
+		(sce_ecc_wrapped_pair_key_t *)params[0].memref.buffer;
+	if ((NULL == wrapped_pair_key) ||
+	    (sizeof(sce_ecc_wrapped_pair_key_t) > params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.ECC_BrainpoolP512r1_WrappedKeyPairGenerate(wrapped_pair_key);
+	err = g_sce_protected_on_sce.ECC_BrainpoolP512r1_WrappedKeyPairGenerate(
+		wrapped_pair_key);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -276,7 +300,8 @@ static TEE_Result ecc_brainpoolp512r1_wrappedkeypairgenerate(uint32_t types, TEE
 	return TEE_SUCCESS;
 }
 
-static TEE_Result randomnumbergenerate(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result randomnumbergenerate(uint32_t types,
+				       TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -285,8 +310,7 @@ static TEE_Result randomnumbergenerate(uint32_t types, TEE_Param params[TEE_NUM_
 	const uint32_t random_length = 16;
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE,
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE,
 				     TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
@@ -307,25 +331,33 @@ static TEE_Result randomnumbergenerate(uint32_t types, TEE_Param params[TEE_NUM_
 	return TEE_SUCCESS;
 }
 
-static int parser_encrypted_key(uintptr_t enc_data, size_t size, uint8_t **initial_vector, uint8_t **encrypted_key)
+static int parser_encrypted_key(uintptr_t enc_data, size_t size,
+				uint8_t **initial_vector,
+				uint8_t **encrypted_key)
 {
 	struct st_encrypted_key_header_t {
 		uint32_t unused[2];
-		uint8_t  initial_vector[16];
+		uint8_t initial_vector[16];
 	};
 
-	uint32_t expected_crc = *(uint32_t *)((enc_data + size) - sizeof(expected_crc));
-	uint32_t crc = crc32calc((uint8_t *)enc_data, size - sizeof(expected_crc));
+	uint32_t expected_crc =
+		*(uint32_t *)((enc_data + size) - sizeof(expected_crc));
+	uint32_t crc =
+		crc32calc((uint8_t *)enc_data, size - sizeof(expected_crc));
 
 	if (expected_crc == TEE_U32_BSWAP(crc)) {
-		*initial_vector = ((struct st_encrypted_key_header_t *)enc_data)->initial_vector;
-		*encrypted_key  = (uint8_t *)(enc_data + sizeof(struct st_encrypted_key_header_t));
+		*initial_vector = ((struct st_encrypted_key_header_t *)enc_data)
+					  ->initial_vector;
+		*encrypted_key =
+			(uint8_t *)(enc_data +
+				    sizeof(struct st_encrypted_key_header_t));
 		return 0;
 	}
 	return -1;
 }
 
-static TEE_Result aes128_encryptedkeywrap(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result aes128_encryptedkeywrap(uint32_t types,
+					  TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -335,21 +367,25 @@ static TEE_Result aes128_encryptedkeywrap(uint32_t types, TEE_Param params[TEE_N
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
 				     TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE))
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	if ((!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t)) || (sizeof(st_encrypted_aes128_key_t) > params[0].memref.size))
+	if ((!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t)) ||
+	    (sizeof(st_encrypted_aes128_key_t) > params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	if (0 != parser_encrypted_key((uintptr_t)params[0].memref.buffer, sizeof(st_encrypted_aes128_key_t), &initial_vector, &encrypted_key))
+	if (0 != parser_encrypted_key((uintptr_t)params[0].memref.buffer,
+				      sizeof(st_encrypted_aes128_key_t),
+				      &initial_vector, &encrypted_key))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	wrapped_key = (sce_aes_wrapped_key_t *)params[1].memref.buffer;
-	if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) || (sizeof(sce_aes_wrapped_key_t) > params[1].memref.size))
+	if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) ||
+	    (sizeof(sce_aes_wrapped_key_t) > params[1].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.AES128_EncryptedKeyWrap(initial_vector, encrypted_key, &key_update_key, wrapped_key);
+	err = g_sce_protected_on_sce.AES128_EncryptedKeyWrap(
+		initial_vector, encrypted_key, &key_update_key, wrapped_key);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -364,7 +400,8 @@ static TEE_Result aes128_encryptedkeywrap(uint32_t types, TEE_Param params[TEE_N
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes256_encryptedkeywrap(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result aes256_encryptedkeywrap(uint32_t types,
+					  TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -374,21 +411,25 @@ static TEE_Result aes256_encryptedkeywrap(uint32_t types, TEE_Param params[TEE_N
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
 				     TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE))
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	if ((!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t)) || (sizeof(st_encrypted_aes256_key_t) > params[0].memref.size))
+	if ((!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t)) ||
+	    (sizeof(st_encrypted_aes256_key_t) > params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	if (0 != parser_encrypted_key((uintptr_t)params[0].memref.buffer, sizeof(st_encrypted_aes256_key_t), &initial_vector, &encrypted_key))
+	if (0 != parser_encrypted_key((uintptr_t)params[0].memref.buffer,
+				      sizeof(st_encrypted_aes256_key_t),
+				      &initial_vector, &encrypted_key))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	wrapped_key = (sce_aes_wrapped_key_t *)params[1].memref.buffer;
-	if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) || (sizeof(sce_aes_wrapped_key_t) > params[1].memref.size))
+	if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) ||
+	    (sizeof(sce_aes_wrapped_key_t) > params[1].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.AES256_EncryptedKeyWrap(initial_vector, encrypted_key, &key_update_key, wrapped_key);
+	err = g_sce_protected_on_sce.AES256_EncryptedKeyWrap(
+		initial_vector, encrypted_key, &key_update_key, wrapped_key);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -403,7 +444,8 @@ static TEE_Result aes256_encryptedkeywrap(uint32_t types, TEE_Param params[TEE_N
 	return TEE_SUCCESS;
 }
 
-static TEE_Result rsa1024_encryptedpublickeywrap(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result
+rsa1024_encryptedpublickeywrap(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -413,21 +455,28 @@ static TEE_Result rsa1024_encryptedpublickeywrap(uint32_t types, TEE_Param param
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
 				     TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE))
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	if ((!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t)) || (sizeof(st_encrypted_rsa_1024_public_key_t) > params[0].memref.size))
+	if ((!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t)) ||
+	    (sizeof(st_encrypted_rsa_1024_public_key_t) >
+	     params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	if (0 != parser_encrypted_key((uintptr_t)params[0].memref.buffer, sizeof(st_encrypted_rsa_1024_public_key_t), &initial_vector, &encrypted_key))
+	if (0 !=
+	    parser_encrypted_key((uintptr_t)params[0].memref.buffer,
+				 sizeof(st_encrypted_rsa_1024_public_key_t),
+				 &initial_vector, &encrypted_key))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	wrapped_key = (sce_rsa1024_public_wrapped_key_t *)params[1].memref.buffer;
-	if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) || (sizeof(sce_rsa1024_public_wrapped_key_t) > params[1].memref.size))
+	wrapped_key =
+		(sce_rsa1024_public_wrapped_key_t *)params[1].memref.buffer;
+	if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) ||
+	    (sizeof(sce_rsa1024_public_wrapped_key_t) > params[1].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.RSA1024_EncryptedPublicKeyWrap(initial_vector, encrypted_key, &key_update_key, wrapped_key);
+	err = g_sce_protected_on_sce.RSA1024_EncryptedPublicKeyWrap(
+		initial_vector, encrypted_key, &key_update_key, wrapped_key);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -442,7 +491,9 @@ static TEE_Result rsa1024_encryptedpublickeywrap(uint32_t types, TEE_Param param
 	return TEE_SUCCESS;
 }
 
-static TEE_Result rsa1024_encryptedprivatekeywrap(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result
+rsa1024_encryptedprivatekeywrap(uint32_t types,
+				TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -452,21 +503,28 @@ static TEE_Result rsa1024_encryptedprivatekeywrap(uint32_t types, TEE_Param para
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
 				     TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE))
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	if ((!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t)) || (sizeof(st_encrypted_rsa_1024_private_key_t) > params[0].memref.size))
+	if ((!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t)) ||
+	    (sizeof(st_encrypted_rsa_1024_private_key_t) >
+	     params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	if (0 != parser_encrypted_key((uintptr_t)params[0].memref.buffer, sizeof(st_encrypted_rsa_1024_private_key_t), &initial_vector, &encrypted_key))
+	if (0 !=
+	    parser_encrypted_key((uintptr_t)params[0].memref.buffer,
+				 sizeof(st_encrypted_rsa_1024_private_key_t),
+				 &initial_vector, &encrypted_key))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	wrapped_key = (sce_rsa1024_private_wrapped_key_t *)params[1].memref.buffer;
-	if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) || (sizeof(sce_rsa1024_private_wrapped_key_t) > params[1].memref.size))
+	wrapped_key =
+		(sce_rsa1024_private_wrapped_key_t *)params[1].memref.buffer;
+	if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) ||
+	    (sizeof(sce_rsa1024_private_wrapped_key_t) > params[1].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.RSA1024_EncryptedPrivateKeyWrap(initial_vector, encrypted_key, &key_update_key, wrapped_key);
+	err = g_sce_protected_on_sce.RSA1024_EncryptedPrivateKeyWrap(
+		initial_vector, encrypted_key, &key_update_key, wrapped_key);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -481,7 +539,8 @@ static TEE_Result rsa1024_encryptedprivatekeywrap(uint32_t types, TEE_Param para
 	return TEE_SUCCESS;
 }
 
-static TEE_Result rsa2048_encryptedpublickeywrap(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result
+rsa2048_encryptedpublickeywrap(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -491,21 +550,28 @@ static TEE_Result rsa2048_encryptedpublickeywrap(uint32_t types, TEE_Param param
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
 				     TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE))
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	if ((!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t)) || (sizeof(st_encrypted_rsa_2048_public_key_t) > params[0].memref.size))
+	if ((!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t)) ||
+	    (sizeof(st_encrypted_rsa_2048_public_key_t) >
+	     params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	if (0 != parser_encrypted_key((uintptr_t)params[0].memref.buffer, sizeof(st_encrypted_rsa_2048_public_key_t), &initial_vector, &encrypted_key))
+	if (0 !=
+	    parser_encrypted_key((uintptr_t)params[0].memref.buffer,
+				 sizeof(st_encrypted_rsa_2048_public_key_t),
+				 &initial_vector, &encrypted_key))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	wrapped_key = (sce_rsa2048_public_wrapped_key_t *)params[1].memref.buffer;
-	if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) || (sizeof(sce_rsa2048_public_wrapped_key_t) > params[1].memref.size))
+	wrapped_key =
+		(sce_rsa2048_public_wrapped_key_t *)params[1].memref.buffer;
+	if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) ||
+	    (sizeof(sce_rsa2048_public_wrapped_key_t) > params[1].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.RSA2048_EncryptedPublicKeyWrap(initial_vector, encrypted_key, &key_update_key, wrapped_key);
+	err = g_sce_protected_on_sce.RSA2048_EncryptedPublicKeyWrap(
+		initial_vector, encrypted_key, &key_update_key, wrapped_key);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -520,7 +586,9 @@ static TEE_Result rsa2048_encryptedpublickeywrap(uint32_t types, TEE_Param param
 	return TEE_SUCCESS;
 }
 
-static TEE_Result rsa2048_encryptedprivatekeywrap(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result
+rsa2048_encryptedprivatekeywrap(uint32_t types,
+				TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -530,21 +598,28 @@ static TEE_Result rsa2048_encryptedprivatekeywrap(uint32_t types, TEE_Param para
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
 				     TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE))
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	if ((!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t)) || (sizeof(st_encrypted_rsa_2048_private_key_t) > params[0].memref.size))
+	if ((!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t)) ||
+	    (sizeof(st_encrypted_rsa_2048_private_key_t) >
+	     params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	if (0 != parser_encrypted_key((uintptr_t)params[0].memref.buffer, sizeof(st_encrypted_rsa_2048_private_key_t), &initial_vector, &encrypted_key))
+	if (0 !=
+	    parser_encrypted_key((uintptr_t)params[0].memref.buffer,
+				 sizeof(st_encrypted_rsa_2048_private_key_t),
+				 &initial_vector, &encrypted_key))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	wrapped_key = (sce_rsa2048_private_wrapped_key_t *)params[1].memref.buffer;
-	if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) || (sizeof(sce_rsa2048_private_wrapped_key_t) > params[1].memref.size))
+	wrapped_key =
+		(sce_rsa2048_private_wrapped_key_t *)params[1].memref.buffer;
+	if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) ||
+	    (sizeof(sce_rsa2048_private_wrapped_key_t) > params[1].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.RSA2048_EncryptedPrivateKeyWrap(initial_vector, encrypted_key, &key_update_key, wrapped_key);
+	err = g_sce_protected_on_sce.RSA2048_EncryptedPrivateKeyWrap(
+		initial_vector, encrypted_key, &key_update_key, wrapped_key);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -559,7 +634,8 @@ static TEE_Result rsa2048_encryptedprivatekeywrap(uint32_t types, TEE_Param para
 	return TEE_SUCCESS;
 }
 
-static TEE_Result rsa4096_encryptedpublickeywrap(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result
+rsa4096_encryptedpublickeywrap(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -569,28 +645,35 @@ static TEE_Result rsa4096_encryptedpublickeywrap(uint32_t types, TEE_Param param
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
 				     TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE))
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	if ((!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t)) || (sizeof(st_encrypted_rsa_4096_public_key_t) > params[0].memref.size))
+	if ((!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t)) ||
+	    (sizeof(st_encrypted_rsa_4096_public_key_t) >
+	     params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	if (0 != parser_encrypted_key((uintptr_t)params[0].memref.buffer, sizeof(st_encrypted_rsa_4096_public_key_t), &initial_vector, &encrypted_key))
+	if (0 !=
+	    parser_encrypted_key((uintptr_t)params[0].memref.buffer,
+				 sizeof(st_encrypted_rsa_4096_public_key_t),
+				 &initial_vector, &encrypted_key))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	wrapped_key = (sce_rsa4096_public_wrapped_key_t *)params[1].memref.buffer;
-	if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) || (sizeof(sce_rsa4096_public_wrapped_key_t) > params[1].memref.size))
+	wrapped_key =
+		(sce_rsa4096_public_wrapped_key_t *)params[1].memref.buffer;
+	if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) ||
+	    (sizeof(sce_rsa4096_public_wrapped_key_t) > params[1].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.RSA4096_EncryptedPublicKeyWrap(initial_vector, encrypted_key, &key_update_key, wrapped_key);
+	err = g_sce_protected_on_sce.RSA4096_EncryptedPublicKeyWrap(
+		initial_vector, encrypted_key, &key_update_key, wrapped_key);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
 	case FSP_ERR_CRYPTO_SCE_RESOURCE_CONFLICT:
 		return TEE_ERROR_ACCESS_CONFLICT;
 	default: /* FSP_ERR_CRYPTO_SCE_FAIL */
-	return TEE_ERROR_GENERIC;
+		return TEE_ERROR_GENERIC;
 	}
 
 	params[1].memref.size = sizeof(sce_rsa4096_public_wrapped_key_t);
@@ -598,7 +681,9 @@ static TEE_Result rsa4096_encryptedpublickeywrap(uint32_t types, TEE_Param param
 	return TEE_SUCCESS;
 }
 
-static TEE_Result ecc_secp192r1_encryptedpublickeywrap(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result
+ecc_secp192r1_encryptedpublickeywrap(uint32_t types,
+				     TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -608,21 +693,27 @@ static TEE_Result ecc_secp192r1_encryptedpublickeywrap(uint32_t types, TEE_Param
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
 				     TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE))
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	if ((!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t)) || (sizeof(st_encrypted_ecc_secp192r1_public_key_t) > params[0].memref.size))
+	if ((!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t)) ||
+	    (sizeof(st_encrypted_ecc_secp192r1_public_key_t) >
+	     params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	if (0 != parser_encrypted_key((uintptr_t)params[0].memref.buffer, sizeof(st_encrypted_ecc_secp192r1_public_key_t), &initial_vector, &encrypted_key))
+	if (0 != parser_encrypted_key(
+			 (uintptr_t)params[0].memref.buffer,
+			 sizeof(st_encrypted_ecc_secp192r1_public_key_t),
+			 &initial_vector, &encrypted_key))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	wrapped_key = (sce_ecc_public_wrapped_key_t *)params[1].memref.buffer;
-	if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) || (sizeof(sce_ecc_public_wrapped_key_t) > params[1].memref.size))
+	if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) ||
+	    (sizeof(sce_ecc_public_wrapped_key_t) > params[1].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.ECC_secp192r1_EncryptedPublicKeyWrap(initial_vector, encrypted_key, &key_update_key, wrapped_key);
+	err = g_sce_protected_on_sce.ECC_secp192r1_EncryptedPublicKeyWrap(
+		initial_vector, encrypted_key, &key_update_key, wrapped_key);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -637,7 +728,9 @@ static TEE_Result ecc_secp192r1_encryptedpublickeywrap(uint32_t types, TEE_Param
 	return TEE_SUCCESS;
 }
 
-static TEE_Result ecc_secp192r1_encryptedprivatekeywrap(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result
+ecc_secp192r1_encryptedprivatekeywrap(uint32_t types,
+				      TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -647,21 +740,27 @@ static TEE_Result ecc_secp192r1_encryptedprivatekeywrap(uint32_t types, TEE_Para
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
 				     TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE))
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	if ((!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t)) || (sizeof(st_encrypted_ecc_secp192r1_private_key_t) > params[0].memref.size))
+	if ((!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t)) ||
+	    (sizeof(st_encrypted_ecc_secp192r1_private_key_t) >
+	     params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	if (0 != parser_encrypted_key((uintptr_t)params[0].memref.buffer, sizeof(st_encrypted_ecc_secp192r1_private_key_t), &initial_vector, &encrypted_key))
+	if (0 != parser_encrypted_key(
+			 (uintptr_t)params[0].memref.buffer,
+			 sizeof(st_encrypted_ecc_secp192r1_private_key_t),
+			 &initial_vector, &encrypted_key))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	wrapped_key = (sce_ecc_private_wrapped_key_t *)params[1].memref.buffer;
-	if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) || (sizeof(sce_ecc_private_wrapped_key_t) > params[1].memref.size))
+	if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) ||
+	    (sizeof(sce_ecc_private_wrapped_key_t) > params[1].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.ECC_secp192r1_EncryptedPrivateKeyWrap(initial_vector, encrypted_key, &key_update_key, wrapped_key);
+	err = g_sce_protected_on_sce.ECC_secp192r1_EncryptedPrivateKeyWrap(
+		initial_vector, encrypted_key, &key_update_key, wrapped_key);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -676,7 +775,9 @@ static TEE_Result ecc_secp192r1_encryptedprivatekeywrap(uint32_t types, TEE_Para
 	return TEE_SUCCESS;
 }
 
-static TEE_Result ecc_secp224r1_encryptedpublickeywrap(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result
+ecc_secp224r1_encryptedpublickeywrap(uint32_t types,
+				     TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -686,21 +787,27 @@ static TEE_Result ecc_secp224r1_encryptedpublickeywrap(uint32_t types, TEE_Param
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
 				     TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE))
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	if ((!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t)) || (sizeof(st_encrypted_ecc_secp224r1_public_key_t) > params[0].memref.size))
+	if ((!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t)) ||
+	    (sizeof(st_encrypted_ecc_secp224r1_public_key_t) >
+	     params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	if (0 != parser_encrypted_key((uintptr_t)params[0].memref.buffer, sizeof(st_encrypted_ecc_secp224r1_public_key_t), &initial_vector, &encrypted_key))
+	if (0 != parser_encrypted_key(
+			 (uintptr_t)params[0].memref.buffer,
+			 sizeof(st_encrypted_ecc_secp224r1_public_key_t),
+			 &initial_vector, &encrypted_key))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	wrapped_key = (sce_ecc_public_wrapped_key_t *)params[1].memref.buffer;
-	if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) || (sizeof(sce_ecc_public_wrapped_key_t) > params[1].memref.size))
+	if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) ||
+	    (sizeof(sce_ecc_public_wrapped_key_t) > params[1].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.ECC_secp224r1_EncryptedPublicKeyWrap(initial_vector, encrypted_key, &key_update_key, wrapped_key);
+	err = g_sce_protected_on_sce.ECC_secp224r1_EncryptedPublicKeyWrap(
+		initial_vector, encrypted_key, &key_update_key, wrapped_key);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -715,7 +822,9 @@ static TEE_Result ecc_secp224r1_encryptedpublickeywrap(uint32_t types, TEE_Param
 	return TEE_SUCCESS;
 }
 
-static TEE_Result ecc_secp224r1_encryptedprivatekeywrap(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result
+ecc_secp224r1_encryptedprivatekeywrap(uint32_t types,
+				      TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -725,21 +834,27 @@ static TEE_Result ecc_secp224r1_encryptedprivatekeywrap(uint32_t types, TEE_Para
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
 				     TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE))
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	if ((!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t)) || (sizeof(st_encrypted_ecc_secp224r1_private_key_t) > params[0].memref.size))
+	if ((!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t)) ||
+	    (sizeof(st_encrypted_ecc_secp224r1_private_key_t) >
+	     params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	if (0 != parser_encrypted_key((uintptr_t)params[0].memref.buffer, sizeof(st_encrypted_ecc_secp224r1_private_key_t), &initial_vector, &encrypted_key))
+	if (0 != parser_encrypted_key(
+			 (uintptr_t)params[0].memref.buffer,
+			 sizeof(st_encrypted_ecc_secp224r1_private_key_t),
+			 &initial_vector, &encrypted_key))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	wrapped_key = (sce_ecc_private_wrapped_key_t *)params[1].memref.buffer;
-	if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) || (sizeof(sce_ecc_private_wrapped_key_t) > params[1].memref.size))
+	if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) ||
+	    (sizeof(sce_ecc_private_wrapped_key_t) > params[1].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.ECC_secp224r1_EncryptedPrivateKeyWrap(initial_vector, encrypted_key, &key_update_key, wrapped_key);
+	err = g_sce_protected_on_sce.ECC_secp224r1_EncryptedPrivateKeyWrap(
+		initial_vector, encrypted_key, &key_update_key, wrapped_key);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -754,7 +869,9 @@ static TEE_Result ecc_secp224r1_encryptedprivatekeywrap(uint32_t types, TEE_Para
 	return TEE_SUCCESS;
 }
 
-static TEE_Result ecc_secp256r1_encryptedpublickeywrap(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result
+ecc_secp256r1_encryptedpublickeywrap(uint32_t types,
+				     TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -764,21 +881,27 @@ static TEE_Result ecc_secp256r1_encryptedpublickeywrap(uint32_t types, TEE_Param
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
 				     TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE))
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	if ((!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t)) || (sizeof(st_encrypted_ecc_secp256r1_public_key_t) > params[0].memref.size))
+	if ((!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t)) ||
+	    (sizeof(st_encrypted_ecc_secp256r1_public_key_t) >
+	     params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	if (0 != parser_encrypted_key((uintptr_t)params[0].memref.buffer, sizeof(st_encrypted_ecc_secp256r1_public_key_t), &initial_vector, &encrypted_key))
+	if (0 != parser_encrypted_key(
+			 (uintptr_t)params[0].memref.buffer,
+			 sizeof(st_encrypted_ecc_secp256r1_public_key_t),
+			 &initial_vector, &encrypted_key))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	wrapped_key = (sce_ecc_public_wrapped_key_t *)params[1].memref.buffer;
-	if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) || (sizeof(sce_ecc_public_wrapped_key_t) > params[1].memref.size))
+	if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) ||
+	    (sizeof(sce_ecc_public_wrapped_key_t) > params[1].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.ECC_secp256r1_EncryptedPublicKeyWrap(initial_vector, encrypted_key, &key_update_key, wrapped_key);
+	err = g_sce_protected_on_sce.ECC_secp256r1_EncryptedPublicKeyWrap(
+		initial_vector, encrypted_key, &key_update_key, wrapped_key);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -793,7 +916,9 @@ static TEE_Result ecc_secp256r1_encryptedpublickeywrap(uint32_t types, TEE_Param
 	return TEE_SUCCESS;
 }
 
-static TEE_Result ecc_secp256r1_encryptedprivatekeywrap(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result
+ecc_secp256r1_encryptedprivatekeywrap(uint32_t types,
+				      TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -803,21 +928,27 @@ static TEE_Result ecc_secp256r1_encryptedprivatekeywrap(uint32_t types, TEE_Para
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
 				     TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE))
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	if ((!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t)) || (sizeof(st_encrypted_ecc_secp256r1_private_key_t) > params[0].memref.size))
+	if ((!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t)) ||
+	    (sizeof(st_encrypted_ecc_secp256r1_private_key_t) >
+	     params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	if (0 != parser_encrypted_key((uintptr_t)params[0].memref.buffer, sizeof(st_encrypted_ecc_secp256r1_private_key_t), &initial_vector, &encrypted_key))
+	if (0 != parser_encrypted_key(
+			 (uintptr_t)params[0].memref.buffer,
+			 sizeof(st_encrypted_ecc_secp256r1_private_key_t),
+			 &initial_vector, &encrypted_key))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	wrapped_key = (sce_ecc_private_wrapped_key_t *)params[1].memref.buffer;
-	if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) || (sizeof(sce_ecc_private_wrapped_key_t) > params[1].memref.size))
+	if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) ||
+	    (sizeof(sce_ecc_private_wrapped_key_t) > params[1].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.ECC_secp256r1_EncryptedPrivateKeyWrap(initial_vector, encrypted_key, &key_update_key, wrapped_key);
+	err = g_sce_protected_on_sce.ECC_secp256r1_EncryptedPrivateKeyWrap(
+		initial_vector, encrypted_key, &key_update_key, wrapped_key);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -832,7 +963,9 @@ static TEE_Result ecc_secp256r1_encryptedprivatekeywrap(uint32_t types, TEE_Para
 	return TEE_SUCCESS;
 }
 
-static TEE_Result ecc_brainpoolp512r1_encryptedpublickeywrap(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result
+ecc_brainpoolp512r1_encryptedpublickeywrap(uint32_t types,
+					   TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -842,21 +975,27 @@ static TEE_Result ecc_brainpoolp512r1_encryptedpublickeywrap(uint32_t types, TEE
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
 				     TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE))
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	if ((!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t)) || (sizeof(st_encrypted_ecc_brainpoolp512r1_public_key_t) > params[0].memref.size))
+	if ((!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t)) ||
+	    (sizeof(st_encrypted_ecc_brainpoolp512r1_public_key_t) >
+	     params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	if (0 != parser_encrypted_key((uintptr_t)params[0].memref.buffer, sizeof(st_encrypted_ecc_brainpoolp512r1_public_key_t), &initial_vector, &encrypted_key))
+	if (0 != parser_encrypted_key(
+			 (uintptr_t)params[0].memref.buffer,
+			 sizeof(st_encrypted_ecc_brainpoolp512r1_public_key_t),
+			 &initial_vector, &encrypted_key))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	wrapped_key = (sce_ecc_public_wrapped_key_t *)params[1].memref.buffer;
-	if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) || (sizeof(sce_ecc_public_wrapped_key_t) > params[1].memref.size))
+	if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) ||
+	    (sizeof(sce_ecc_public_wrapped_key_t) > params[1].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.ECC_BrainpoolP512r1_EncryptedPublicKeyWrap(initial_vector, encrypted_key, &key_update_key, wrapped_key);
+	err = g_sce_protected_on_sce.ECC_BrainpoolP512r1_EncryptedPublicKeyWrap(
+		initial_vector, encrypted_key, &key_update_key, wrapped_key);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -871,7 +1010,9 @@ static TEE_Result ecc_brainpoolp512r1_encryptedpublickeywrap(uint32_t types, TEE
 	return TEE_SUCCESS;
 }
 
-static TEE_Result ecc_brainpoolp512r1_encryptedprivatekeywrap(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result
+ecc_brainpoolp512r1_encryptedprivatekeywrap(uint32_t types,
+					    TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 
@@ -881,21 +1022,27 @@ static TEE_Result ecc_brainpoolp512r1_encryptedprivatekeywrap(uint32_t types, TE
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
 				     TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE))
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	if ((!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t)) || (sizeof(st_encrypted_ecc_brainpoolp512r1_private_key_t) > params[0].memref.size))
+	if ((!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t)) ||
+	    (sizeof(st_encrypted_ecc_brainpoolp512r1_private_key_t) >
+	     params[0].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	if (0 != parser_encrypted_key((uintptr_t)params[0].memref.buffer, sizeof(st_encrypted_ecc_brainpoolp512r1_private_key_t), &initial_vector, &encrypted_key))
+	if (0 != parser_encrypted_key(
+			 (uintptr_t)params[0].memref.buffer,
+			 sizeof(st_encrypted_ecc_brainpoolp512r1_private_key_t),
+			 &initial_vector, &encrypted_key))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	wrapped_key = (sce_ecc_private_wrapped_key_t *)params[1].memref.buffer;
-	if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) || (sizeof(sce_ecc_private_wrapped_key_t) > params[1].memref.size))
+	if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) ||
+	    (sizeof(sce_ecc_private_wrapped_key_t) > params[1].memref.size))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	err = g_sce_protected_on_sce.ECC_BrainpoolP512r1_EncryptedPrivateKeyWrap(initial_vector, encrypted_key, &key_update_key, wrapped_key);
+	err = g_sce_protected_on_sce.ECC_BrainpoolP512r1_EncryptedPrivateKeyWrap(
+		initial_vector, encrypted_key, &key_update_key, wrapped_key);
 	switch (err) {
 	case FSP_SUCCESS:
 		break;
@@ -930,7 +1077,7 @@ static TEE_Result invoke_command(void *session __unused, uint32_t cmd,
 				 uint32_t ptypes,
 				 TEE_Param params[TEE_NUM_PARAMS])
 {
-	DMSG(PTA_NAME" command %#"PRIx32" ptypes %#"PRIx32, cmd, ptypes);
+	DMSG(PTA_NAME " command %#" PRIx32 " ptypes %#" PRIx32, cmd, ptypes);
 
 	switch (cmd) {
 	case PTA_CMD_AES128_WrappedKeyGenerate:
@@ -948,7 +1095,8 @@ static TEE_Result invoke_command(void *session __unused, uint32_t cmd,
 	case PTA_CMD_ECC_secp256r1_WrappedKeyPairGenerate:
 		return ecc_secp256r1_wrappedkeypairgenerate(ptypes, params);
 	case PTA_CMD_ECC_BrainpoolP512r1_WrappedKeyPairGenerate:
-		return ecc_brainpoolp512r1_wrappedkeypairgenerate(ptypes, params);
+		return ecc_brainpoolp512r1_wrappedkeypairgenerate(ptypes,
+								  params);
 	case PTA_CMD_RandomNumberGenerate:
 		return randomnumbergenerate(ptypes, params);
 	case PTA_CMD_AES128_EncryptedKeyWrap:
@@ -972,7 +1120,8 @@ static TEE_Result invoke_command(void *session __unused, uint32_t cmd,
 	case PTA_CMD_ECC_secp256r1_EncryptedPublicKeyWrap:
 		return ecc_secp256r1_encryptedpublickeywrap(ptypes, params);
 	case PTA_CMD_ECC_BrainpoolP512r1_EncryptedPublicKeyWrap:
-		return ecc_brainpoolp512r1_encryptedpublickeywrap(ptypes, params);
+		return ecc_brainpoolp512r1_encryptedpublickeywrap(ptypes,
+								  params);
 	case PTA_CMD_ECC_secp192r1_EncryptedPrivateKeyWrap:
 		return ecc_secp192r1_encryptedprivatekeywrap(ptypes, params);
 	case PTA_CMD_ECC_secp224r1_EncryptedPrivateKeyWrap:
@@ -980,7 +1129,8 @@ static TEE_Result invoke_command(void *session __unused, uint32_t cmd,
 	case PTA_CMD_ECC_secp256r1_EncryptedPrivateKeyWrap:
 		return ecc_secp256r1_encryptedprivatekeywrap(ptypes, params);
 	case PTA_CMD_ECC_BrainpoolP512r1_EncryptedPrivateKeyWrap:
-		return ecc_brainpoolp512r1_encryptedprivatekeywrap(ptypes, params);
+		return ecc_brainpoolp512r1_encryptedprivatekeywrap(ptypes,
+								   params);
 	default:
 		return TEE_ERROR_NOT_SUPPORTED;
 	}

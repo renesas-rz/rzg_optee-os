@@ -20,7 +20,8 @@ void spi_multi_setup_device(void)
 void spi_multi_busy_wait(void)
 {
 	while (1) {
-		uint8_t read_status = spi_multi_cmd_read(SMCMR_CMD_READ_STATUS_REGISTER);
+		uint8_t read_status =
+			spi_multi_cmd_read(SMCMR_CMD_READ_STATUS_REGISTER);
 
 		if ((read_status & STATUS_BUSY_BIT) != STATUS_BUSY)
 			break;

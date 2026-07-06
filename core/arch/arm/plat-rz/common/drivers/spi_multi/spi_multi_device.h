@@ -9,4 +9,4 @@
 void spi_multi_setup_device(void);
 void spi_multi_busy_wait(void);
 
-#endif	/* _SPI_MULTI_DEVICE_H_ */
+#endif /* _SPI_MULTI_DEVICE_H_ */

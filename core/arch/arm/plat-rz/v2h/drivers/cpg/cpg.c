@@ -13,18 +13,18 @@
 #include <cpg.h>
 #include <cpg_regs.h>
 
-#define CPG_T_CLK						(0)
-#define CPG_T_RST						(1)
+#define CPG_T_CLK (0)
+#define CPG_T_RST (1)
 
 struct CPG_REG_SETTING {
 	uintptr_t addr;
-	uint32_t  val;
+	uint32_t val;
 };
 
 struct CPG_SETUP_DATA {
 	struct CPG_REG_SETTING reg;
 	struct CPG_REG_SETTING mon;
-	uint32_t  type;
+	uint32_t type;
 };
 
 static vaddr_t cpg_base;
@@ -44,50 +44,21 @@ static inline uint32_t cpg_io_read(uint32_t reg)
 	return ret;
 }
 
+/* xSPI */
 static struct CPG_SETUP_DATA cpg_clk_on_tbl[] = {
-	{	/* xSPI */
-		.reg =  {
-				.addr = (uintptr_t)CPG_CLKON_9,
-				.val  = 0x00008000,
-				},
-
-		.mon =  {
-				.addr = (uintptr_t)CPG_CLKMON_4,
-				.val  = 0x80000000,
-				},
-
-		.type = CPG_T_CLK
-	},
-
-	{	/* xSPI */
-		.reg =  {
-				.addr = (uintptr_t)CPG_CLKON_10,
-				.val  = 0x00000003,
-				},
-
-		.mon =  {
-				.addr = (uintptr_t)CPG_CLKMON_5,
-				.val  = 0x00000007,
-				},
-
-		.type = CPG_T_CLK
-	},
+	{ .reg = { .addr = (uintptr_t)CPG_CLKON_9, .val = 0x00008000 },
+	  .mon = { .addr = (uintptr_t)CPG_CLKMON_4, .val = 0x80000000 },
+	  .type = CPG_T_CLK },
+	{ .reg = { .addr = (uintptr_t)CPG_CLKON_10, .val = 0x00000003 },
+	  .mon = { .addr = (uintptr_t)CPG_CLKMON_5, .val = 0x00000007 },
+	  .type = CPG_T_CLK },
 };
 
+/* xSPI */
 static struct CPG_SETUP_DATA cpg_reset_tbl[] = {
-	{	/* xSPI */
-		.reg =  {
-				.addr = (uintptr_t)CPG_RST_10,
-				.val  = 0x00000018,
-				},
-
-		.mon =  {
-				.addr = (uintptr_t)CPG_RSTMON_4,
-				.val  = 0x00300000,
-				},
-
-		.type = CPG_T_RST
-	}
+	{ .reg = { .addr = (uintptr_t)CPG_RST_10, .val = 0x00000018 },
+	  .mon = { .addr = (uintptr_t)CPG_RSTMON_4, .val = 0x00300000 },
+	  .type = CPG_T_RST },
 };
 
 static void cpg_clkon_rst(struct CPG_SETUP_DATA const *array, uint32_t num)
@@ -100,12 +71,13 @@ static void cpg_clkon_rst(struct CPG_SETUP_DATA const *array, uint32_t num)
 		/*
 		 * Upper 16bits are enables for lower 16bits so write the upper 16bits with same value as lower value
 		 */
-		uint32_t val = (array->reg.val & 0xFFFF) | ((array->reg.val & 0xFFFF) << 16);
+		uint32_t val = (array->reg.val & 0xFFFF) |
+			       ((array->reg.val & 0xFFFF) << 16);
 
 		cpg_io_write(array->reg.addr, val);
 
 		mask = array->mon.val;
-		cmp  = mask;
+		cmp = mask;
 
 		if (array->type == CPG_T_RST)
 			cmp = ~cmp;
@@ -125,7 +97,8 @@ static void cpg_clkoff_rst(struct CPG_SETUP_DATA const *array, uint32_t num)
 		/*
 		 * Upper 16bits are enables for lower 16bits so write the upper 16bits with same value as lower value
 		 */
-		uint32_t val = (array->reg.val & 0xFFFF) | ((array->reg.val & 0xFFFF) << 16);
+		uint32_t val = (array->reg.val & 0xFFFF) |
+			       ((array->reg.val & 0xFFFF) << 16);
 
 		if ((array->type == CPG_T_CLK) || (array->type == CPG_T_RST))
 			val = val & 0xffff0000;
@@ -133,7 +106,7 @@ static void cpg_clkoff_rst(struct CPG_SETUP_DATA const *array, uint32_t num)
 		cpg_io_write(array->reg.addr, val);
 
 		mask = array->mon.val;
-		cmp  = mask;
+		cmp = mask;
 
 		if (array->type == CPG_T_CLK)
 			cmp = ~cmp;

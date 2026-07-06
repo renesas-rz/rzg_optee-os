@@ -20,7 +20,7 @@ struct sflash_dev {
 	uint8_t ch; /* XSPI channel */
 	paddr_t base; /* Flash base address */
 	vaddr_t virt; /* Virtual address mapping */
-	size_t	size; /* Flash size */
+	size_t size; /* Flash size */
 };
 
 /* Work buffer for partial sector updates */
@@ -63,7 +63,7 @@ void sflash_write_buffer(uintptr_t addr, uintptr_t buff, size_t len)
 		ROUNDDOWN(addr + len - 1, XSPI_SECTOR_SIZE);
 	uint32_t write_offset;
 	uint32_t write_length;
-	int32_t	 sector_count;
+	int32_t sector_count;
 
 	struct sflash_dev *dev = get_flash_device(addr, len);
 	assert(dev);

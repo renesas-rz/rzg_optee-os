@@ -45,24 +45,28 @@ void sflash_write_buffer(uintptr_t addr, uintptr_t buff, size_t len)
 	uintptr_t sflash_work_base = (uintptr_t)&sflash_work[0];
 	uintptr_t base_sector_addr = ROUNDDOWN(addr, SPI_SECTOR_SIZE);
 	uintptr_t last_sector_addr = ROUNDDOWN(addr + len - 1, SPI_SECTOR_SIZE);
-	uint32_t  write_offset;
-	uint32_t  write_length;
-	int32_t   sector_count;
+	uint32_t write_offset;
+	uint32_t write_length;
+	int32_t sector_count;
 
-	sector_count = ((last_sector_addr - base_sector_addr) / SPI_SECTOR_SIZE) + 1;
+	sector_count =
+		((last_sector_addr - base_sector_addr) / SPI_SECTOR_SIZE) + 1;
 	write_offset = addr - base_sector_addr;
 	write_length = MIN(len, SPI_SECTOR_SIZE - write_offset);
 
 	if (write_offset != 0) {
 		vaddr_t virt_addr = sflash_phys_to_virt(base_sector_addr);
 
-		memcpy((void *)sflash_work_base, (void *)virt_addr, SPI_SECTOR_SIZE);
+		memcpy((void *)sflash_work_base, (void *)virt_addr,
+		       SPI_SECTOR_SIZE);
 
-		memcpy((void *)(sflash_work_base + write_offset), (void *)buff, write_length);
+		memcpy((void *)(sflash_work_base + write_offset), (void *)buff,
+		       write_length);
 
 		sflash_sector_erase(base_sector_addr, SPI_SECTOR_SIZE);
 
-		sflash_page_program(base_sector_addr, sflash_work_base, SPI_SECTOR_SIZE);
+		sflash_page_program(base_sector_addr, sflash_work_base,
+				    SPI_SECTOR_SIZE);
 
 		base_sector_addr += SPI_SECTOR_SIZE;
 
@@ -74,13 +78,16 @@ void sflash_write_buffer(uintptr_t addr, uintptr_t buff, size_t len)
 	if ((sector_count > 0) && ((write_length % SPI_SECTOR_SIZE) > 0)) {
 		vaddr_t virt_addr = sflash_phys_to_virt(last_sector_addr);
 
-		memcpy((void *)sflash_work_base, (void *)virt_addr, SPI_SECTOR_SIZE);
+		memcpy((void *)sflash_work_base, (void *)virt_addr,
+		       SPI_SECTOR_SIZE);
 
-		memcpy((void *)sflash_work_base, (void *)((buff + len) - write_length), write_length);
+		memcpy((void *)sflash_work_base,
+		       (void *)((buff + len) - write_length), write_length);
 
 		sflash_sector_erase(last_sector_addr, SPI_SECTOR_SIZE);
 
-		sflash_page_program(last_sector_addr, sflash_work_base, SPI_SECTOR_SIZE);
+		sflash_page_program(last_sector_addr, sflash_work_base,
+				    SPI_SECTOR_SIZE);
 
 		sector_count--;
 	}
@@ -90,7 +97,9 @@ void sflash_write_buffer(uintptr_t addr, uintptr_t buff, size_t len)
 	if (sector_count > 0) {
 		sflash_sector_erase(base_sector_addr, write_length);
 
-		sflash_page_program(base_sector_addr, buff + (base_sector_addr - addr), write_length);
+		sflash_page_program(base_sector_addr,
+				    buff + (base_sector_addr - addr),
+				    write_length);
 	}
 }
 

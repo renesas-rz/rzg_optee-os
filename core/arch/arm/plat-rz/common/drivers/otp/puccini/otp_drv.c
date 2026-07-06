@@ -25,19 +25,26 @@ static bool r_otp_open(void)
 	/* On power up OTP is powered on but on returning to this */
 	/* function it is probably powered off. */
 	if (0U == (otp_io_read(OTP_OTPPWR) & (1U << OTP_OTPPWR_PWR)))
-		if ((0U == (otp_io_read(OTP_OTPSTR) & (1U << OTP_OTPSTR_CMD_RDY))))
-			if (0U != (otp_io_read(OTP_OTPFLAG) & (1U << OTP_OTPFLAG_FLAG)))
-				if (0U != (otp_io_read(OTP_OTPFLAG) & (1U << OTP_OTPFLAG_RREND)))
+		if ((0U ==
+		     (otp_io_read(OTP_OTPSTR) & (1U << OTP_OTPSTR_CMD_RDY))))
+			if (0U != (otp_io_read(OTP_OTPFLAG) &
+				   (1U << OTP_OTPFLAG_FLAG)))
+				if (0U != (otp_io_read(OTP_OTPFLAG) &
+					   (1U << OTP_OTPFLAG_RREND)))
 					/* RDY bit should be clear */
 					ready = true;
-	else if (0U != (otp_io_read(OTP_OTPSTR) & (1U << OTP_OTPSTR_CMD_RDY))) /* Not powered off so RDY bit should be set */
-		ready = true;
-	else
-		ready = false;
+				else if (0U !=
+					 (otp_io_read(OTP_OTPSTR) &
+					  (1U
+					   << OTP_OTPSTR_CMD_RDY))) /* Not powered off so RDY bit should be set */
+					ready = true;
+				else
+					ready = false;
 
 	if (true == ready) {
 		/* Enable power and switch to APB interface */
-		otp_io_write(OTP_OTPPWR, (1U << OTP_OTPPWR_PWR) | (1U << OTP_OTPPWR_ACCL));
+		otp_io_write(OTP_OTPPWR,
+			     (1U << OTP_OTPPWR_PWR) | (1U << OTP_OTPPWR_ACCL));
 		ret = true;
 	}
 
@@ -54,7 +61,7 @@ static void r_otp_close(void)
 
 	/* Wait for ready bit to clear */
 	while (0U != (otp_io_read(OTP_OTPSTR) & (1U << OTP_OTPSTR_CMD_RDY)))
-		isb();	  /* Not sure if this is necessary */
+		isb(); /* Not sure if this is necessary */
 }
 
 static void r_otp_dummy_read(void)
@@ -72,16 +79,19 @@ bool r_otp_read(uint32_t addr, uint32_t *p_value, uint32_t count)
 	bool ret = false;
 
 	if (true == r_otp_open()) {
-		if ((addr >= OTP_IP_ADDR_MIN) && (addr <= OTP_IP_ADDR_MAX) && ((addr + count - 1U) <= OTP_IP_ADDR_MAX)) {
+		if ((addr >= OTP_IP_ADDR_MIN) && (addr <= OTP_IP_ADDR_MAX) &&
+		    ((addr + count - 1U) <= OTP_IP_ADDR_MAX)) {
 			/* Wait for OTP access enable */
-			while (1U != (otp_io_read(OTP_OTPSTR) & (1U << OTP_OTPSTR_CMD_RDY)))
-				isb();	  /* Not sure if this is necessary */
+			while (1U != (otp_io_read(OTP_OTPSTR) &
+				      (1U << OTP_OTPSTR_CMD_RDY)))
+				isb(); /* Not sure if this is necessary */
 
 			otp_io_write(OTP_OTPADRRD, addr);
 
 			while (count > 0U) {
 				*p_value = otp_io_read(OTP_OTPDATARD);
-				if (0U != (otp_io_read(OTP_OTPSTR) & (1U << OTP_OTPSTR_ERR_RP)))
+				if (0U != (otp_io_read(OTP_OTPSTR) &
+					   (1U << OTP_OTPSTR_ERR_RP)))
 					/* Error - reading protected area */
 					break;
 				/* The address in OTP_OTPDATARD auto increments */

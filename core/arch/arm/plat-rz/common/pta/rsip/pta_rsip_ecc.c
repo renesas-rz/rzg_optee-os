@@ -14,13 +14,14 @@
 
 extern rsip_instance_ctrl_t rsip_instance_ctrl;
 
-
-static TEE_Result generate_hash(uint8_t const *const message, uint32_t const message_length,
+static TEE_Result generate_hash(uint8_t const *const message,
+				uint32_t const message_length,
 				rsip_hash_type_t hash_type, uint8_t *digest)
 {
 	fsp_err_t err;
 
-	err = R_RSIP_SHA_Compute(&rsip_instance_ctrl, hash_type, message, message_length, digest);
+	err = R_RSIP_SHA_Compute(&rsip_instance_ctrl, hash_type, message,
+				 message_length, digest);
 	switch ((uint32_t)err) {
 	case FSP_SUCCESS:
 		break;
@@ -41,7 +42,8 @@ static TEE_Result generate_hash(uint8_t const *const message, uint32_t const mes
 	return TEE_SUCCESS;
 }
 
-static TEE_Result ecdsa_secp192r1_sign(uint32_t types, TEE_Param params[TEE_NUM_PARAMS],
+static TEE_Result ecdsa_secp192r1_sign(uint32_t types,
+				       TEE_Param params[TEE_NUM_PARAMS],
 				       rsip_byte_size_wrapped_key_t key_size)
 {
 	fsp_err_t err;
@@ -72,24 +74,28 @@ static TEE_Result ecdsa_secp192r1_sign(uint32_t types, TEE_Param params[TEE_NUM_
 	}
 
 	signature = (uint8_t *)params[1].memref.buffer;
-	if (!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t) || (SIGNATURE_SIZE > params[1].memref.size)) {
+	if (!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t) ||
+	    (SIGNATURE_SIZE > params[1].memref.size)) {
 		EMSG("signature err");
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
 
 	wrapped_key = (rsip_wrapped_key_t *)params[2].memref.buffer;
-	if (!IS_ALIGNED_WITH_TYPE(params[2].memref.buffer, uint32_t) || (key_size > params[2].memref.size)) {
+	if (!IS_ALIGNED_WITH_TYPE(params[2].memref.buffer, uint32_t) ||
+	    (key_size > params[2].memref.size)) {
 		EMSG("key err");
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
 
-	result = generate_hash(message, message_length, RSIP_HASH_TYPE_SHA1, sha1_digest);
+	result = generate_hash(message, message_length, RSIP_HASH_TYPE_SHA1,
+			       sha1_digest);
 	if (TEE_SUCCESS != result)
 		return result;
 
 	memcpy(&digest[8], sha1_digest, SHA1_HASH_SIZE);
 
-	err = R_RSIP_ECDSA_Sign(&rsip_instance_ctrl, wrapped_key, digest, signature);
+	err = R_RSIP_ECDSA_Sign(&rsip_instance_ctrl, wrapped_key, digest,
+				signature);
 	switch ((uint32_t)err) {
 	case FSP_SUCCESS:
 		break;
@@ -120,7 +126,8 @@ static TEE_Result ecdsa_secp192r1_sign(uint32_t types, TEE_Param params[TEE_NUM_
 	return TEE_SUCCESS;
 }
 
-static TEE_Result ecdsa_secp224r1_sign(uint32_t types, TEE_Param params[TEE_NUM_PARAMS],
+static TEE_Result ecdsa_secp224r1_sign(uint32_t types,
+				       TEE_Param params[TEE_NUM_PARAMS],
 				       rsip_byte_size_wrapped_key_t key_size)
 {
 	fsp_err_t err;
@@ -151,24 +158,28 @@ static TEE_Result ecdsa_secp224r1_sign(uint32_t types, TEE_Param params[TEE_NUM_
 	}
 
 	signature = (uint8_t *)params[1].memref.buffer;
-	if (!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t) || (SIGNATURE_SIZE > params[1].memref.size)) {
+	if (!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t) ||
+	    (SIGNATURE_SIZE > params[1].memref.size)) {
 		EMSG("signature err");
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
 
 	wrapped_key = (rsip_wrapped_key_t *)params[2].memref.buffer;
-	if (!IS_ALIGNED_WITH_TYPE(params[2].memref.buffer, uint32_t) || (key_size > params[2].memref.size)) {
+	if (!IS_ALIGNED_WITH_TYPE(params[2].memref.buffer, uint32_t) ||
+	    (key_size > params[2].memref.size)) {
 		EMSG("key err");
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
 
-	result = generate_hash(message, message_length, RSIP_HASH_TYPE_SHA224, sha224_digest);
+	result = generate_hash(message, message_length, RSIP_HASH_TYPE_SHA224,
+			       sha224_digest);
 	if (TEE_SUCCESS != result)
 		return result;
 
 	memcpy(&digest[4], sha224_digest, SHA224_HASH_SIZE);
 
-	err = R_RSIP_ECDSA_Sign(&rsip_instance_ctrl, wrapped_key, digest, signature);
+	err = R_RSIP_ECDSA_Sign(&rsip_instance_ctrl, wrapped_key, digest,
+				signature);
 	switch ((uint32_t)err) {
 	case FSP_SUCCESS:
 		break;
@@ -199,7 +210,8 @@ static TEE_Result ecdsa_secp224r1_sign(uint32_t types, TEE_Param params[TEE_NUM_
 	return TEE_SUCCESS;
 }
 
-static TEE_Result ecdsa_secp256r1_sign(uint32_t types, TEE_Param params[TEE_NUM_PARAMS],
+static TEE_Result ecdsa_secp256r1_sign(uint32_t types,
+				       TEE_Param params[TEE_NUM_PARAMS],
 				       rsip_byte_size_wrapped_key_t key_size)
 {
 	fsp_err_t err;
@@ -228,22 +240,26 @@ static TEE_Result ecdsa_secp256r1_sign(uint32_t types, TEE_Param params[TEE_NUM_
 	}
 
 	signature = (uint8_t *)params[1].memref.buffer;
-	if (!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t) || (SIGNATURE_SIZE > params[1].memref.size)) {
+	if (!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t) ||
+	    (SIGNATURE_SIZE > params[1].memref.size)) {
 		EMSG("signature err");
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
 
 	wrapped_key = (rsip_wrapped_key_t *)params[2].memref.buffer;
-	if (!IS_ALIGNED_WITH_TYPE(params[2].memref.buffer, uint32_t) || (key_size > params[2].memref.size)) {
+	if (!IS_ALIGNED_WITH_TYPE(params[2].memref.buffer, uint32_t) ||
+	    (key_size > params[2].memref.size)) {
 		EMSG("key err");
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
 
-	result = generate_hash(message, message_length, RSIP_HASH_TYPE_SHA256, digest);
+	result = generate_hash(message, message_length, RSIP_HASH_TYPE_SHA256,
+			       digest);
 	if (TEE_SUCCESS != result)
 		return result;
 
-	err = R_RSIP_ECDSA_Sign(&rsip_instance_ctrl, wrapped_key, digest, signature);
+	err = R_RSIP_ECDSA_Sign(&rsip_instance_ctrl, wrapped_key, digest,
+				signature);
 	switch ((uint32_t)err) {
 	case FSP_SUCCESS:
 		break;
@@ -274,8 +290,9 @@ static TEE_Result ecdsa_secp256r1_sign(uint32_t types, TEE_Param params[TEE_NUM_
 	return TEE_SUCCESS;
 }
 
-static TEE_Result ecdsa_brainpoolp256r1_sign(uint32_t types, TEE_Param params[TEE_NUM_PARAMS],
-					     rsip_byte_size_wrapped_key_t key_size)
+static TEE_Result
+ecdsa_brainpoolp256r1_sign(uint32_t types, TEE_Param params[TEE_NUM_PARAMS],
+			   rsip_byte_size_wrapped_key_t key_size)
 {
 	fsp_err_t err;
 	TEE_Result result;
@@ -303,22 +320,26 @@ static TEE_Result ecdsa_brainpoolp256r1_sign(uint32_t types, TEE_Param params[TE
 	}
 
 	signature = (uint8_t *)params[1].memref.buffer;
-	if (!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t) || (SIGNATURE_SIZE > params[1].memref.size)) {
+	if (!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t) ||
+	    (SIGNATURE_SIZE > params[1].memref.size)) {
 		EMSG("signature err");
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
 
 	wrapped_key = (rsip_wrapped_key_t *)params[2].memref.buffer;
-	if (!IS_ALIGNED_WITH_TYPE(params[2].memref.buffer, uint32_t) || (key_size > params[2].memref.size)) {
+	if (!IS_ALIGNED_WITH_TYPE(params[2].memref.buffer, uint32_t) ||
+	    (key_size > params[2].memref.size)) {
 		EMSG("key err");
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
 
-	result = generate_hash(message, message_length, RSIP_HASH_TYPE_SHA256, digest);
+	result = generate_hash(message, message_length, RSIP_HASH_TYPE_SHA256,
+			       digest);
 	if (TEE_SUCCESS != result)
 		return result;
 
-	err = R_RSIP_ECDSA_Sign(&rsip_instance_ctrl, wrapped_key, digest, signature);
+	err = R_RSIP_ECDSA_Sign(&rsip_instance_ctrl, wrapped_key, digest,
+				signature);
 	switch ((uint32_t)err) {
 	case FSP_SUCCESS:
 		break;
@@ -349,7 +370,8 @@ static TEE_Result ecdsa_brainpoolp256r1_sign(uint32_t types, TEE_Param params[TE
 	return TEE_SUCCESS;
 }
 
-static TEE_Result ecdsa_secp192r1_verify(uint32_t types, TEE_Param params[TEE_NUM_PARAMS],
+static TEE_Result ecdsa_secp192r1_verify(uint32_t types,
+					 TEE_Param params[TEE_NUM_PARAMS],
 					 rsip_byte_size_wrapped_key_t key_size)
 {
 	fsp_err_t err;
@@ -386,18 +408,21 @@ static TEE_Result ecdsa_secp192r1_verify(uint32_t types, TEE_Param params[TEE_NU
 	}
 
 	wrapped_key = (rsip_wrapped_key_t *)params[2].memref.buffer;
-	if (!IS_ALIGNED_WITH_TYPE(params[2].memref.buffer, uint32_t) || (key_size > params[2].memref.size)) {
+	if (!IS_ALIGNED_WITH_TYPE(params[2].memref.buffer, uint32_t) ||
+	    (key_size > params[2].memref.size)) {
 		EMSG("key err");
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
 
-	result = generate_hash(message, message_length, RSIP_HASH_TYPE_SHA1, sha1_digest);
+	result = generate_hash(message, message_length, RSIP_HASH_TYPE_SHA1,
+			       sha1_digest);
 	if (TEE_SUCCESS != result)
 		return result;
 
 	memcpy(&digest[8], sha1_digest, SHA1_HASH_SIZE);
 
-	err = R_RSIP_ECDSA_Verify(&rsip_instance_ctrl, wrapped_key, digest, signature);
+	err = R_RSIP_ECDSA_Verify(&rsip_instance_ctrl, wrapped_key, digest,
+				  signature);
 	switch ((uint32_t)err) {
 	case FSP_SUCCESS:
 		break;
@@ -426,7 +451,8 @@ static TEE_Result ecdsa_secp192r1_verify(uint32_t types, TEE_Param params[TEE_NU
 	return TEE_SUCCESS;
 }
 
-static TEE_Result ecdsa_secp224r1_verify(uint32_t types, TEE_Param params[TEE_NUM_PARAMS],
+static TEE_Result ecdsa_secp224r1_verify(uint32_t types,
+					 TEE_Param params[TEE_NUM_PARAMS],
 					 rsip_byte_size_wrapped_key_t key_size)
 {
 	fsp_err_t err;
@@ -463,18 +489,21 @@ static TEE_Result ecdsa_secp224r1_verify(uint32_t types, TEE_Param params[TEE_NU
 	}
 
 	wrapped_key = (rsip_wrapped_key_t *)params[2].memref.buffer;
-	if (!IS_ALIGNED_WITH_TYPE(params[2].memref.buffer, uint32_t) || (key_size > params[2].memref.size)) {
+	if (!IS_ALIGNED_WITH_TYPE(params[2].memref.buffer, uint32_t) ||
+	    (key_size > params[2].memref.size)) {
 		EMSG("key err");
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
 
-	result = generate_hash(message, message_length, RSIP_HASH_TYPE_SHA224, sha224_digest);
+	result = generate_hash(message, message_length, RSIP_HASH_TYPE_SHA224,
+			       sha224_digest);
 	if (TEE_SUCCESS != result)
 		return result;
 
 	memcpy(&digest[4], sha224_digest, SHA224_HASH_SIZE);
 
-	err = R_RSIP_ECDSA_Verify(&rsip_instance_ctrl, wrapped_key, digest, signature);
+	err = R_RSIP_ECDSA_Verify(&rsip_instance_ctrl, wrapped_key, digest,
+				  signature);
 	switch ((uint32_t)err) {
 	case FSP_SUCCESS:
 		break;
@@ -503,7 +532,8 @@ static TEE_Result ecdsa_secp224r1_verify(uint32_t types, TEE_Param params[TEE_NU
 	return TEE_SUCCESS;
 }
 
-static TEE_Result ecdsa_secp256r1_verify(uint32_t types, TEE_Param params[TEE_NUM_PARAMS],
+static TEE_Result ecdsa_secp256r1_verify(uint32_t types,
+					 TEE_Param params[TEE_NUM_PARAMS],
 					 rsip_byte_size_wrapped_key_t key_size)
 {
 	fsp_err_t err;
@@ -538,16 +568,19 @@ static TEE_Result ecdsa_secp256r1_verify(uint32_t types, TEE_Param params[TEE_NU
 	}
 
 	wrapped_key = (rsip_wrapped_key_t *)params[2].memref.buffer;
-	if (!IS_ALIGNED_WITH_TYPE(params[2].memref.buffer, uint32_t) || (key_size > params[2].memref.size)) {
+	if (!IS_ALIGNED_WITH_TYPE(params[2].memref.buffer, uint32_t) ||
+	    (key_size > params[2].memref.size)) {
 		EMSG("key err");
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
 
-	result = generate_hash(message, message_length, RSIP_HASH_TYPE_SHA256, digest);
+	result = generate_hash(message, message_length, RSIP_HASH_TYPE_SHA256,
+			       digest);
 	if (TEE_SUCCESS != result)
 		return result;
 
-	err = R_RSIP_ECDSA_Verify(&rsip_instance_ctrl, wrapped_key, digest, signature);
+	err = R_RSIP_ECDSA_Verify(&rsip_instance_ctrl, wrapped_key, digest,
+				  signature);
 	switch ((uint32_t)err) {
 	case FSP_SUCCESS:
 		break;
@@ -576,8 +609,9 @@ static TEE_Result ecdsa_secp256r1_verify(uint32_t types, TEE_Param params[TEE_NU
 	return TEE_SUCCESS;
 }
 
-static TEE_Result ecdsa_brainpoolp256r1_verify(uint32_t types, TEE_Param params[TEE_NUM_PARAMS],
-					       rsip_byte_size_wrapped_key_t key_size)
+static TEE_Result
+ecdsa_brainpoolp256r1_verify(uint32_t types, TEE_Param params[TEE_NUM_PARAMS],
+			     rsip_byte_size_wrapped_key_t key_size)
 {
 	fsp_err_t err;
 	TEE_Result result;
@@ -611,16 +645,19 @@ static TEE_Result ecdsa_brainpoolp256r1_verify(uint32_t types, TEE_Param params[
 	}
 
 	wrapped_key = (rsip_wrapped_key_t *)params[2].memref.buffer;
-	if (!IS_ALIGNED_WITH_TYPE(params[2].memref.buffer, uint32_t) || (key_size > params[2].memref.size)) {
+	if (!IS_ALIGNED_WITH_TYPE(params[2].memref.buffer, uint32_t) ||
+	    (key_size > params[2].memref.size)) {
 		EMSG("key err");
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
 
-	result = generate_hash(message, message_length, RSIP_HASH_TYPE_SHA256, digest);
+	result = generate_hash(message, message_length, RSIP_HASH_TYPE_SHA256,
+			       digest);
 	if (TEE_SUCCESS != result)
 		return result;
 
-	err = R_RSIP_ECDSA_Verify(&rsip_instance_ctrl, wrapped_key, digest, signature);
+	err = R_RSIP_ECDSA_Verify(&rsip_instance_ctrl, wrapped_key, digest,
+				  signature);
 	switch ((uint32_t)err) {
 	case FSP_SUCCESS:
 		break;
@@ -651,36 +688,44 @@ static TEE_Result ecdsa_brainpoolp256r1_verify(uint32_t types, TEE_Param params[
 
 static TEE_Result invoke_command(void *session __unused, uint32_t cmd,
 				 uint32_t ptypes,
-		    TEE_Param params[TEE_NUM_PARAMS])
+				 TEE_Param params[TEE_NUM_PARAMS])
 {
-	EMSG(PTA_NAME" command %#"PRIx32" ptypes %#"PRIx32, cmd, ptypes);
+	EMSG(PTA_NAME " command %#" PRIx32 " ptypes %#" PRIx32, cmd, ptypes);
 
 	switch (cmd) {
 	case PTA_CMD_ECDSA_secp192r1_SignatureGenerate:
-		return ecdsa_secp192r1_sign(ptypes, params,
-				RSIP_BYTE_SIZE_WRAPPED_KEY_ECC_secp192r1_PRIVATE);
+		return ecdsa_secp192r1_sign(
+			ptypes, params,
+			RSIP_BYTE_SIZE_WRAPPED_KEY_ECC_secp192r1_PRIVATE);
 	case PTA_CMD_ECDSA_secp224r1_SignatureGenerate:
-		return ecdsa_secp224r1_sign(ptypes, params,
-				RSIP_BYTE_SIZE_WRAPPED_KEY_ECC_secp224r1_PRIVATE);
+		return ecdsa_secp224r1_sign(
+			ptypes, params,
+			RSIP_BYTE_SIZE_WRAPPED_KEY_ECC_secp224r1_PRIVATE);
 	case PTA_CMD_ECDSA_secp256r1_SignatureGenerate:
-		return ecdsa_secp256r1_sign(ptypes, params,
-				RSIP_BYTE_SIZE_WRAPPED_KEY_ECC_secp256r1_PRIVATE);
+		return ecdsa_secp256r1_sign(
+			ptypes, params,
+			RSIP_BYTE_SIZE_WRAPPED_KEY_ECC_secp256r1_PRIVATE);
 	case PTA_CMD_ECDSA_BrainpoolP256r1_SignatureGenerate:
-		return ecdsa_brainpoolp256r1_sign(ptypes, params,
-				RSIP_BYTE_SIZE_WRAPPED_KEY_ECC_BRAINPOOLP256R1_PRIVATE);
+		return ecdsa_brainpoolp256r1_sign(
+			ptypes, params,
+			RSIP_BYTE_SIZE_WRAPPED_KEY_ECC_BRAINPOOLP256R1_PRIVATE);
 
 	case PTA_CMD_ECDSA_secp192r1_SignatureVerify:
-		return ecdsa_secp192r1_verify(ptypes, params,
-				RSIP_BYTE_SIZE_WRAPPED_KEY_ECC_secp192r1_PUBLIC);
+		return ecdsa_secp192r1_verify(
+			ptypes, params,
+			RSIP_BYTE_SIZE_WRAPPED_KEY_ECC_secp192r1_PUBLIC);
 	case PTA_CMD_ECDSA_secp224r1_SignatureVerify:
-		return ecdsa_secp224r1_verify(ptypes, params,
-				RSIP_BYTE_SIZE_WRAPPED_KEY_ECC_secp224r1_PUBLIC);
+		return ecdsa_secp224r1_verify(
+			ptypes, params,
+			RSIP_BYTE_SIZE_WRAPPED_KEY_ECC_secp224r1_PUBLIC);
 	case PTA_CMD_ECDSA_secp256r1_SignatureVerify:
-		return ecdsa_secp256r1_verify(ptypes, params,
-				RSIP_BYTE_SIZE_WRAPPED_KEY_ECC_secp256r1_PUBLIC);
+		return ecdsa_secp256r1_verify(
+			ptypes, params,
+			RSIP_BYTE_SIZE_WRAPPED_KEY_ECC_secp256r1_PUBLIC);
 	case PTA_CMD_ECDSA_BrainpoolP256r1_SignatureVerify:
-		return ecdsa_brainpoolp256r1_verify(ptypes, params,
-				RSIP_BYTE_SIZE_WRAPPED_KEY_ECC_BRAINPOOLP256R1_PUBLIC);
+		return ecdsa_brainpoolp256r1_verify(
+			ptypes, params,
+			RSIP_BYTE_SIZE_WRAPPED_KEY_ECC_BRAINPOOLP256R1_PUBLIC);
 
 	default:
 		return TEE_ERROR_NOT_SUPPORTED;

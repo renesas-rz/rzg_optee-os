@@ -13,40 +13,40 @@
 #include <xspi_reg_values.h>
 #include <xspi.h>
 
-#define RDID		     (0)
-#define RSTEN		     (1)
-#define RESET		     (2)
-#define WTEN		     (3)
-#define ERASE		     (4)
-#define RDSTA		     (5)
-#define WRITE		     (6)
+#define RDID (0)
+#define RSTEN (1)
+#define RESET (2)
+#define WTEN (3)
+#define ERASE (4)
+#define RDSTA (5)
+#define WRITE (6)
 
-#define IN_DIR		     (0u)
-#define OUT_DIR		     (1u)
+#define IN_DIR (0u)
+#define OUT_DIR (1u)
 
-#define DEVID_ID_MASK	     (0x00FFFFFFu)
-#define DEVICE_ID_BAD	     (0u)
-#define DEVICE_ID_ERROR	     (0x00FFFFFFu)
+#define DEVID_ID_MASK (0x00FFFFFFu)
+#define DEVICE_ID_BAD (0u)
+#define DEVICE_ID_ERROR (0x00FFFFFFu)
 
 #define XSPI_COMMAND_TIMEOUT (100000u)
 
 struct xspi_dev {
 	paddr_t phys; /* Physical register base */
 	vaddr_t virt; /* Mapped virtual register base */
-	size_t	size; /* Register region size */
+	size_t size; /* Register region size */
 };
 
 struct xspi_cmd {
 	uint16_t instruction;
-	uint8_t	 direction : 3; /* Transfer direction */
-	uint8_t	 latency : 5; /* Dummy/latency cycles */
-	uint8_t	 data_size : 4; /* Data length in bytes */
-	uint8_t	 addr_size : 4; /* Address length in bytes */
-	uint8_t	 cmd_size : 4; /* Instruction length in bytes */
+	uint8_t direction : 3; /* Transfer direction */
+	uint8_t latency : 5; /* Dummy/latency cycles */
+	uint8_t data_size : 4; /* Data length in bytes */
+	uint8_t addr_size : 4; /* Address length in bytes */
+	uint8_t cmd_size : 4; /* Instruction length in bytes */
 };
 
 struct xspi_cmd_info {
-	uint8_t	 cmd_id; /* Command table index */
+	uint8_t cmd_id; /* Command table index */
 	uint32_t addr; /* Target address */
 	uint32_t data; /* Write data */
 };
@@ -98,7 +98,7 @@ static struct xspi_dev *get_xspi_device(uint8_t ch)
 }
 
 /* Execute a single manual command transaction */
-static int32_t xspi_single_command(const struct xspi_dev	    *dev,
+static int32_t xspi_single_command(const struct xspi_dev *dev,
 				   const struct xspi_cmd_info *const cmd_info)
 {
 	uint32_t timeout = XSPI_COMMAND_TIMEOUT;
@@ -169,8 +169,8 @@ static int32_t xspi_wait_flash_ready(const struct xspi_dev *dev)
 {
 	int32_t ret = XSPI_ERR;
 
-	int32_t	 count	 = 1000;
-	uint32_t id	 = DEVICE_ID_BAD;
+	int32_t count = 1000;
+	uint32_t id = DEVICE_ID_BAD;
 	uint32_t prev_id = DEVICE_ID_BAD;
 
 	struct xspi_cmd_info cmd_rdid = { RDID, 0, 0 };
@@ -218,7 +218,7 @@ int32_t xspi_erase(uint8_t ch, const uintptr_t addr, uint32_t byte_count)
 	uint32_t i;
 	uint32_t count = DIV_ROUND_UP(byte_count, XSPI_WRITE_PROG_SIZE);
 
-	struct xspi_cmd_info cmd_wten  = { WTEN, 0, 0 };
+	struct xspi_cmd_info cmd_wten = { WTEN, 0, 0 };
 	struct xspi_cmd_info cmd_erase = { ERASE, addr, 0 };
 
 	volatile uint32_t status = 0xFFFFFFFF;
@@ -260,11 +260,11 @@ int32_t xspi_write(uint8_t ch, const uintptr_t addr, uintptr_t data,
 {
 	int32_t ret = XSPI_ERR;
 
-	uint32_t  i;
-	uint32_t *src	= (uint32_t *)data;
-	uint32_t  count = byte_count / sizeof(uint32_t);
+	uint32_t i;
+	uint32_t *src = (uint32_t *)data;
+	uint32_t count = byte_count / sizeof(uint32_t);
 
-	struct xspi_cmd_info cmd_wten  = { WTEN, 0, 0 };
+	struct xspi_cmd_info cmd_wten = { WTEN, 0, 0 };
 	struct xspi_cmd_info cmd_write = { WRITE, addr, 0 };
 
 	volatile uint32_t status = 0xFFFFFFFF;

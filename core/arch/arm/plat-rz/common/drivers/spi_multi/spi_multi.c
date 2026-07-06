@@ -114,13 +114,15 @@ void spi_multi_page_program(uint32_t addr, uintptr_t buff)
 	uint32_t val;
 
 	/* Write Enable Command */
-	spi_multi_cmd_write(SMCMR_CMD_WRITE_ENABLE, SPI_MANUAL_COMMAND_SIZE_0, 0);
+	spi_multi_cmd_write(SMCMR_CMD_WRITE_ENABLE, SPI_MANUAL_COMMAND_SIZE_0,
+			    0);
 
 	/* Clear the RCF bit */
 	spi_io_write(SPIM_DRCR, SPIM_DRCR_SET_VALUE);
 
 	/* SDR mode serial flash settings & WBUF enable */
-	val = spi_io_read(SPIM_PHYCNT) | PHYCNT_CAL_PERFORMED | PHYCNT_WBUF2_USED | PHYCNT_WBUF_USED;
+	val = spi_io_read(SPIM_PHYCNT) | PHYCNT_CAL_PERFORMED |
+	      PHYCNT_WBUF2_USED | PHYCNT_WBUF_USED;
 	spi_io_write(SPIM_PHYCNT, val);
 
 	/* Set the QSPIn_SSL setting value & Manual Mode  */
@@ -137,7 +139,8 @@ void spi_multi_page_program(uint32_t addr, uintptr_t buff)
 	spi_io_write(SPIM_SMDRENR, SPIM_SMDRENR_SET_VALUE);
 
 	/* Set the Transfer Data size, address enable &  command output enable */
-	val = SMENR_CDE | SMENR_ADE_ADR23_0_OUT | SPI_MANUAL_COMMAND_SIZE_32_BIT;
+	val = SMENR_CDE | SMENR_ADE_ADR23_0_OUT |
+	      SPI_MANUAL_COMMAND_SIZE_32_BIT;
 	spi_io_write(SPIM_SMENR, val);
 
 	for (int i = 0; i < SPI_PAGE_SIZE; i += 4)
@@ -163,7 +166,8 @@ void spi_multi_erase_sector(uint32_t addr)
 	uint32_t val;
 
 	/* Write Enable Command */
-	spi_multi_cmd_write(SMCMR_CMD_WRITE_ENABLE, SPI_MANUAL_COMMAND_SIZE_0, 0);
+	spi_multi_cmd_write(SMCMR_CMD_WRITE_ENABLE, SPI_MANUAL_COMMAND_SIZE_0,
+			    0);
 
 	/* Clear the RCF bit */
 	spi_io_write(SPIM_DRCR, SPIM_DRCR_SET_VALUE);

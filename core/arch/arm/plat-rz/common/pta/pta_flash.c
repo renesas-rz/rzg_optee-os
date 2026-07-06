@@ -37,7 +37,8 @@ static TEE_Result spi_write(uint32_t param_types, TEE_Param p[TEE_NUM_PARAMS])
 	if (0 < p[1].memref.size) {
 		sflash_open();
 
-		sflash_write_buffer(p[0].value.a, (uintptr_t)p[1].memref.buffer, p[1].memref.size);
+		sflash_write_buffer(p[0].value.a, (uintptr_t)p[1].memref.buffer,
+				    p[1].memref.size);
 
 		sflash_close();
 	}
@@ -72,8 +73,8 @@ static void close_session(void *pSessionContext __unused)
 	DMSG("close entry point for pseudo ta \"%s\"", TA_NAME);
 }
 
-static TEE_Result invoke_command(void *psess __unused,
-				 uint32_t cmd, uint32_t ptypes,
+static TEE_Result invoke_command(void *psess __unused, uint32_t cmd,
+				 uint32_t ptypes,
 				 TEE_Param params[TEE_NUM_PARAMS])
 {
 	switch (cmd) {
@@ -86,8 +87,7 @@ static TEE_Result invoke_command(void *psess __unused,
 }
 
 pseudo_ta_register(.uuid = FLASH_UUID, .name = TA_NAME,
-		   .flags = PTA_DEFAULT_FLAGS,
-		   .create_entry_point = create_ta,
+		   .flags = PTA_DEFAULT_FLAGS, .create_entry_point = create_ta,
 		   .destroy_entry_point = destroy_ta,
 		   .open_session_entry_point = open_session,
 		   .close_session_entry_point = close_session,

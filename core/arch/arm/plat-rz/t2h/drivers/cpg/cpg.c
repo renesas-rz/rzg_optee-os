@@ -16,7 +16,7 @@
 #include <cpg_regs.h>
 #include <platform_config.h>
 
-#define CPG_DUMMY_READ_COUNT		U(7)
+#define CPG_DUMMY_READ_COUNT U(7)
 
 static vaddr_t cpg_base;
 
@@ -106,7 +106,7 @@ static void cpg_module_start_xspi0(void)
 	/* Enable slave interface */
 	sys_start_slave_xspi0();
 
-	for(i = 0; i < CPG_DUMMY_READ_COUNT; i++)
+	for (i = 0; i < CPG_DUMMY_READ_COUNT; i++)
 		(void)xspi_dummy_read(0);
 }
 
@@ -135,7 +135,7 @@ static void cpg_module_start_xspi1(void)
 	/* Enable slave interface */
 	sys_start_slave_xspi1();
 
-	for(i = 0; i < CPG_DUMMY_READ_COUNT; i++)
+	for (i = 0; i < CPG_DUMMY_READ_COUNT; i++)
 		(void)xspi_dummy_read(1);
 }
 

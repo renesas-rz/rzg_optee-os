@@ -29,7 +29,7 @@ TEE_Result hw_get_random_bytes(void *buf, size_t len)
 
 	for (i = 0; i < len; i += rand_size) {
 		fsp_err_t err = R_RSIP_RandomNumberGenerate(
-						&rsip_instance_ctrl, (uint8_t *const)rand);
+			&rsip_instance_ctrl, (uint8_t *const)rand);
 		if (err != FSP_SUCCESS)
 			return TEE_ERROR_BUSY;
 

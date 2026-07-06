@@ -13,14 +13,14 @@
 #include <cpg.h>
 #include <cpg_regs.h>
 
-#define CPG_T_CLK						(0)
-#define CPG_T_RST						(1)
+#define CPG_T_CLK (0)
+#define CPG_T_RST (1)
 
 struct st_cpg_clkrst_t {
 	uintptr_t reg;
 	uintptr_t mon;
-	uint32_t  val;
-	uint32_t  type;
+	uint32_t val;
+	uint32_t type;
 };
 
 static vaddr_t cpg_base;
@@ -35,22 +35,20 @@ static inline uint32_t cpg_io_read(uint32_t reg)
 	return io_read32(cpg_base + reg);
 }
 
+/* xSPI */
 static const struct st_cpg_clkrst_t cpg_xspi[] = {
-	{		/* SPI */
-		(uintptr_t)CPG_CLKON_SPI,
-		(uintptr_t)CPG_CLKMON_SPI,
-		0x000F000F,
-		CPG_T_CLK
-	},
-	{		/* SPI */
-		(uintptr_t)CPG_RST_SPI,
-		(uintptr_t)CPG_RSTMON_SPI,
-		0x00030003,
-		CPG_T_RST
-	},
+	{ .reg = (uintptr_t)CPG_CLKON_SPI,
+	  .mon = (uintptr_t)CPG_CLKMON_SPI,
+	  .val = 0x000F000F,
+	  .type = CPG_T_CLK },
+	{ .reg = (uintptr_t)CPG_RST_SPI,
+	  .mon = (uintptr_t)CPG_RSTMON_SPI,
+	  .val = 0x00030003,
+	  .type = CPG_T_RST },
 };
 
-static void cpg_clkrst_start(const struct st_cpg_clkrst_t *tbl, const uint32_t size)
+static void cpg_clkrst_start(const struct st_cpg_clkrst_t *tbl,
+			     const uint32_t size)
 {
 	uint32_t cnt;
 	uint32_t mask;
@@ -69,7 +67,8 @@ static void cpg_clkrst_start(const struct st_cpg_clkrst_t *tbl, const uint32_t s
 	}
 }
 
-static void cpg_clkrst_stop(const struct st_cpg_clkrst_t *tbl, const uint32_t size)
+static void cpg_clkrst_stop(const struct st_cpg_clkrst_t *tbl,
+			    const uint32_t size)
 {
 	uint32_t cnt;
 	uint32_t mask;

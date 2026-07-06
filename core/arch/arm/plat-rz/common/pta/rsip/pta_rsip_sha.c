@@ -12,14 +12,15 @@
 
 extern rsip_instance_ctrl_t rsip_instance_ctrl;
 
-static TEE_Result sha_generateinit(uint32_t types, TEE_Param params[TEE_NUM_PARAMS], rsip_hash_type_t const hash_type)
+static TEE_Result sha_generateinit(uint32_t types,
+				   TEE_Param params[TEE_NUM_PARAMS],
+				   rsip_hash_type_t const hash_type)
 {
 	fsp_err_t err;
 	rsip_sha_handle_t *handle;
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE,
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE,
 				     TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
@@ -48,7 +49,8 @@ static TEE_Result sha_generateinit(uint32_t types, TEE_Param params[TEE_NUM_PARA
 	return TEE_SUCCESS;
 }
 
-static TEE_Result sha_generateupdate(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result sha_generateupdate(uint32_t types,
+				     TEE_Param params[TEE_NUM_PARAMS])
 {
 	fsp_err_t err;
 	rsip_sha_handle_t *handle;
@@ -57,8 +59,7 @@ static TEE_Result sha_generateupdate(uint32_t types, TEE_Param params[TEE_NUM_PA
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
 				     TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE))
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (rsip_sha_handle_t *)params[0].memref.buffer;
@@ -74,7 +75,8 @@ static TEE_Result sha_generateupdate(uint32_t types, TEE_Param params[TEE_NUM_PA
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
 
-	err = R_RSIP_SHA_GenerateUpdate(&rsip_instance_ctrl, handle, message, message_length);
+	err = R_RSIP_SHA_GenerateUpdate(&rsip_instance_ctrl, handle, message,
+					message_length);
 	switch ((uint32_t)err) {
 	case FSP_SUCCESS:
 		break;
@@ -95,7 +97,9 @@ static TEE_Result sha_generateupdate(uint32_t types, TEE_Param params[TEE_NUM_PA
 	return TEE_SUCCESS;
 }
 
-static TEE_Result sha_generatefinal(uint32_t types, TEE_Param params[TEE_NUM_PARAMS], uint32_t hash_size)
+static TEE_Result sha_generatefinal(uint32_t types,
+				    TEE_Param params[TEE_NUM_PARAMS],
+				    uint32_t hash_size)
 {
 	fsp_err_t err;
 	rsip_sha_handle_t *handle;
@@ -104,8 +108,7 @@ static TEE_Result sha_generatefinal(uint32_t types, TEE_Param params[TEE_NUM_PAR
 
 	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
 				     TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE))
+				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	handle = (rsip_sha_handle_t *)params[0].memref.buffer;
@@ -116,7 +119,8 @@ static TEE_Result sha_generatefinal(uint32_t types, TEE_Param params[TEE_NUM_PAR
 
 	digest = (uint8_t *)params[1].memref.buffer;
 	digest_length = (uint32_t)params[1].memref.size;
-	if (!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t) || (hash_size > digest_length)) {
+	if (!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t) ||
+	    (hash_size > digest_length)) {
 		EMSG("digest err");
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
@@ -148,7 +152,7 @@ static TEE_Result invoke_command(void *session __unused, uint32_t cmd,
 				 uint32_t ptypes,
 				 TEE_Param params[TEE_NUM_PARAMS])
 {
-	EMSG(PTA_NAME" command %#"PRIx32" ptypes %#"PRIx32, cmd, ptypes);
+	EMSG(PTA_NAME " command %#" PRIx32 " ptypes %#" PRIx32, cmd, ptypes);
 
 	switch (cmd) {
 	case PTA_CMD_SHA1_Init:
@@ -162,9 +166,11 @@ static TEE_Result invoke_command(void *session __unused, uint32_t cmd,
 	case PTA_CMD_SHA512_Init:
 		return sha_generateinit(ptypes, params, RSIP_HASH_TYPE_SHA512);
 	case PTA_CMD_SHA512_224_Init:
-		return sha_generateinit(ptypes, params, RSIP_HASH_TYPE_SHA512_224);
+		return sha_generateinit(ptypes, params,
+					RSIP_HASH_TYPE_SHA512_224);
 	case PTA_CMD_SHA512_256_Init:
-		return sha_generateinit(ptypes, params, RSIP_HASH_TYPE_SHA512_256);
+		return sha_generateinit(ptypes, params,
+					RSIP_HASH_TYPE_SHA512_256);
 
 	case PTA_CMD_SHA1_Update:
 	case PTA_CMD_SHA224_Update:
