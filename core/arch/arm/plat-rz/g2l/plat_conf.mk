@@ -29,13 +29,14 @@ else
 $(call force,CFG_ARM32_core,y)
 endif
 
+CFG_RZ_SCE ?= n
 ifeq ($(CFG_RZ_SCE),y)
-CFG_RZ_TSIP ?= y
 CFG_KUK_BASE ?= 0x20A00000
 ldflags-external += $(CFG_RZ_SCE_LIB_DIR)/libr_secure_ip_1_0.a.1.0.0
+$(call force,CFG_RZ_TSIP_PROTECTED,y)
 endif
 
-ifeq ($(CFG_RZ_TSIP),y)
+ifeq ($(CFG_RZ_SCE),y)
 CFG_WITH_SOFTWARE_PRNG ?= n
 endif
 
