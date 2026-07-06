@@ -66,4 +66,4 @@ static TEE_Result sce_init(void)
 	return TEE_SUCCESS;
 }
 
-service_init(sce_init);
+service_init_crypto(sce_init);

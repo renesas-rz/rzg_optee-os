@@ -106,4 +106,4 @@ static TEE_Result otp_init(void)
 	return TEE_SUCCESS;
 }
 
-service_init(otp_init);
+early_init(otp_init);

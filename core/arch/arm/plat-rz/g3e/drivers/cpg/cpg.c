@@ -178,4 +178,4 @@ static TEE_Result cpg_init(void)
 	return TEE_SUCCESS;
 }
 
-driver_init(cpg_init);
+service_init(cpg_init);

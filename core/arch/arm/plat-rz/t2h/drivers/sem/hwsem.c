@@ -25,4 +25,4 @@ static TEE_Result sem_init(void)
 	return TEE_SUCCESS;
 }
 
-service_init(sem_init);
+early_init_late(sem_init);

@@ -57,4 +57,4 @@ static TEE_Result rsip_init(void)
 	return TEE_SUCCESS;
 }
 
-service_init(rsip_init);
+service_init_crypto(rsip_init);

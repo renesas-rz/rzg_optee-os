@@ -77,4 +77,4 @@ static TEE_Result mbxsem_init(void)
 	return TEE_SUCCESS;
 }
 
-service_init(mbxsem_init);
+early_init(mbxsem_init);
