@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /*
+ * Copyright (c) 2016, GlobalLogic
  * Copyright (c) 2019-2020, Renesas Electronics Corporation
  */
 

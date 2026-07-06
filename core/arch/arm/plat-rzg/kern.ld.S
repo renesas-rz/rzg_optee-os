@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: (BSD-2-Clause AND MIT) */
 /*
  * Copyright (c) 2014, Linaro Limited
- * Copyright (c) 2019-2020, Renesas Electronics Corporation
+ * Copyright (c) 2019-2026, Renesas Electronics Corporation
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -55,12 +55,11 @@
 #include <util.h>
 
 /*
- * TEE_RAM_VA_START:            The start virtual address of the TEE RAM
- * TEE_TEXT_VA_START:           The start virtual address of the OP-TEE text
+ * Note:
+ * Clang 11 (ld.lld) generates non-relocatable reference when using ROUNDDOWN()
+ * from <util.h>, which does not work with ASLR.
  */
-#define TEE_RAM_VA_START        TEE_RAM_START
-#define TEE_TEXT_VA_START       (TEE_RAM_VA_START + \
-					(TEE_LOAD_ADDR - TEE_RAM_START))
+#define LD_ROUNDDOWN(x, y) ((x) - ((x) % (y)))
 
 OUTPUT_FORMAT(CFG_KERN_LINKER_FORMAT)
 OUTPUT_ARCH(CFG_KERN_LINKER_ARCH)
@@ -68,25 +67,24 @@ OUTPUT_ARCH(CFG_KERN_LINKER_ARCH)
 ENTRY(_start)
 SECTIONS
 {
-	. = TEE_TEXT_VA_START;
-#ifdef ARM32
-	ASSERT(!(TEE_TEXT_VA_START & 31), "text start should align to 32bytes")
-#endif
-#ifdef ARM64
-	ASSERT(!(TEE_TEXT_VA_START & 127), "text start should align to 128bytes")
-#endif
+	. = TEE_LOAD_ADDR;
+	ASSERT(!(TEE_LOAD_ADDR & (SMALL_PAGE_SIZE - 1)),
+	       "text start should be page aligned")
 	__text_start = .;
 
 	/*
-	 * Memory between TEE_TEXT_VA_START and page aligned rounded down
+	 * Memory between TEE_LOAD_ADDR and page aligned rounded down
 	 * value will be mapped with unpaged "text" section attributes:
 	 * likely to be read-only/executable.
 	 */
-	__flatmap_unpg_rx_start = ROUNDDOWN(__text_start, SMALL_PAGE_SIZE);
+	__flatmap_unpg_rx_start = LD_ROUNDDOWN(__text_start, SMALL_PAGE_SIZE);
 
 	.text : {
 		KEEP(*(.text._start))
 		__identity_map_init_start = .;
+		__text_data_start = .;
+		*(.identity_map.data)
+		__text_data_end = .;
 		*(.identity_map .identity_map.* \
 			/*
 			 * The one below is needed because it's a weak
@@ -136,30 +134,31 @@ SECTIONS
 		__rodata_start = .;
 		*(.gnu.linkonce.r.*)
 #ifdef CFG_WITH_PAGER
-		*(.rodata .rodata.__unpaged)
+		*(.rodata .rodata.__unpaged .rodata.__unpaged.*)
 #include <rodata_unpaged.ld.S>
 #else
-#ifdef CFG_DT
-		__rodata_dtdrv_start = .;
-		KEEP(*(.rodata.dtdrv))
-		__rodata_dtdrv_end = .;
-#endif
-#ifdef CFG_EARLY_TA
-		. = ALIGN(8);
-		__rodata_early_ta_start = .;
-		KEEP(*(.rodata.early_ta))
-		__rodata_early_ta_end = .;
-#endif
-
 		*(.rodata .rodata.*)
+#ifndef CFG_CORE_ASLR
 		. = ALIGN(8);
 		KEEP(*(SORT(.scattered_array*)));
+#endif
 #endif
 		. = ALIGN(8);
 		__rodata_end = .;
 	}
 
+#if defined(CFG_CORE_ASLR)
+	.data.rel.ro : {
+#if !defined(CFG_WITH_PAGER)
+		. = ALIGN(8);
+		KEEP(*(SORT(.scattered_array*)));
+#endif
+		*(.data.rel.ro.__unpaged .data.rel.ro.__unpaged.*)
+	}
+#endif
+
 	.got : { *(.got.plt) *(.got) }
+	.note.gnu.property : { *(.note.gnu.property) }
 	.plt : { *(.plt) }
 
 	.ctors : ALIGN(8) {
@@ -174,13 +173,13 @@ SECTIONS
 	}
 
 	/* .ARM.exidx is sorted, so has to go in its own output section.  */
-	.ARM.exidx : {
+	.ARM.exidx : ALIGN(8) {
 		__exidx_start = .;
 		*(.ARM.exidx* .gnu.linkonce.armexidx.*)
 		__exidx_end = .;
 	}
 
-	.ARM.extab : {
+	.ARM.extab : ALIGN(8) {
 		__extab_start = .;
 		*(.ARM.extab*)
 		__extab_end = .;
@@ -192,7 +191,7 @@ SECTIONS
 #endif
 	__flatmap_unpg_ro_size = . - __flatmap_unpg_ro_start;
 
-#ifdef CFG_VIRTUALIZATION
+#ifdef CFG_NS_VIRTUALIZATION
 	__flatmap_nex_rw_start = . ;
 	.nex_data : ALIGN(8) {
 		*(.nex_data .nex_data.*)
@@ -227,7 +226,7 @@ SECTIONS
 	}
 	.nex_nozi (NOLOAD) : {
 		ASSERT(!(ABSOLUTE(.) & (16 * 1024 - 1)), "align nozi to 16kB");
-		KEEP(*(.nozi.mmu.l1 .nozi.mmu.l2))
+		KEEP(*(.nozi.mmu.base_table .nozi.mmu.l2))
 	}
 
 	. = ALIGN(SMALL_PAGE_SIZE);
@@ -248,7 +247,7 @@ SECTIONS
 		. = ALIGN(8);
 	}
 
-	/* uninitialized data */
+	/* unintialized data */
 	.bss : {
 		__data_end = .;
 		__bss_start = .;
@@ -296,8 +295,11 @@ SECTIONS
 		. = ALIGN(8);
 		__nozi_stack_end = .;
 	}
-
-#ifdef CFG_WITH_PAGER
+#ifndef CFG_WITH_PAGER
+	. = ALIGN(SMALL_PAGE_SIZE);
+	__flatmap_free_start = .;
+	__flatmap_unpg_rw_size = __flatmap_free_start - __flatmap_unpg_rw_start;
+#else
 	.heap2 (NOLOAD) : {
 		__heap2_start = .;
 		/*
@@ -320,6 +322,7 @@ SECTIONS
 		"read-write memory is not paged aligned")
 
 	.text_init : {
+		__text_init_start = .;
 /*
  * Include list of sections needed for boot initialization, this list
  * overlaps with unpaged.ld.S but since unpaged.ld.S is first all those
@@ -330,6 +333,7 @@ SECTIONS
 		/* Make sure constructor functions are available during init */
 		KEEP(*(.text._GLOBAL__sub_*));
 		. = ALIGN(8);
+		__text_init_end = .;
 	}
 
 #ifdef CFG_CORE_RODATA_NOEXEC
@@ -339,17 +343,23 @@ SECTIONS
 	__flatmap_init_ro_start = .;
 
 	.rodata_init : {
+		__rodata_init_start = .;
 #include <rodata_init.ld.S>
-
+#ifndef CFG_CORE_ASLR
 		. = ALIGN(8);
 		KEEP(*(SORT(.scattered_array*)));
-
-		. = ALIGN(8);
+#endif
 		__rodata_init_end = .;
 	}
-	__rodata_init_end = .;
+#ifdef CFG_CORE_ASLR
+	.data.rel.ro_init : ALIGN(8) {
+		KEEP(*(SORT(.scattered_array*)));
+	}
+#endif
+	. = ALIGN(8);
+	__ro_and_relro_data_init_end = .;
 
-	__init_end = ROUNDUP(__rodata_init_end, SMALL_PAGE_SIZE);
+	__init_end = ALIGN(__ro_and_relro_data_init_end, SMALL_PAGE_SIZE);
 	__get_tee_init_end = __init_end;
 	__init_size = __init_end - __init_start;
 
@@ -357,18 +367,9 @@ SECTIONS
 	__flatmap_init_ro_size = __init_end - __flatmap_init_ro_start;
 
 	.rodata_pageable : ALIGN(8) {
-#ifdef CFG_DT
-		__rodata_dtdrv_start = .;
-		KEEP(*(.rodata.dtdrv))
-		__rodata_dtdrv_end = .;
-#endif
-#ifdef CFG_EARLY_TA
-		. = ALIGN(8);
-		__rodata_early_ta_start = .;
-		KEEP(*(.rodata.early_ta))
-		__rodata_early_ta_end = .;
-#endif
+		__rodata_pageable_start = .;
 		*(.rodata*)
+		__rodata_pageable_end = .;
 	}
 
 #ifdef CFG_CORE_RODATA_NOEXEC
@@ -376,8 +377,10 @@ SECTIONS
 #endif
 
 	.text_pageable : ALIGN(8) {
+		__text_pageable_start = .;
 		*(.text*)
 		. = ALIGN(SMALL_PAGE_SIZE);
+		__text_pageable_end = .;
 	}
 
 	__pageable_part_end = .;
@@ -389,15 +392,28 @@ SECTIONS
 		"Load address before start of physical memory")
 	ASSERT(TEE_LOAD_ADDR < (TEE_RAM_START + TEE_RAM_PH_SIZE),
 		"Load address after end of physical memory")
-	ASSERT((TEE_RAM_VA_START + TEE_RAM_PH_SIZE - __init_end) >
-		SMALL_PAGE_SIZE, "Too few free pages to initialize paging")
+	ASSERT((TEE_RAM_START + TEE_RAM_PH_SIZE - __init_end) >
+		SMALL_PAGE_SIZE * 2 +
+		(__pageable_end - __pageable_start) / 4096 * 32 +
+		SIZEOF(.rel) / 2 + SIZEOF(.rela) / 3 ,
+		"Too few free pages to initialize paging")
 
 
 #endif /*CFG_WITH_PAGER*/
 
 #ifdef CFG_CORE_SANITIZE_KADDRESS
-	. = TEE_RAM_VA_START + (TEE_RAM_VA_SIZE * 8) / 9 - 8;
+	/*
+	 * Guard against moving the location counter backwards in the assignment
+	 * below.
+	 */
+	ASSERT(. <= (TEE_RAM_START + (TEE_RAM_VA_SIZE * 8) / 9 - 8),
+		"TEE_RAM_VA_SIZE is too small")
+	. = TEE_RAM_START + (TEE_RAM_VA_SIZE * 8) / 9 - 8;
 	. = ALIGN(8);
+#ifndef CFG_WITH_PAGER
+	__flatmap_free_size = LD_ROUNDDOWN(. - __flatmap_free_start,
+					   SMALL_PAGE_SIZE);
+#endif
 	.asan_shadow : {
 		__asan_shadow_start = .;
 		. += TEE_RAM_VA_SIZE / 9;
@@ -409,21 +425,23 @@ SECTIONS
 	__end = .;
 
 #ifndef CFG_WITH_PAGER
-	__init_size = __data_end - TEE_TEXT_VA_START;
+	__init_size = __data_end - TEE_LOAD_ADDR;
 #endif
 	/*
 	 * Guard against moving the location counter backwards in the assignment
 	 * below.
 	 */
-	ASSERT(. <= (TEE_RAM_VA_START + TEE_RAM_VA_SIZE),
+	ASSERT(. <= (TEE_RAM_START + TEE_RAM_VA_SIZE),
 		"TEE_RAM_VA_SIZE is too small")
-	. = TEE_RAM_VA_START + TEE_RAM_VA_SIZE;
+	. = TEE_RAM_START + TEE_RAM_VA_SIZE;
 
 	_end_of_ram = .;
 
 #ifndef CFG_WITH_PAGER
-	__flatmap_unpg_rw_size = _end_of_ram - __flatmap_unpg_rw_start;
 	__get_tee_init_end = .;
+#ifndef CFG_CORE_SANITIZE_KADDRESS
+	__flatmap_free_size = _end_of_ram - __flatmap_free_start;
+#endif
 #endif
 
 	/*
@@ -442,7 +460,7 @@ SECTIONS
 	.rela : {
 		*(.rela.*)
 	}
-#ifndef CFG_CORE_ASLR
+#if !defined(CFG_CORE_ASLR) && !defined(CFG_CORE_PHYS_RELOCATABLE)
 	ASSERT(SIZEOF(.rel) == 0, "Relocation entries not expected")
 	ASSERT(SIZEOF(.rela) == 0, "Relocation entries not expected")
 #endif
@@ -475,7 +493,13 @@ __vcore_unpg_rw_start = __flatmap_unpg_rw_start;
 __vcore_unpg_rw_size = __flatmap_unpg_rw_size;
 __vcore_unpg_rw_end = __vcore_unpg_rw_start + __vcore_unpg_rw_size;
 
-#ifdef CFG_VIRTUALIZATION
+#ifndef CFG_WITH_PAGER
+__vcore_free_start = __flatmap_free_start;
+__vcore_free_size = __flatmap_free_size;
+__vcore_free_end = __flatmap_free_start + __flatmap_free_size;
+#endif
+
+#ifdef CFG_NS_VIRTUALIZATION
 /* Nexus read-write memory */
 __vcore_nex_rw_start = __flatmap_nex_rw_start;
 __vcore_nex_rw_size = __flatmap_nex_rw_size;
@@ -483,28 +507,21 @@ __vcore_nex_rw_end = __vcore_nex_rw_start + __vcore_nex_rw_size;
 #endif
 
 #ifdef CFG_WITH_PAGER
-/*
- * Core init mapping shall cover up to end of the physical RAM.
- * This is required since the hash table is appended to the
- * binary data after the firmware build sequence.
- */
-#define __FLATMAP_PAGER_TRAILING_SPACE	\
-	(TEE_RAM_START + TEE_RAM_PH_SIZE - \
-		(__flatmap_init_ro_start + __flatmap_init_ro_size))
-
 /* Paged/init read-only memories */
 __vcore_init_rx_start = __flatmap_init_rx_start;
-__vcore_init_ro_start = __flatmap_init_ro_start;
 #ifdef CFG_CORE_RODATA_NOEXEC
 __vcore_init_rx_size = __flatmap_init_rx_size;
-__vcore_init_ro_size = __flatmap_init_ro_size + __FLATMAP_PAGER_TRAILING_SPACE;
+__vcore_init_ro_start = __flatmap_init_ro_start;
+__vcore_init_ro_size = __flatmap_init_ro_size;
 #else
-__vcore_init_rx_size = __flatmap_init_rx_size + __flatmap_init_ro_size +
-		       __FLATMAP_PAGER_TRAILING_SPACE;
+__vcore_init_rx_size = __flatmap_init_rx_size + __flatmap_init_ro_size;
+__vcore_init_ro_start = __vcore_init_rx_end;
 __vcore_init_ro_size = 0;
 #endif /* CFG_CORE_RODATA_NOEXEC */
 __vcore_init_rx_end = __vcore_init_rx_start + __vcore_init_rx_size;
 __vcore_init_ro_end = __vcore_init_ro_start + __vcore_init_ro_size;
+ASSERT(__vcore_init_ro_start == __vcore_init_rx_end,
+       "__vcore_init_ro_start should follow __vcore_init_rx_end")
 #endif /* CFG_WITH_PAGER */
 
 #ifdef CFG_CORE_SANITIZE_KADDRESS
