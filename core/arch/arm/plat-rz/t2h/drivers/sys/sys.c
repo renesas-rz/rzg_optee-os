@@ -129,6 +129,21 @@ void sys_stop_slave_xspi1(void)
 		       SYS_SSTPCR6_XSPI1_ACK);
 }
 
+static void sys_configure_xspi_area(void)
+{
+	const uint32_t cs0_xspi0_end = (SFLASH_0_BASE + SFLASH_0_SIZE) - 1;
+	const uint32_t cs0_xspi1_end = (SFLASH_1_BASE + SFLASH_1_SIZE) - 1;
+
+	sem_regprotect_lock();
+	sys_unlock_sysctrl();
+
+	io_write32(sys_base + SYS_CS0ENDAD_XSPI0_OFFSET, cs0_xspi0_end);
+	io_write32(sys_base + SYS_CS0ENDAD_XSPI1_OFFSET, cs0_xspi1_end);
+
+	sys_lock_sysctrl();
+	sem_regprotect_unlock();
+}
+
 static TEE_Result sys_init(void)
 {
 	sys_base = (vaddr_t)phys_to_virt_io(SYS_BASE, SYS_SIZE);
@@ -136,16 +151,7 @@ static TEE_Result sys_init(void)
 		(vaddr_t)phys_to_virt_io(SYS_BASE_SAFETY, SYS_SIZE_SAFETY);
 	assert(sys_base && sys_base_safety);
 
-	sem_regprotect_lock();
-
-	sys_unlock_sysctrl();
-
-	io_write32(sys_base + SYS_CS0ENDAD_XSPI0_OFFSET, 0x47FFFFFFU);
-	io_write32(sys_base + SYS_CS0ENDAD_XSPI1_OFFSET, 0x57FFFFFFU);
-
-	sys_lock_sysctrl();
-
-	sem_regprotect_unlock();
+	sys_configure_xspi_area();
 
 	return TEE_SUCCESS;
 }
