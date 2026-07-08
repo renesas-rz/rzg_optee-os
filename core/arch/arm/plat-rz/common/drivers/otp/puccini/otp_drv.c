@@ -12,9 +12,6 @@
 #include <otp_regs.h>
 #include <platform_config.h>
 
-#define OTP_MAP_MIN (OTPM_BASE)
-#define OTP_MAP_MAX ((OTPM_BASE + OTPM_WORDS) - 1)
-
 static vaddr_t otp_base;
 
 static inline void otp_io_write(uint32_t reg, uint32_t data)
@@ -93,8 +90,8 @@ bool r_otp_read(uint32_t addr, uint32_t *p_value, uint32_t count)
 	bool ret = false;
 
 	if (otp_open()) {
-		if ((addr >= OTP_MAP_MIN) && (addr <= OTP_MAP_MAX) &&
-		    ((addr + count - 1U) <= OTP_MAP_MAX)) {
+		if ((addr >= OTPM_MIN) && (addr <= OTPM_MAX) &&
+		    ((addr + count - 1U) <= OTPM_MAX)) {
 			/* Wait for OTP access enable */
 			while (1U != otp_io_getbits(OTP_OTPSTR, OTPSTR_CMD_RDY))
 				isb(); /* Not sure if this is necessary */

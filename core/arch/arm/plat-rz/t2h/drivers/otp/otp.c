@@ -15,7 +15,7 @@
 TEE_Result otp_read_cpid(void *buf, size_t *len)
 {
 	size_t read_len;
-	uint32_t chipid[OTPM_CPID_WORDS];
+	uint32_t chipid[OTPM_CPID_SIZE / sizeof(uint32_t)];
 
 	assert(buf && len);
 
