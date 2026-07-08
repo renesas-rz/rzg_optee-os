@@ -6,6 +6,8 @@
 #ifndef __OTP_REGS_H__
 #define __OTP_REGS_H__
 
+#include <util.h>
+
 #define OTP_OTPPWR (0x0000)
 #define OTP_OTPSTR (0x0004)
 #define OTP_OTPADRRD (0x0014)
@@ -13,15 +15,15 @@
 #define OTP_OTPFLAG (0x001C)
 
 /* OTPPWR Register */
-#define OTP_OTPPWR_PWR U(0)
-#define OTP_OTPPWR_ACCL U(4)
+#define OTPPWR_PWR BIT(0)
+#define OTPPWR_ACCL BIT(4)
 
 /* OTPSTR Register */
-#define OTP_OTPSTR_CMD_RDY U(0)
-#define OTP_OTPSTR_ERR_RP U(4)
+#define OTPSTR_CMD_RDY BIT(0)
+#define OTPSTR_ERR_RP BIT(4)
 
 /* OTPFLAG Register */
-#define OTP_OTPFLAG_FLAG U(0)
-#define OTP_OTPFLAG_RREND U(1)
+#define OTPFLAG_FLAG BIT(0)
+#define OTPFLAG_RREND BIT(1)
 
 #endif /* __OTP_REGS_H__ */
