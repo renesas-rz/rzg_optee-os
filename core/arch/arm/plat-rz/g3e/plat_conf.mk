@@ -27,9 +27,10 @@ $(call force,CFG_ARM32_core,y)
 endif
 
 CFG_RZ_SCE ?= n
+CFG_SECURE_IP_LIB ?= $(CFG_RZ_SCE_LIB_DIR)/libr_secure_ip_3_0.a.1.1.0
 ifeq ($(CFG_RZ_SCE),y)
 CFG_KUK_BASE ?= 0x20A00000
-ldflags-external += $(CFG_RZ_SCE_LIB_DIR)/libr_secure_ip_3_0.a.1.1.0
+ldflags-external += $(CFG_SECURE_IP_LIB)
 $(call force,CFG_RZ_RSIP_PROTECTED,y)
 endif
 
