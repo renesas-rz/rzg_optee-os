@@ -5,6 +5,7 @@
 
 #include <stdint.h>
 #include <assert.h>
+#include <string.h>
 #include <string_ext.h>
 #include <tee_api_types.h>
 #include <otp_drv.h>
