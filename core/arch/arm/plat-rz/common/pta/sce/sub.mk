@@ -1,4 +1,5 @@
-srcs-$(CFG_RZ_TSIP_PROTECTED) += \
+incdirs-y += include
+srcs-y += \
 	pta_sce.c \
 	pta_sce_ecc.c \
 	pta_sce_rsa.c \
