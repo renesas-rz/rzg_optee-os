@@ -1,4 +1,4 @@
 srcs-y += spi_multi.c
 global-incdirs-y += .
 
-subdirs-y += $(CFG_SPI_FLASH_DEV)
+subdirs-y += devices/$(CFG_SPI_FLASH_DEV)

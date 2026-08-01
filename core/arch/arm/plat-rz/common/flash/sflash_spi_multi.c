@@ -124,7 +124,7 @@ void sflash_close(void)
 
 static TEE_Result sflash_init(void)
 {
-	sflash_base = (vaddr_t)phys_to_virt_io(SPI_FLASH_BASE, SPI_FLASH_SIZE);
+	sflash_base = (vaddr_t)phys_to_virt_io(SFLASH_BASE, SFLASH_SIZE);
 
 	return TEE_SUCCESS;
 }
