@@ -292,6 +292,6 @@
  * Generate random data.
  * memref[0] (out): Output buffer filled with random data.
  */
-#define PTA_CMD_RandomNumberGenerate (0x16000000)
+#define PTA_CMD_RandomNumberGenerate (0x15000000)
 
 #endif /* __PTA_RSIP_H */
