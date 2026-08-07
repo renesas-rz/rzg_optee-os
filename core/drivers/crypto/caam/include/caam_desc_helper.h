@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: BSD-2-Clause */
 /*
- * Copyright 2018-2021 NXP
+ * Copyright 2018-2021, 2024 NXP
  *
  * Brief   CAAM Descriptor interface.
  */
@@ -32,7 +32,9 @@ void caam_desc_add_dmaobj(uint32_t *desc, struct caamdmaobj *data,
 #define caam_desc_store(desc, data, cla, src)                                  \
 	caam_desc_add_dmaobj(desc, data, ST_NOIMM(cla, src, 0))
 #define caam_desc_fifo_store(desc, data, src)                                  \
-	caam_desc_add_dmaobj(desc, data, FIFO_ST(src, 0))
+	caam_desc_add_dmaobj(desc, data, FIFO_ST(CLASS_NO, src, 0))
+#define caam_desc_seq_in(desc, data)                                           \
+	caam_desc_add_dmaobj(desc, data, SEQ_IN_PTR(0))
 #define caam_desc_seq_out(desc, data)                                          \
 	caam_desc_add_dmaobj(desc, data, SEQ_OUT_PTR(0))
 
@@ -136,6 +138,14 @@ static inline void dump_desc(uint32_t *desc)
 	 LOAD_LENGTH(len))
 
 /*
+ * Load Immediate value of length len to register dst of class starting of
+ * register offset.
+ */
+#define LD_IMM_OFF(cla, dst, len, off)                                         \
+	(CMD_LOAD_TYPE | CMD_CLASS(cla) | CMD_IMM | LOAD_DST(dst) |            \
+	 LOAD_OFFSET(off) | LOAD_LENGTH(len))
+
+/*
  * Load Immediate value of length len to register dst w/o class
  */
 #define LD_NOCLASS_IMM(dst, len) LD_IMM(CLASS_NO, dst, len)
@@ -195,6 +205,13 @@ static inline void dump_desc(uint32_t *desc)
 	 FIFO_LOAD_INPUT(dst) | FIFO_LOAD_ACTION(act) | FIFO_LOAD_LENGTH(len))
 
 /*
+ * SEQ FIFO Load from register src of length len
+ */
+#define FIFO_LD_SEQ(src, len)                                                  \
+	(CMD_SEQ_FIFO_LOAD_TYPE | FIFO_LOAD_INPUT(src) |                       \
+	 FIFO_LOAD_LENGTH(len))
+
+/*
  * Store value of length len from register src of class cla
  */
 #define ST_NOIMM(cla, src, len)                                                \
@@ -226,8 +243,9 @@ static inline void dump_desc(uint32_t *desc)
 /*
  * FIFO Store from register src of length len
  */
-#define FIFO_ST(src, len)                                                      \
-	(CMD_FIFO_STORE_TYPE | FIFO_STORE_OUTPUT(src) | FIFO_STORE_LENGTH(len))
+#define FIFO_ST(cla, src, len)                                                 \
+	(CMD_FIFO_STORE_TYPE | CMD_CLASS(cla) | FIFO_STORE_OUTPUT(src) |       \
+	 FIFO_STORE_LENGTH(len))
 
 /*
  * FIFO Store from register src.
@@ -387,6 +405,12 @@ static inline void dump_desc(uint32_t *desc)
 	 KEY_LENGTH(len))
 
 /*
+ * Load a class cla key of length len to register dst.
+ */
+#define LD_KEY(cla, dst, len)                                                  \
+	(CMD_KEY_TYPE | CMD_CLASS(cla) | KEY_DEST(dst) | KEY_LENGTH(len))
+
+/*
  * MPPRIVK generation function.
  */
 #define MPPRIVK (CMD_OP_TYPE | OP_TYPE(ENCAPS) | PROTID(MPKEY))
@@ -476,35 +500,37 @@ static inline void dump_desc(uint32_t *desc)
 /*
  * RSA Finalize Key in format
  */
-#define RSA_FINAL_KEY(format)                                                  \
-	(CMD_OP_TYPE | PROTID(RSA_FINISH_KEY) | PROT_RSA_KEY(format))
+#define RSA_FINAL_KEY(format, alg)                                             \
+	(CMD_OP_TYPE | PROTID(RSA_FINISH_KEY) | PROT_RSA_KEY(format) |         \
+	 PROT_RSA_FINISH_KEY(alg))
 
 /*
  * Public Keypair generation
  */
-#define PK_KEYPAIR_GEN(type)                                                   \
-	(CMD_OP_TYPE | OP_TYPE(UNI) | PROTID(PKKEY) | PROT_PK_TYPE(type))
+#define PK_KEYPAIR_GEN(type, alg)                                              \
+	(CMD_OP_TYPE | OP_TYPE(UNI) | PROTID(PKKEY) | PROT_PK_TYPE(type) |     \
+	 PROT_PRI(alg))
 
 /*
- * DSA/ECDSA signature of message hashed
+ * DSA/ECDSA signature of message of msg_type
  */
-#define DSA_SIGN(type)                                                         \
-	(CMD_OP_TYPE | OP_TYPE(UNI) | PROTID(DSASIGN) | PROT_PK_MSG(HASHED) |  \
-	 PROT_PK_TYPE(type))
+#define DSA_SIGN(type, msg_type, alg) \
+	(CMD_OP_TYPE | OP_TYPE(UNI) | PROTID(DSASIGN) | \
+	 PROT_PK_MSG(msg_type) | PROT_PK_TYPE(type) | PROT_PRI(alg))
 
 /*
- * DSA/ECDSA signature verify message hashed
+ * DSA/ECDSA signature verify message of msg_type
  */
-#define DSA_VERIFY(type)                                                       \
-	(CMD_OP_TYPE | OP_TYPE(UNI) | PROTID(DSAVERIFY) |                      \
-	 PROT_PK_MSG(HASHED) | PROT_PK_TYPE(type))
+#define DSA_VERIFY(type, msg_type)                        \
+	(CMD_OP_TYPE | OP_TYPE(UNI) | PROTID(DSAVERIFY) | \
+	 PROT_PK_MSG(msg_type) | PROT_PK_TYPE(type))
 
 /*
  * DH/ECC Shared Secret
  */
-#define SHARED_SECRET(type)                                                    \
+#define SHARED_SECRET(type, alg)                                               \
 	(CMD_OP_TYPE | OP_TYPE(UNI) | PROTID(SHARED_SECRET) |                  \
-	 PROT_PK_TYPE(type))
+	 PROT_PK_TYPE(type) | PROT_PRI(alg))
 
 /*
  * Blob Master Key Verification

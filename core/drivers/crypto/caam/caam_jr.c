@@ -5,8 +5,10 @@
  * Brief   CAAM Job Rings manager.
  *         Implementation of functions to enqueue/dequeue CAAM Job Descriptor
  */
+#include <caam_hal_clk.h>
 #include <caam_common.h>
 #include <caam_desc_helper.h>
+#include <caam_hal_clk.h>
 #include <caam_hal_jr.h>
 #include <caam_io.h>
 #include <caam_jr.h>
@@ -157,7 +159,7 @@ end_alloc:
 static enum itr_return caam_jr_irqhandler(struct itr_handler *handler)
 {
 	JR_TRACE("Disable the interrupt");
-	itr_disable(handler->it);
+	interrupt_disable(handler->chip, handler->it);
 
 	/* Send a signal to exit WFE loop */
 	sev();
@@ -298,6 +300,8 @@ static enum caam_status do_jr_enqueue(struct caam_jobctx *jobctx,
 	bool found = false;
 
 	exceptions = cpu_spin_lock_xsave(&jr_privdata->inlock);
+
+	caam_hal_clk_enable(true);
 
 	/*
 	 * Stay locked until a job is available
@@ -578,13 +582,17 @@ enum caam_status caam_jr_init(struct caam_jrcfg *jrcfg)
 	 * Prepare the interrupt handler to secure the interrupt even
 	 * if the interrupt is not used
 	 */
+	jr_privdata->it_handler.chip = interrupt_get_main_chip();
 	jr_privdata->it_handler.it = jrcfg->it_num;
 	jr_privdata->it_handler.flags = ITRF_TRIGGER_LEVEL;
 	jr_privdata->it_handler.handler = caam_jr_irqhandler;
 	jr_privdata->it_handler.data = jr_privdata;
 
 #if defined(CFG_NXP_CAAM_RUNTIME_JR) && defined(CFG_CAAM_ITR)
-	itr_add(&jr_privdata->it_handler);
+	if (interrupt_add_handler(&jr_privdata->it_handler)) {
+		retstatus = CAAM_FAILURE;
+		goto end_init;
+	}
 #endif
 	caam_hal_jr_enable_itr(jr_privdata->baseaddr);
 

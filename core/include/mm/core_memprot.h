@@ -3,8 +3,8 @@
  * Copyright (c) 2016, Linaro Limited
  * Copyright (c) 2014, STMicroelectronics International N.V.
  */
-#ifndef CORE_MEMPROT_H
-#define CORE_MEMPROT_H
+#ifndef __MM_CORE_MEMPROT_H
+#define __MM_CORE_MEMPROT_H
 
 #include <mm/core_mmu.h>
 #include <types_ext.h>
@@ -28,7 +28,6 @@ enum buf_is_attr {
 	CORE_MEM_NON_SEC,
 	CORE_MEM_SEC,
 	CORE_MEM_TEE_RAM,
-	CORE_MEM_TA_RAM,
 	CORE_MEM_SDP_MEM,
 	CORE_MEM_REG_SHM,
 };
@@ -90,6 +89,11 @@ void *phys_to_virt_io(paddr_t pa, size_t len);
  */
 paddr_t virt_to_phys(void *va);
 
+static inline paddr_t vaddr_to_phys(vaddr_t va)
+{
+	return virt_to_phys((void *)va);
+}
+
 /*
  * Return runtime usable address, irrespective of whether
  * the MMU is enabled or not. In case of MMU enabled also will be performed
@@ -97,8 +101,31 @@ paddr_t virt_to_phys(void *va);
  */
 vaddr_t core_mmu_get_va(paddr_t pa, enum teecore_memtypes type, size_t len);
 
-/* Return true if @va relates to a unpaged section else false */
-bool is_unpaged(void *va);
+/*
+ * is_unpaged() - report unpaged status of an address
+ * @va:		virtual address
+ *
+ * Returns true if the @va is non-NULL and is in the unpaged area if paging
+ * is enabled, else false.
+ */
+#ifdef CFG_WITH_PAGER
+bool is_unpaged(const void *va);
+#else
+static inline bool is_unpaged(const void *va) { return va; }
+#endif
+
+/*
+ * is_nexus() - report nexus status of an address
+ * @va:		virtual address
+ *
+ * Returns true if the @va is non-NULL and is in the nexus memory area
+ * if ns-virtualization is enabled, else false.
+ */
+#ifdef CFG_NS_VIRTUALIZATION
+bool is_nexus(const void *va);
+#else
+static inline bool is_nexus(const void *va) { return va; }
+#endif
 
 struct io_pa_va {
 	paddr_t pa;
@@ -115,4 +142,4 @@ vaddr_t io_pa_or_va_secure(struct io_pa_va *p, size_t len);
 vaddr_t io_pa_or_va_nsec(struct io_pa_va *p, size_t len);
 vaddr_t io_pa_or_va(struct io_pa_va *p, size_t len);
 
-#endif /* CORE_MEMPROT_H */
+#endif /* __MM_CORE_MEMPROT_H */

@@ -17,8 +17,7 @@ static unsigned int sp_mem_lock = SPINLOCK_UNLOCK;
 /* mem_shares stores all active FF-A shares. */
 SLIST_HEAD(sp_mem_head, sp_mem);
 static struct sp_mem_head mem_shares = SLIST_HEAD_INITIALIZER(sp_mem_head);
-/* Weak instance of mobj_sp_ops mandates it is not static */
-const struct mobj_ops mobj_sp_ops;
+static const struct mobj_ops mobj_sp_ops;
 
 struct mobj_sp {
 	struct mobj mobj;
@@ -70,7 +69,7 @@ struct mobj *sp_mem_new_mobj(uint64_t pages, uint32_t mem_type, bool is_secure)
 
 static size_t get_page_count(struct mobj_sp *ms)
 {
-	return ROUNDUP(ms->mobj.size, SMALL_PAGE_SIZE) / SMALL_PAGE_SIZE;
+	return ROUNDUP_DIV(ms->mobj.size, SMALL_PAGE_SIZE);
 }
 
 /* Add some physical pages to the mobj object. */
@@ -174,7 +173,7 @@ static void inactivate(struct mobj *mobj)
 	cpu_spin_unlock_xrestore(&sp_mem_lock, exceptions);
 }
 
-const struct mobj_ops mobj_sp_ops __weak __relrodata_unpaged("mobj_sp_ops") = {
+static const struct mobj_ops mobj_sp_ops = {
 	.get_pa = get_pa,
 	.get_phys_offs = get_phys_offs,
 	.get_mem_type = get_mem_type,
@@ -225,7 +224,7 @@ struct sp_mem *sp_mem_new(void)
 	uint32_t exceptions = 0;
 	int i = 0;
 
-	smem = calloc(sizeof(*smem), 1);
+	smem = calloc(1, sizeof(*smem));
 	if (!smem)
 		return NULL;
 

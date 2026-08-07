@@ -3,18 +3,19 @@
  * Copyright (c) 2014, STMicroelectronics International N.V.
  */
 
-#ifndef TEE_MM_H
-#define TEE_MM_H
+#ifndef __MM_TEE_MM_H
+#define __MM_TEE_MM_H
 
 #include <malloc.h>
+#include <pta_stats.h>
 #include <types_ext.h>
 
 /* Define to indicate default pool initiation */
-#define TEE_MM_POOL_NO_FLAGS            0
+#define TEE_MM_POOL_NO_FLAGS            MAF_NULL
 /* Flag to indicate that memory is allocated from hi address to low address */
-#define TEE_MM_POOL_HI_ALLOC            (1u << 0)
+#define TEE_MM_POOL_HI_ALLOC            MAF_HI_ALLOC
 /* Flag to indicate that pool should use nex_malloc instead of malloc */
-#define TEE_MM_POOL_NEX_MALLOC             (1u << 1)
+#define TEE_MM_POOL_NEX_MALLOC          MAF_NEX
 
 struct _tee_mm_entry_t {
 	struct _tee_mm_pool_t *pool;
@@ -36,15 +37,6 @@ struct _tee_mm_pool_t {
 #endif
 };
 typedef struct _tee_mm_pool_t tee_mm_pool_t;
-
-/* Physical Secure DDR pool */
-extern tee_mm_pool_t tee_mm_sec_ddr;
-
-/* Virtual eSRAM pool */
-extern tee_mm_pool_t tee_mm_vcore;
-
-/* Shared memory pool */
-extern tee_mm_pool_t tee_mm_shm;
 
 /*
  * Returns a pointer to the mm covering the supplied address,
@@ -76,12 +68,18 @@ bool tee_mm_init(tee_mm_pool_t *pool, paddr_t lo, paddr_size_t size,
 /* Kill managed memory area*/
 void tee_mm_final(tee_mm_pool_t *pool);
 
+tee_mm_entry_t *tee_mm_alloc_flags(tee_mm_pool_t *pool, size_t size,
+				   uint32_t flags);
+
 /*
  * Allocates size number of bytes in the paged virtual address space
  * Returns a handle to the memory. The handle is used as an input to
  * the tee_mm_free function.
  */
-tee_mm_entry_t *tee_mm_alloc(tee_mm_pool_t *pool, size_t size);
+static inline tee_mm_entry_t *tee_mm_alloc(tee_mm_pool_t *pool, size_t size)
+{
+	return tee_mm_alloc_flags(pool, size, MAF_NULL);
+}
 
 /* Allocate supplied memory range if it's free */
 tee_mm_entry_t *tee_mm_alloc2(tee_mm_pool_t *pool, paddr_t base, size_t size);
@@ -112,7 +110,7 @@ bool tee_mm_addr_is_within_range(const tee_mm_pool_t *pool, paddr_t addr);
 bool tee_mm_is_empty(tee_mm_pool_t *pool);
 
 #ifdef CFG_WITH_STATS
-void tee_mm_get_pool_stats(tee_mm_pool_t *pool, struct malloc_stats *stats,
+void tee_mm_get_pool_stats(tee_mm_pool_t *pool, struct pta_stats_alloc *stats,
 			   bool reset);
 #endif
 

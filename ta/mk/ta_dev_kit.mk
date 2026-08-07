@@ -7,6 +7,8 @@ all:
 include $(ta-dev-kit-dir)/mk/conf.mk
 ta-dev-kit-dir$(sm) := $(ta-dev-kit-dir)
 
+include $(ta-dev-kit-dir$(sm))/mk/macros.mk
+
 ifneq (1, $(words $(BINARY) $(LIBNAME) $(SHLIBNAME)))
 $(error You must specify exactly one of BINARY, LIBNAME or SHLIBNAME)
 endif
@@ -65,6 +67,9 @@ ifneq (,$(shlibname))
 cxxflags$(sm)  += -fno-exceptions
 endif
 
+ifeq ($(CFG_TA_OPTEE_CORE_API_COMPAT_1_1),y)
+cppflags$(sm)	+= -D__OPTEE_CORE_API_COMPAT_1_1=1
+endif
 CFG_TEE_TA_LOG_LEVEL ?= 2
 cppflags$(sm) += -DTRACE_LEVEL=$(CFG_TEE_TA_LOG_LEVEL)
 
@@ -72,6 +77,10 @@ cppflags$(sm) += -I. -I$(ta-dev-kit-dir$(sm))/include
 
 ifeq ($(CFG_TA_MCOUNT),y)
 cppflags$(sm) += -pg
+endif
+
+ifeq ($(CFG_TA_SANITIZE_UNDEFINED),y)
+cflags$(sm) += -fsanitize=undefined
 endif
 
 libdirs += $(ta-dev-kit-dir$(sm))/lib
@@ -96,9 +105,9 @@ libdeps += $(ta-dev-kit-dir$(sm))/lib/libdl.a
 libnames-after-libgcc += utils
 libdeps-after-libgcc += $(ta-dev-kit-dir$(sm))/lib/libutils.a
 
-# Pass config variable (CFG_) from conf.mk on the command line
+# Pass config variable (CFG_) and (_CFG_) from conf.mk on the command line
 cppflags$(sm) += $(strip \
-	$(foreach var, $(filter CFG_%,$(.VARIABLES)), \
+	$(foreach var, $(filter CFG_% _CFG_%,$(.VARIABLES)), \
 		$(if $(filter y,$($(var))), \
 			-D$(var)=1, \
 			$(if $(filter xn x,x$($(var))),,-D$(var)='$($(var))'))))
@@ -121,11 +130,10 @@ include  $(ta-dev-kit-dir$(sm))/mk/subdir.mk
 
 ifneq ($(user-ta-uuid),)
 # Build target is TA
-vpath %.c $(ta-dev-kit-dir$(sm))/src
-srcs += user_ta_header.c
+spec-out-dir := $(link-out-dir$(sm))
+spec-srcs += $(ta-dev-kit-dir$(sm))/src/user_ta_header.c
 ifeq ($(sm),ta_arm32)
-vpath %.S $(ta-dev-kit-dir$(sm))/src
-srcs += ta_entry_a32.S
+spec-srcs += $(ta-dev-kit-dir$(sm))/src/ta_entry_a32.S
 endif
 endif
 
@@ -138,10 +146,10 @@ endif
 
 ifneq ($(libname),)
 # Build target is static library
-all: $(libname).a
-cleanfiles += $(libname).a
+all: $(link-out-dir$(sm))/$(libname).a
+cleanfiles += $(link-out-dir$(sm))/$(libname).a
 
-$(libname).a: $(objs)
+$(link-out-dir$(sm))/$(libname).a: $(objs)
 	@echo '  AR      $@'
 	$(q)rm -f $@ && $(AR$(sm)) rcs $@ $^
 endif

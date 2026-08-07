@@ -2,8 +2,8 @@
 /*
 * Copyright (c) 2014, STMicroelectronics International N.V.
 */
-#ifndef TEE_SVC_CRYP_H
-#define TEE_SVC_CRYP_H
+#ifndef __TEE_TEE_SVC_CRYP_H
+#define __TEE_TEE_SVC_CRYP_H
 
 #include <tee_api_types.h>
 #include <utee_types.h>
@@ -11,7 +11,8 @@
 
 struct user_ta_ctx;
 
-TEE_Result syscall_cryp_obj_get_info(unsigned long obj, TEE_ObjectInfo *info);
+TEE_Result syscall_cryp_obj_get_info(unsigned long obj,
+				     struct utee_object_info *info);
 TEE_Result syscall_cryp_obj_restrict_usage(unsigned long obj,
 			unsigned long usage);
 TEE_Result syscall_cryp_obj_get_attr(unsigned long obj, unsigned long attr_id,
@@ -92,4 +93,4 @@ TEE_Result tee_obj_attr_from_binary(struct tee_obj *o, const void *data,
 				    size_t data_len);
 TEE_Result tee_obj_attr_copy_from(struct tee_obj *o, const struct tee_obj *src);
 
-#endif /* TEE_SVC_CRYP_H */
+#endif /* __TEE_TEE_SVC_CRYP_H */

@@ -17,7 +17,7 @@ objs		:=
 # Disable all builtin rules
 .SUFFIXES:
 
-comp-cflags$(sm) = -std=gnu99
+comp-cflags$(sm) = -std=gnu11
 comp-aflags$(sm) =
 comp-cppflags$(sm) =
 
@@ -37,6 +37,8 @@ comp-cflags-warns-high = \
 	-Wwrite-strings \
 	-Wno-missing-field-initializers -Wno-format-zero-length \
 	-Wno-c2x-extensions
+comp-cflags-warns-high += $(call cc-option,-Wpacked-not-aligned)
+comp-cflags-warns-high += $(call cc-option,-Waddress-of-packed-member)
 ifeq ($(CFG_WARN_DECL_AFTER_STATEMENT),y)
 comp-cflags-warns-high += $(call cc-option,-Wdeclaration-after-statement)
 endif
@@ -78,7 +80,8 @@ comp-compiler-$2 := $$(CC$(sm))
 comp-flags-$2 = $$(filter-out $$(CFLAGS_REMOVE) $$(cflags-remove) \
 			      $$(cflags-remove-$$(comp-sm-$2)) \
 			      $$(cflags-remove-$2), \
-		   $$(CFLAGS$$(arch-bits-$$(comp-sm-$2))) $$(CFLAGS_WARNS) \
+		   $$(CFLAGS$$(arch-bits-$$(comp-sm-$2))) $$(CFLAGS) \
+		   $$(CFLAGS_WARNS) \
 		   $$(comp-cflags$$(comp-sm-$2)) $$(cflags$$(comp-sm-$2)) \
 		   $$(cflags-lib$$(comp-lib-$2)) $$(cflags-$2))
 ifeq ($C,1)
@@ -118,9 +121,9 @@ comp-cppflags-$2 = $$(filter-out $$(CPPFLAGS_REMOVE) $$(cppflags-remove) \
 		      $$(addprefix -I,$$(incdirs-$2)) \
 		      $$(cppflags$$(comp-sm-$2)) \
 		      $$(cppflags-lib$$(comp-lib-$2)) $$(cppflags-$2)) \
-		      -D__FILE_ID__=$$(subst -,_,$$(subst /,_,$$(subst .,_,$1)))
+		      -D__FILE_ID__=$$(subst -,_,$$(subst /,_,$$(subst .,_,$$(patsubst $$(out-dir)/%,%,$1))))
 
-comp-flags-$2 += -MD -MF $$(comp-dep-$2) -MT $$@
+comp-flags-$2 += -MD -MF $$(comp-dep-$2) -MP -MT $$@
 comp-flags-$2 += $$(comp-cppflags-$2)
 
 comp-cmd-$2 = $$(comp-compiler-$2) $$(comp-flags-$2) -c $$< -o $$@
@@ -160,8 +163,7 @@ $2: $1 FORCE-GENSRC$(sm)
 
 endef
 
-$(foreach f, $(srcs), $(eval $(call \
-	process_srcs,$(f),$(out-dir)/$(base-prefix)$$(basename $f).o)))
+$(foreach f, $(srcs), $(eval $(call process_srcs,$(f),$$(oname-$(sm)-$(f)))))
 
 # Handle generated source files, that is, files that are compiled from out-dir
 $(foreach f, $(gen-srcs), $(eval $(call process_srcs,$(f),$$(basename $f).o)))
@@ -204,7 +206,7 @@ comp-cppflags-$3 = $$(filter-out $$(CPPFLAGS_REMOVE) $$(cppflags-remove) \
 		      $$(cppflags$$(comp-sm-$3)) \
 		      $$(cppflags-lib$$(comp-lib-$3)) $$(cppflags-$3))
 
-comp-flags-$3 += -MD -MF $$(comp-dep-$3) -MT $$@
+comp-flags-$3 += -MD -MF $$(comp-dep-$3) -MP -MT $$@
 comp-flags-$3 += $$(comp-cppflags-$3)
 
 comp-cmd-$3 = $$(CC$(sm)) $$(comp-flags-$3) -fverbose-asm -S $$< -o $$@
@@ -251,8 +253,6 @@ $(foreach f,$(asm-defines-files),$(eval $(call gen-asm-defines-file,$(f),$(out-d
 
 # Device tree source file compilation
 DTC := dtc
-DTC_FLAGS += -I dts -O dtb
-DTC_FLAGS += -Wno-unit_address_vs_reg
 
 define gen-dtb-file
 # dts file path/name in $1
@@ -261,6 +261,7 @@ define gen-dtb-file
 dtb-basename-$2	:= $$(basename $$(notdir $2))
 dtb-predts-$2   := $$(dir $2)$$(dtb-basename-$2).pre.dts
 dtb-predep-$2	:= $$(dir $2).$$(dtb-basename-$2).pre.dts.d
+dtb-precmd-file-$2 := $$(dir $2).$$(dtb-basename-$2).pre.dts.cmd
 dtb-dep-$2	:= $$(dir $2).$$(notdir $2).d
 dtb-cmd-file-$2	:= $$(dir $2).$$(notdir $2).cmd
 
@@ -268,36 +269,42 @@ cleanfiles := $$(cleanfiles) $2 \
 		$$(dtb-predts-$2) $$(dtb-predep-$2) \
 		$$(dtb-dep-$2) $$(dtb-cmd-file-$2)
 
-dtb-cppflags-$2	:= -Icore/include/ -x assembler-with-cpp \
+dtb-cppflags-$2 := -Icore/include/ -x assembler-with-cpp -undef -D__DTS__ \
 		   -E -ffreestanding $$(CPPFLAGS) \
-		   -MD -MF $$(dtb-predep-$2) -MT $2
+		   -MD -MF $$(dtb-predep-$2) -MP -MT $$(dtb-predts-$2)
 
-dtb-dtcflags-$2	:= $$(DTC_FLAGS) -d $$(dtb-dep-$2)
+dtb-dtcflags-$2	:= $$(DTC_FLAGS) -I dts -O dtb -Wno-unit_address_vs_reg \
+		   -d $$(dtb-dep-$2)
 
 -include $$(dtb-dep-$2)
 -include $$(dtb-predep-$2)
 -include $$(dtb-cmd-file-$2)
+-include $$(dtb-precmd-file-$2)
 
 dtb-precmd-$2 = $$(CPP$(sm)) $$(dtb-cppflags-$2) -o $$(dtb-predts-$2) $$<
 dtb-cmd-$2 = $$(DTC) $$(dtb-dtcflags-$2) -o $$@ $$(dtb-predts-$2)
 
-$2: $1 FORCE
-# Check if any prerequisites are newer than the target and
-# check if command line has changed
+$$(dtb-predts-$2): $1 FORCE
 	$$(if $$(strip $$(filter-out FORCE, $$?) \
 	    $$(filter-out $$(dtb-precmd-$2), $$(dtb-old-precmd-$2)) 	\
-	    $$(filter-out $$(dtb-old-precmd-$2), $$(dtb-precmd-$2)) 	\
-	    $$(filter-out $$(dtb-cmd-$2), $$(dtb-old-cmd-$2)) 		\
-	    $$(filter-out $$(dtb-old-cmd-$2), $$(dtb-cmd-$2))),		\
-		@set -e; 						\
+	    $$(filter-out $$(dtb-old-precmd-$2), $$(dtb-precmd-$2))), 	\
+		$(q)set -e; 						\
 		mkdir -p $$(dir $2); 					\
 		$(cmd-echo-silent) '  CPP     $$(dtb-predts-$2)'; 	\
 		$$(dtb-precmd-$2);					\
+		echo "dtb-old-precmd-$2 := $$(subst \",\\\",$$(dtb-precmd-$2))" > \
+			$$(dtb-precmd-file-$2) ;\
+	)
+
+$2: $$(dtb-predts-$2) FORCE
+	$$(if $$(strip $$(filter-out FORCE, $$?) \
+	    $$(filter-out $$(dtb-cmd-$2), $$(dtb-old-cmd-$2)) 		\
+	    $$(filter-out $$(dtb-old-cmd-$2), $$(dtb-cmd-$2))),		\
+		$(q)set -e; 						\
+		mkdir -p $$(dir $2); 					\
 		$(cmd-echo-silent) '  DTC     $$@'; 			\
 		$$(dtb-cmd-$2);						\
-		echo "dtb-old-precmd-$2 := $$(subst \",\\\",$$(dtb-precmd-$2))" > \
-			$$(dtb-cmd-file-$2) ;\
-		echo "dtb-old-cmd-$2 := $$(subst \",\\\",$$(dtb-cmd-$2))" >> \
+		echo "dtb-old-cmd-$2 := $$(subst \",\\\",$$(dtb-cmd-$2))" > \
 			$$(dtb-cmd-file-$2) ;\
 	)
 

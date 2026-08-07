@@ -42,6 +42,7 @@ struct clk_stm32_priv {
 	const struct mux_cfg *muxes;
 	const uint32_t nb_muxes;
 	const struct gate_cfg *gates;
+	uint8_t *gate_cpt;
 	const uint32_t nb_gates;
 	const struct div_cfg *div;
 	const uint32_t nb_div;
@@ -118,6 +119,13 @@ bool stm32_gate_is_enabled(uint16_t gate_id);
 TEE_Result stm32_gate_wait_ready(uint16_t gate_id, bool ready_on);
 TEE_Result stm32_gate_rdy_enable(uint16_t gate_id);
 TEE_Result stm32_gate_rdy_disable(uint16_t gate_id);
+
+/*
+ * Set gate to an enable or disable state without updating its
+ * refcount. This is exclusively intended to be used during initialization
+ * where refcount value are 0.
+ */
+void stm32_gate_set_init_state(uint16_t gate_id, bool enable);
 
 size_t stm32_mux_get_parent(uint32_t mux_id);
 TEE_Result stm32_mux_set_parent(uint16_t pid, uint8_t sel);

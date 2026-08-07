@@ -2,12 +2,13 @@
 # SPDX-License-Identifier: BSD-2-Clause
 #
 # Copyright (c) 2017, 2020, Linaro Limited
-# Copyright (c) 2020-2022, Arm Limited.
+# Copyright (c) 2020-2023, Arm Limited.
 #
 
 import argparse
 import array
-from elftools.elf.elffile import ELFFile
+from elftools.elf.elffile import ELFFile, ELFError
+from elftools.elf.sections import SymbolTableSection
 import os
 import re
 import struct
@@ -66,6 +67,21 @@ def ta_get_flags(ta_f):
         elffile = ELFFile(f)
 
         for s in elffile.iter_sections():
+            if isinstance(s, SymbolTableSection):
+                for symbol in s.iter_symbols():
+                    if symbol.name == 'ta_head':
+                        # Get the section containing the symbol
+                        s2 = elffile.get_section(symbol.entry['st_shndx'])
+                        offs = s2.header['sh_offset'] - s2.header['sh_addr']
+                        # ta_head offset into ELF binary
+                        offs = offs + symbol.entry['st_value']
+                        offs = offs + 20    # Flags offset in ta_head
+                        f.seek(offs)
+                        flags = struct.unpack('<I', f.read(4))[0]
+                        return flags
+
+        # For compatibility with older TAs
+        for s in elffile.iter_sections():
             if get_name(s) == '.ta_head':
                 return struct.unpack('<16x4xI', s.data()[:24])[0]
 
@@ -74,7 +90,11 @@ def ta_get_flags(ta_f):
 
 def sp_get_flags(sp_f):
     with open(sp_f, 'rb') as f:
-        elffile = ELFFile(f)
+        try:
+            elffile = ELFFile(f)
+        except ELFError:
+            # Binary format SP, return zero flags
+            return 0
 
         for s in elffile.iter_sections():
             if get_name(s) == '.sp_head':

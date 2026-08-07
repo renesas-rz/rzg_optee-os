@@ -101,7 +101,7 @@ enum pkcs11_rc pkcs2tee_validate_rsa_pss(struct active_processing *proc,
 	if ((modulus_size % 8) == 1)
 		k = modulus_size / 8;
 	else
-		k = ROUNDUP(modulus_size, 8) / 8;
+		k = ROUNDUP_DIV(modulus_size, 8);
 
 	if (rsa_pss_ctx->salt_len > (k - 2 - hash_size))
 		return PKCS11_CKR_KEY_SIZE_RANGE;
@@ -251,6 +251,68 @@ pkcs2tee_proc_params_rsa_oaep(struct active_processing *proc,
 	return PKCS11_CKR_OK;
 }
 
+enum pkcs11_rc
+pkcs2tee_proc_params_rsa_aes_wrap(struct active_processing *proc,
+				  struct pkcs11_attribute_head *proc_params)
+{
+	struct serialargs args = { };
+	enum pkcs11_rc rc = PKCS11_CKR_GENERAL_ERROR;
+	struct rsa_aes_key_wrap_processing_ctx *ctx = NULL;
+	uint32_t aes_key_bits = 0;
+	uint32_t hash = 0;
+	uint32_t mgf = 0;
+	uint32_t source_type = 0;
+	void *source_data = NULL;
+	uint32_t source_size = 0;
+
+	serialargs_init(&args, proc_params->data, proc_params->size);
+
+	rc = serialargs_get_u32(&args, &aes_key_bits);
+	if (rc)
+		return rc;
+
+	rc = serialargs_get_u32(&args, &hash);
+	if (rc)
+		return rc;
+
+	rc = serialargs_get_u32(&args, &mgf);
+	if (rc)
+		return rc;
+
+	rc = serialargs_get_u32(&args, &source_type);
+	if (rc)
+		return rc;
+
+	rc = serialargs_get_u32(&args, &source_size);
+	if (rc)
+		return rc;
+
+	rc = serialargs_get_ptr(&args, &source_data, source_size);
+	if (rc)
+		return rc;
+
+	if (serialargs_remaining_bytes(&args))
+		return PKCS11_CKR_ARGUMENTS_BAD;
+
+	proc->extra_ctx =
+		TEE_Malloc(sizeof(struct rsa_aes_key_wrap_processing_ctx) +
+			   source_size,
+			   TEE_USER_MEM_HINT_NO_FILL_ZERO);
+	if (!proc->extra_ctx)
+		return PKCS11_CKR_DEVICE_MEMORY;
+
+	ctx = proc->extra_ctx;
+
+	ctx->aes_key_bits = aes_key_bits;
+	ctx->hash_alg = hash;
+	ctx->mgf_type = mgf;
+	ctx->source_type = source_type;
+	ctx->source_data_len = source_size;
+	TEE_MemMove(ctx->source_data, source_data, source_size);
+
+	return PKCS11_CKR_OK;
+}
+
 /*
  * Set TEE RSA OAEP algorithm identifier upon PKCS11 mechanism parameters
  * @tee_id: output TEE RSA OAEP algorithm identifier
@@ -347,6 +409,128 @@ pkcs2tee_algo_rsa_oaep(uint32_t *tee_id, uint32_t *tee_hash_id,
 	return PKCS11_CKR_OK;
 }
 
+enum pkcs11_rc
+pkcs2tee_algo_rsa_aes_wrap(uint32_t *tee_id, uint32_t *tee_hash_id,
+			   struct pkcs11_attribute_head *proc_params)
+{
+	struct serialargs args = { };
+	enum pkcs11_rc rc = PKCS11_CKR_GENERAL_ERROR;
+	uint32_t aes_key_bits = 0;
+	uint32_t hash = 0;
+	uint32_t mgf = 0;
+	uint32_t source_type = 0;
+	void *source_data = NULL;
+	uint32_t source_size = 0;
+
+	serialargs_init(&args, proc_params->data, proc_params->size);
+
+	rc = serialargs_get_u32(&args, &aes_key_bits);
+	if (rc)
+		return rc;
+
+	rc = serialargs_get_u32(&args, &hash);
+	if (rc)
+		return rc;
+
+	rc = serialargs_get_u32(&args, &mgf);
+	if (rc)
+		return rc;
+
+	rc = serialargs_get_u32(&args, &source_type);
+	if (rc)
+		return rc;
+
+	rc = serialargs_get_u32(&args, &source_size);
+	if (rc)
+		return rc;
+
+	rc = serialargs_get_ptr(&args, &source_data, source_size);
+	if (rc)
+		return rc;
+
+	if (serialargs_remaining_bytes(&args))
+		return PKCS11_CKR_ARGUMENTS_BAD;
+
+	if (source_type != PKCS11_CKZ_DATA_SPECIFIED)
+		return PKCS11_CKR_MECHANISM_PARAM_INVALID;
+
+	switch (proc_params->id) {
+	case PKCS11_CKM_RSA_AES_KEY_WRAP:
+		switch (hash) {
+		case PKCS11_CKM_SHA_1:
+			if (mgf != PKCS11_CKG_MGF1_SHA1)
+				return PKCS11_CKR_MECHANISM_PARAM_INVALID;
+			*tee_id = TEE_ALG_RSAES_PKCS1_OAEP_MGF1_SHA1;
+			*tee_hash_id = TEE_ALG_SHA1;
+			break;
+		case PKCS11_CKM_SHA224:
+			if (mgf != PKCS11_CKG_MGF1_SHA224)
+				return PKCS11_CKR_MECHANISM_PARAM_INVALID;
+			*tee_id = TEE_ALG_RSAES_PKCS1_OAEP_MGF1_SHA224;
+			*tee_hash_id = TEE_ALG_SHA224;
+			break;
+		case PKCS11_CKM_SHA256:
+			if (mgf != PKCS11_CKG_MGF1_SHA256)
+				return PKCS11_CKR_MECHANISM_PARAM_INVALID;
+			*tee_id = TEE_ALG_RSAES_PKCS1_OAEP_MGF1_SHA256;
+			*tee_hash_id = TEE_ALG_SHA256;
+			break;
+		case PKCS11_CKM_SHA384:
+			if (mgf != PKCS11_CKG_MGF1_SHA384)
+				return PKCS11_CKR_MECHANISM_PARAM_INVALID;
+			*tee_id = TEE_ALG_RSAES_PKCS1_OAEP_MGF1_SHA384;
+			*tee_hash_id = TEE_ALG_SHA384;
+			break;
+		case PKCS11_CKM_SHA512:
+			if (mgf != PKCS11_CKG_MGF1_SHA512)
+				return PKCS11_CKR_MECHANISM_PARAM_INVALID;
+			*tee_id = TEE_ALG_RSAES_PKCS1_OAEP_MGF1_SHA512;
+			*tee_hash_id = TEE_ALG_SHA512;
+			break;
+		default:
+			EMSG("Unexpected %#"PRIx32"/%s", hash,
+			     id2str_proc(hash));
+
+			return PKCS11_CKR_GENERAL_ERROR;
+		}
+		break;
+	default:
+		EMSG("Unexpected mechanism %#"PRIx32"/%s", proc_params->id,
+		     id2str_proc(proc_params->id));
+
+		return PKCS11_CKR_GENERAL_ERROR;
+	}
+
+	return PKCS11_CKR_OK;
+}
+
+static enum pkcs11_rc contains_all_rsa_crt_parameters(struct pkcs11_object *obj)
+{
+	const uint32_t crt_attr[] = {
+		PKCS11_CKA_PRIME_1, PKCS11_CKA_PRIME_2, PKCS11_CKA_EXPONENT_1,
+		PKCS11_CKA_EXPONENT_2, PKCS11_CKA_COEFFICIENT,
+	};
+	enum pkcs11_rc rc = PKCS11_CKR_GENERAL_ERROR;
+	uint32_t a_size = 0;
+	void *a_ptr = NULL;
+	size_t count = 0;
+	size_t n = 0;
+
+	for (n = 0; n < ARRAY_SIZE(crt_attr); n++) {
+		rc = get_attribute_ptr(obj->attributes, crt_attr[n], &a_ptr,
+				       &a_size);
+		if (rc != PKCS11_CKR_OK)
+			return rc;
+		if (a_ptr && a_size)
+			count++;
+	}
+
+	if (count != ARRAY_SIZE(crt_attr))
+		return PKCS11_RV_NOT_FOUND;
+
+	return PKCS11_CKR_OK;
+}
+
 enum pkcs11_rc load_tee_rsa_key_attrs(TEE_Attribute **tee_attrs,
 				      size_t *tee_count,
 				      struct pkcs11_object *obj)
@@ -354,7 +538,6 @@ enum pkcs11_rc load_tee_rsa_key_attrs(TEE_Attribute **tee_attrs,
 	TEE_Attribute *attrs = NULL;
 	size_t count = 0;
 	enum pkcs11_rc rc = PKCS11_CKR_GENERAL_ERROR;
-	void *a_ptr = NULL;
 
 	assert(get_key_type(obj->attributes) == PKCS11_CKK_RSA);
 
@@ -402,15 +585,20 @@ enum pkcs11_rc load_tee_rsa_key_attrs(TEE_Attribute **tee_attrs,
 		if (count != 3)
 			break;
 
-		/* If pre-computed values are present load those */
-		rc = get_attribute_ptr(obj->attributes, PKCS11_CKA_PRIME_1,
-				       &a_ptr, NULL);
-		if (rc != PKCS11_CKR_OK && rc != PKCS11_RV_NOT_FOUND)
-			break;
-		if (rc == PKCS11_RV_NOT_FOUND || !a_ptr) {
-			rc = PKCS11_CKR_OK;
+		/*
+		 * If the pre-computed CRT parameters are present load them
+		 * but only if they are all present since the GP TEE
+		 * specification expects either the 5 are present
+		 * or none is present.
+		 */
+		rc = contains_all_rsa_crt_parameters(obj);
+		if (rc != PKCS11_CKR_OK) {
+			if (rc == PKCS11_RV_NOT_FOUND)
+				rc = PKCS11_CKR_OK;
 			break;
 		}
+
+		rc = PKCS11_CKR_GENERAL_ERROR;
 
 		if (pkcs2tee_load_attr(&attrs[count], TEE_ATTR_RSA_PRIME1, obj,
 				       PKCS11_CKA_PRIME_1))
@@ -617,4 +805,23 @@ size_t rsa_get_input_max_byte_size(TEE_OperationHandle op)
 	TEE_GetOperationInfo(op, &info);
 
 	return info.maxKeySize / 8;
+}
+
+enum pkcs11_rc pkcs2tee_rsa_nopad_context(struct active_processing *proc)
+{
+	size_t key_size = 0;
+
+	/*
+	 * RSA no-pad (CKM_RSA_X_509) verify needs a buffer of the size
+	 * of the key to safely run.
+	 */
+	key_size = rsa_get_input_max_byte_size(proc->tee_op_handle);
+	if (!key_size)
+		return PKCS11_CKR_GENERAL_ERROR;
+
+	proc->extra_ctx = TEE_Malloc(key_size, TEE_USER_MEM_HINT_NO_FILL_ZERO);
+	if (!proc->extra_ctx)
+		return PKCS11_CKR_DEVICE_MEMORY;
+
+	return PKCS11_CKR_OK;
 }

@@ -4,6 +4,7 @@
  */
 
 #include <kernel/mutex.h>
+#include <kernel/mutex_pm_aware.h>
 #include <kernel/panic.h>
 #include <kernel/refcount.h>
 #include <kernel/spinlock.h>
@@ -60,7 +61,7 @@ static void __mutex_lock(struct mutex *m, const char *fname, int lineno)
 			 * Someone else is holding the lock, wait in normal
 			 * world for the lock to become available.
 			 */
-			wq_wait_final(&m->wq, &wqe, m, fname, lineno);
+			wq_wait_final(&m->wq, &wqe, 0, m, fname, lineno);
 		} else
 			return;
 	}
@@ -205,7 +206,7 @@ static void __mutex_read_lock(struct mutex *m, const char *fname, int lineno)
 			 * Someone else is holding the lock, wait in normal
 			 * world for the lock to become available.
 			 */
-			wq_wait_final(&m->wq, &wqe, m, fname, lineno);
+			wq_wait_final(&m->wq, &wqe, 0, m, fname, lineno);
 		} else
 			return;
 	}
@@ -342,6 +343,39 @@ unsigned int mutex_get_recursive_lock_depth(struct recursive_mutex *m)
 	return refcount_val(&m->lock_depth);
 }
 
+void mutex_pm_aware_init(struct mutex_pm_aware *m)
+{
+	*m = (struct mutex_pm_aware)MUTEX_PM_AWARE_INITIALIZER;
+}
+
+void mutex_pm_aware_destroy(struct mutex_pm_aware *m)
+{
+	mutex_destroy(&m->mutex);
+}
+
+void mutex_pm_aware_lock(struct mutex_pm_aware *m)
+{
+	if (thread_get_id_may_fail() == THREAD_ID_INVALID) {
+		if (!cpu_spin_trylock(&m->lock) || m->mutex.state)
+			panic();
+	} else {
+		mutex_lock(&m->mutex);
+		if (!thread_spin_trylock(&m->lock))
+			panic();
+	}
+}
+
+void mutex_pm_aware_unlock(struct mutex_pm_aware *m)
+{
+	if (thread_get_id_may_fail() == THREAD_ID_INVALID) {
+		assert(!m->mutex.state);
+		cpu_spin_unlock(&m->lock);
+	} else {
+		thread_spin_unlock(&m->lock);
+		mutex_unlock(&m->mutex);
+	}
+}
+
 void condvar_init(struct condvar *cv)
 {
 	*cv = (struct condvar)CONDVAR_INITIALIZER;
@@ -393,13 +427,15 @@ void condvar_broadcast(struct condvar *cv)
 }
 #endif /*CFG_MUTEX_DEBUG*/
 
-static void __condvar_wait(struct condvar *cv, struct mutex *m,
-			const char *fname, int lineno)
+static TEE_Result __condvar_wait_timeout(struct condvar *cv, struct mutex *m,
+					 uint32_t timeout_ms, const char *fname,
+					 int lineno)
 {
-	uint32_t old_itr_status;
-	struct wait_queue_elem wqe;
-	short old_state;
-	short new_state;
+	TEE_Result res = TEE_SUCCESS;
+	uint32_t old_itr_status = 0;
+	struct wait_queue_elem wqe = { };
+	short old_state = 0;
+	short new_state = 0;
 
 	mutex_unlock_check(m);
 
@@ -434,23 +470,38 @@ static void __condvar_wait(struct condvar *cv, struct mutex *m,
 	if (!new_state)
 		wq_wake_next(&m->wq, m, fname, lineno);
 
-	wq_wait_final(&m->wq, &wqe, m, fname, lineno);
+	res = wq_wait_final(&m->wq, &wqe, timeout_ms, m, fname, lineno);
 
 	if (old_state > 0)
 		mutex_read_lock(m);
 	else
 		mutex_lock(m);
+
+	return res;
 }
 
 #ifdef CFG_MUTEX_DEBUG
 void condvar_wait_debug(struct condvar *cv, struct mutex *m,
 			const char *fname, int lineno)
 {
-	__condvar_wait(cv, m, fname, lineno);
+	__condvar_wait_timeout(cv, m, 0, fname, lineno);
+}
+
+TEE_Result condvar_wait_timeout_debug(struct condvar *cv, struct mutex *m,
+				      uint32_t timeout_ms, const char *fname,
+				      int lineno)
+{
+	return __condvar_wait_timeout(cv, m, timeout_ms, fname, lineno);
 }
 #else
 void condvar_wait(struct condvar *cv, struct mutex *m)
 {
-	__condvar_wait(cv, m, NULL, -1);
+	__condvar_wait_timeout(cv, m, 0, NULL, -1);
+}
+
+TEE_Result condvar_wait_timeout(struct condvar *cv, struct mutex *m,
+				uint32_t timeout_ms)
+{
+	return __condvar_wait_timeout(cv, m, timeout_ms, NULL, -1);
 }
 #endif

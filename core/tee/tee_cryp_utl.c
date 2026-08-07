@@ -9,7 +9,6 @@
 #include <kernel/dt_driver.h>
 #include <kernel/panic.h>
 #include <kernel/tee_time.h>
-#include <rng_support.h>
 #include <stdlib.h>
 #include <string_ext.h>
 #include <string.h>
@@ -72,6 +71,7 @@ TEE_Result tee_cipher_get_block_size(uint32_t algo, size_t *size)
 	case TEE_ALG_AES_GCM:
 	case TEE_ALG_SM4_ECB_NOPAD:
 	case TEE_ALG_SM4_CBC_NOPAD:
+	case TEE_ALG_SM4_XTS:
 	case TEE_ALG_SM4_CTR:
 		*size = 16;
 		break;
@@ -130,6 +130,7 @@ TEE_Result tee_do_cipher_update(void *ctx, uint32_t algo,
 		case TEE_ALG_AES_CTR:
 		case TEE_ALG_AES_XTS:
 		case TEE_ALG_AES_CTS:
+		case TEE_ALG_SM4_XTS:
 			/*
 			 * These modes doesn't require padding for the last
 			 * block.
@@ -170,7 +171,7 @@ __weak void plat_prng_add_jitter_entropy(enum crypto_rng_src sid,
 		crypto_rng_add_event(sid, pnum, &current, sizeof(current));
 }
 
-__weak void plat_rng_init(void)
+void __plat_rng_init(void)
 {
 	TEE_Result res = TEE_SUCCESS;
 	TEE_Time t;
@@ -199,6 +200,15 @@ __weak void plat_rng_init(void)
 	}
 }
 
+/*
+ * Override this in your platform code. This default implementation only seeds
+ * the random number generator from an easily predictable timestamp value or a
+ * constant value. It is not suitable for a secure environment.
+ */
+#ifdef CFG_INSECURE
+void plat_rng_init(void) __weak __alias("__plat_rng_init");
+#endif
+
 static TEE_Result tee_cryp_init(void)
 {
 	TEE_Result res = crypto_init();
@@ -213,4 +223,4 @@ static TEE_Result tee_cryp_init(void)
 
 	return TEE_SUCCESS;
 }
-service_init(tee_cryp_init);
+service_init_crypto(tee_cryp_init);

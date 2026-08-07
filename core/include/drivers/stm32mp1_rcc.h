@@ -465,6 +465,11 @@
 #define RCC_APB5RSTSETR_USART1RST	BIT(4)
 #define RCC_APB5RSTSETR_STGENRST	BIT(20)
 
+/* RCC_MP_APB1EN(SET|CLR)R bit fields */
+#define RCC_MP_APB1ENSETR_I2C5EN_POS		24
+
+#define RCC_MP_APB1ENSETR_I2C5EN	BIT(RCC_MP_APB1ENSETR_I2C5EN_POS)
+
 /* RCC_MP_APB5EN(SET|CLR)R bit fields */
 #define RCC_MP_APB5ENSETR_SPI6EN_POS		0
 #define RCC_MP_APB5ENSETR_I2C4EN_POS		2
@@ -556,6 +561,17 @@ static inline bool stm32_rcc_is_mckprot(void)
 {
 	return io_read32(stm32_rcc_base() + RCC_TZCR) & RCC_TZCR_MCKPROT;
 }
+
+static inline void stm32_rcc_set_mckprot(bool enable)
+{
+	vaddr_t tzcr_reg = stm32_rcc_base() + RCC_TZCR;
+
+	if (enable)
+		io_setbits32(tzcr_reg, RCC_TZCR_MCKPROT);
+	else
+		io_clrbits32(tzcr_reg, RCC_TZCR_MCKPROT);
+}
+
 #endif /*__ASSEMBLER__*/
 
 #endif /*__DRIVERS_STM32MP1_RCC_H__*/

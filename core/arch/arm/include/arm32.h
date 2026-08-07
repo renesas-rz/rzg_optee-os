@@ -4,8 +4,8 @@
  * Copyright (c) 2014, STMicroelectronics International N.V.
  */
 
-#ifndef ARM32_H
-#define ARM32_H
+#ifndef __ARM32_H
+#define __ARM32_H
 
 #include <compiler.h>
 #include <sys/cdefs.h>
@@ -61,7 +61,7 @@
 #define SCTLR_SPAN	BIT32(23)
 #define SCTLR_VE	BIT32(24)
 #define SCTLR_EE	BIT32(25)
-#define SCTLR_NMFI	BIT32(26)
+#define SCTLR_NMFI	BIT32(27)
 #define SCTLR_TRE	BIT32(28)
 #define SCTLR_AFE	BIT32(29)
 #define SCTLR_TE	BIT32(30)
@@ -278,4 +278,4 @@ static __always_inline __noprof uint32_t read_r7(void)
 
 #endif /*__ASSEMBLER__*/
 
-#endif /*ARM32_H*/
+#endif /*__ARM32_H*/

@@ -23,6 +23,15 @@
 #define TI_SCI_MSG_FWL_GET               0x9001
 #define TI_SCI_MSG_FWL_CHANGE_OWNER      0x9002
 #define TI_SCI_MSG_SA2UL_GET_DKEK        0x9029
+#define TI_SCI_MSG_READ_OTP_MMR          0x9022
+#define TI_SCI_MSG_WRITE_OTP_ROW         0x9023
+#define TI_SCI_MSG_LOCK_OTP_ROW          0x9024
+
+/* OTP Revision Read/Write Message Description */
+#define TI_SCI_MSG_WRITE_SWREV           0x9032
+#define TI_SCI_MSG_READ_SWREV            0x9033
+#define TI_SCI_MSG_READ_KEYCNT_KEYREV    0x9034
+#define TI_SCI_MSG_WRITE_KEYREV          0x9035
 
 /**
  * struct ti_sci_secure_msg_hdr - Secure Message Header for All messages
@@ -294,6 +303,206 @@ struct ti_sci_msg_resp_sa2ul_get_dkek {
 	struct ti_sci_msg_hdr hdr;
 #define SA2UL_DKEK_KEY_LEN 32
 	uint8_t dkek[SA2UL_DKEK_KEY_LEN];
+} __packed;
+
+/**
+ * struct ti_sci_msg_resp_read_otp_mmr - Request for reading extended OTP
+ * @hdr:	Generic header
+ * @mmr_idx:	Index of 32 bit MMR
+ *
+ * Request for TI_SCI_MSG_READ_OTP_MMR
+ */
+struct ti_sci_msg_req_read_otp_mmr {
+	struct ti_sci_msg_hdr hdr;
+	uint8_t mmr_idx;
+} __packed;
+
+/**
+ * struct ti_sci_msg_resp_read_otp_mmr - Response for reading extended OTP
+ * @hdr:	Generic header
+ * @mmr_val:	Value written in the OTP
+ *
+ * Response to request TI_SCI_MSG_READ_OTP_MMR
+ */
+struct ti_sci_msg_resp_read_otp_mmr {
+	struct ti_sci_msg_hdr hdr;
+	uint32_t mmr_val;
+} __packed;
+
+/**
+ * struct ti_sci_msg_req_write_otp_row - Request for writing Extended OTP
+ * @hdr:	Generic header
+ * @row_idx:		Index of the OTP row. Zero indexing
+ * @row_val:		Value to be written
+ * @row_mask:		Mask bits for row_val to be written
+ *
+ * Request for TI_SCI_MSG_WRITE_OTP_ROW
+ */
+struct ti_sci_msg_req_write_otp_row {
+	struct ti_sci_msg_hdr hdr;
+	uint8_t row_idx;
+	uint32_t row_val;
+	uint32_t row_mask;
+} __packed;
+
+/**
+ * struct ti_sci_msg_resp_write_otp_row - Response for writing Extended OTP
+ * @hdr:		Generic header
+ * @row_val:		Value that is written
+ *
+ * Response to request TI_SCI_MSG_WRITE_OTP_ROW
+ */
+struct ti_sci_msg_resp_write_otp_row {
+	struct ti_sci_msg_hdr hdr;
+	uint32_t row_val;
+} __packed;
+
+/**
+ * struct ti_sci_msg_req_lock_otp_row - Request for Lock OTP row
+ * @hdr:		Generic header
+ * @row_idx:		Index of the OTP row. Zero indexing
+ * @hw_write_lock:	0x5A indicates row will be write protected
+ * @hw_read_lock:	0x5A indicates row will be read protected
+ * @row_soft_lock:	Software write lock
+ *
+ * Request for TI_SCI_MSG_LOCK_OTP_ROW
+ */
+struct ti_sci_msg_req_lock_otp_row {
+	struct ti_sci_msg_hdr hdr;
+	uint8_t row_idx;
+	uint8_t hw_write_lock;
+	uint8_t hw_read_lock;
+	uint8_t row_soft_lock;
+} __packed;
+
+/**
+ * struct ti_sci_msg_resp_lock_otp_row - Response for Lock OTP row
+ * @hdr:	Generic header
+ *
+ * Response to request TI_SCI_MSG_LOCK_OTP_ROW
+ */
+struct ti_sci_msg_resp_lock_otp_row {
+	struct ti_sci_msg_hdr hdr;
+} __packed;
+
+/**
+ * \brief OTP Revision Identifiers
+ */
+enum tisci_otp_revision_identifier {
+	/** Software Revision SBL */
+	OTP_REV_ID_SBL        = 0,
+	/** Software Revision SYSFW */
+	OTP_REV_ID_SYSFW      = 1,
+	/** Software Revision Secure Board Configuration */
+	OTP_REV_ID_SEC_BRDCFG = 2,
+};
+
+/**
+ * struct ti_sci_msq_req_set_swrev - Request for writing the Software Revision
+ * in OTP
+ * @hdr:	Generic header
+ * @identifier: One of the entries from enum tisci_otp_revision_identifier
+ * @swrev:	Revision value (integer) to be bit encoded, and programmed
+ *
+ * Request for TI_SCI_MSG_WRITE_SWREV
+ */
+struct ti_sci_msq_req_set_swrev {
+	struct ti_sci_msg_hdr hdr;
+	uint8_t identifier;
+	uint32_t swrev;
+} __packed;
+
+/**
+ * struct ti_sci_msq_resp_set_swrev - Response for writing the Software Revision
+ * in OTP
+ * @hdr:	Generic header
+ *
+ * Response for TI_SCI_MSG_WRITE_SWREV
+ */
+struct ti_sci_msq_resp_set_swrev {
+	struct ti_sci_msg_hdr hdr;
+} __packed;
+
+/**
+ * struct ti_sci_msq_req_get_swrev - Request for reading the Software Revision
+ * in OTP
+ * @hdr:	Generic header
+ * @identifier: One of the entries from enum tisci_otp_revision_identifier
+ *		(Current support only for OTP_REV_ID_SEC_BRDCFG)
+ *
+ * Request for TI_SCI_MSG_READ_SWREV
+ */
+struct ti_sci_msq_req_get_swrev {
+	struct ti_sci_msg_hdr hdr;
+	uint8_t identifier;
+} __packed;
+
+/**
+ * struct ti_sci_msq_resp_get_swrev - Response for reading the Software Revision
+ * in OTP
+ * @hdr:	Generic header
+ * @swrev:	Decoded Sofrware Revision value from efuses
+ *
+ * Response for TI_SCI_MSG_READ_SWREV
+ */
+struct ti_sci_msq_resp_get_swrev {
+	struct ti_sci_msg_hdr hdr;
+	uint32_t swrev;
+} __packed;
+
+/**
+ * struct ti_sci_msq_req_get_keycnt_keyrev - Request for reading the Key Count
+ * and Key Revision in OTP
+ * @hdr:	Generic header
+ *
+ * Request for TI_SCI_MSG_READ_KEYCNT_KEYREV
+ */
+struct ti_sci_msq_req_get_keycnt_keyrev {
+	struct ti_sci_msg_hdr hdr;
+} __packed;
+
+/**
+ * struct ti_sci_msq_resp_get_keycnt_keyrev - Response for reading the Key Count
+ * and Key Revision in OTP
+ * Revision in OTP
+ * @hdr:	Generic header
+ * @keycnt:	Key Count integer value
+ * @keyrev:	Key Revision integer value
+ *
+ * Response for TI_SCI_MSG_READ_KEYCNT_KEYREV
+ */
+struct ti_sci_msq_resp_get_keycnt_keyrev {
+	struct ti_sci_msg_hdr hdr;
+	uint32_t keycnt;
+	uint32_t keyrev;
+} __packed;
+
+/**
+ * struct ti_sci_msq_req_set_keyrev - Request for writing the Key Revision
+ * in OTP
+ * @hdr:		Generic header
+ * @value:		Key Revision value to be written
+ * @cert_addr_lo:	Lower 32 bit address of the dual signed certificate
+ * @cert_addr_hi:	Higher 32 bit address of the dual signed certificate
+ *
+ * Request for TI_SCI_MSG_WRITE_KEYREV
+ */
+struct ti_sci_msq_req_set_keyrev {
+	struct ti_sci_msg_hdr hdr;
+	uint32_t value;
+	uint32_t cert_addr_lo;
+	uint32_t cert_addr_hi;
+} __packed;
+
+/**
+ * struct ti_sci_msq_resp_set_keyrev - Response for writing the Key Revision
+ * in OTP
+ * @hdr:	Generic header
+ *
+ * Response for TI_SCI_MSG_WRITE_KEYREV
+ */
+struct ti_sci_msq_resp_set_keyrev {
+	struct ti_sci_msg_hdr hdr;
 } __packed;
 
 #endif

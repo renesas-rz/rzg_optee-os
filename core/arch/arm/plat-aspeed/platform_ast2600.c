@@ -59,25 +59,18 @@ register_phys_mem(MEM_AREA_IO_NSEC, SCU_BASE, SMALL_PAGE_SIZE);
 register_ddr(CFG_DRAM_BASE, CFG_DRAM_SIZE);
 
 static struct serial8250_uart_data console_data;
-static struct gic_data gic_data;
 
-void main_init_gic(void)
+void boot_primary_init_intc(void)
 {
-	gic_init(&gic_data, GIC_BASE + GICC_OFFSET, GIC_BASE + GICD_OFFSET);
-	itr_init(&gic_data.chip);
+	gic_init(GIC_BASE + GICC_OFFSET, GIC_BASE + GICD_OFFSET);
 }
 
-void main_secondary_init_gic(void)
+void boot_secondary_init_intc(void)
 {
-	gic_cpu_init(&gic_data);
+	gic_init_per_cpu();
 }
 
-void itr_core_handler(void)
-{
-	gic_it_handle(&gic_data);
-}
-
-void console_init(void)
+void plat_console_init(void)
 {
 	serial8250_uart_init(&console_data, CONSOLE_UART_BASE,
 			     CONSOLE_UART_CLK_IN_HZ, CONSOLE_BAUDRATE);

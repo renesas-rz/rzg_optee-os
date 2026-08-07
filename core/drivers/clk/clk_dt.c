@@ -7,7 +7,7 @@
 #include <drivers/clk.h>
 #include <drivers/clk_dt.h>
 #include <initcall.h>
-#include <kernel/boot.h>
+#include <kernel/dt.h>
 #include <kernel/dt_driver.h>
 #include <kernel/panic.h>
 #include <libfdt.h>
@@ -32,10 +32,14 @@ static TEE_Result clk_dt_get_by_idx_prop(const char *prop_name, const void *fdt,
 					 struct clk **clk)
 {
 	TEE_Result res = TEE_ERROR_GENERIC;
+	void *out_clk = NULL;
 
-	*clk = dt_driver_device_from_node_idx_prop(prop_name, fdt, nodeoffset,
-						   clk_idx, DT_DRIVER_CLK,
-						   &res);
+	res = dt_driver_device_from_node_idx_prop(prop_name, fdt, nodeoffset,
+						  clk_idx, DT_DRIVER_CLK,
+						  &out_clk);
+	if (!res)
+		*clk = out_clk;
+
 	return res;
 }
 
@@ -97,7 +101,7 @@ static TEE_Result clk_probe_clock_provider_node(const void *fdt, int node)
 	int status = 0;
 	TEE_Result res = TEE_ERROR_GENERIC;
 
-	status = _fdt_get_status(fdt, node);
+	status = fdt_get_status(fdt, node);
 	if (!(status & DT_STATUS_OK_SEC))
 		return TEE_ERROR_ITEM_NOT_FOUND;
 
@@ -124,7 +128,7 @@ static void clk_probe_node(const void *fdt, int parent_node)
 	__maybe_unused TEE_Result res = TEE_ERROR_GENERIC;
 
 	fdt_for_each_subnode(child, fdt, parent_node) {
-		status = _fdt_get_status(fdt, child);
+		status = fdt_get_status(fdt, child);
 		if (status == DT_STATUS_DISABLED)
 			continue;
 
@@ -143,7 +147,7 @@ static void parse_assigned_clock(const void *fdt, int nodeoffset)
 	unsigned long rate = 0;
 	struct clk *parent = NULL;
 	const uint32_t *rate_prop = NULL;
-	TEE_Result __maybe_unused res = TEE_ERROR_GENERIC;
+	TEE_Result res = TEE_ERROR_GENERIC;
 
 	rate_prop = fdt_getprop(fdt, nodeoffset, "assigned-clock-rates",
 				&rate_len);
@@ -152,9 +156,9 @@ static void parse_assigned_clock(const void *fdt, int nodeoffset)
 	while (true) {
 		res = clk_dt_get_by_idx_prop("assigned-clocks", fdt, nodeoffset,
 					     clock_idx, &clk);
-		if (!clk)
+		if (res)
 			return;
-		assert(!res);
+		assert(clk);
 
 		res = clk_dt_get_by_idx_prop("assigned-clock-parents", fdt,
 					     nodeoffset, clock_idx, &parent);
@@ -186,7 +190,7 @@ static void clk_probe_assigned(const void *fdt, int parent_node)
 	fdt_for_each_subnode(child, fdt, parent_node) {
 		clk_probe_assigned(fdt, child);
 
-		status = _fdt_get_status(fdt, child);
+		status = fdt_get_status(fdt, child);
 		if (status == DT_STATUS_DISABLED)
 			continue;
 
@@ -197,7 +201,7 @@ static void clk_probe_assigned(const void *fdt, int parent_node)
 
 static TEE_Result clk_dt_probe(void)
 {
-	const void *fdt = get_embedded_dt();
+	const void *fdt = get_secure_dt();
 
 	DMSG("Probing clocks from devicetree");
 	if (!fdt)

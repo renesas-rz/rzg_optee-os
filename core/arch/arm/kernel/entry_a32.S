@@ -1,17 +1,20 @@
 /* SPDX-License-Identifier: BSD-2-Clause */
 /*
- * Copyright (c) 2014, Linaro Limited
- * Copyright (c) 2021, Arm Limited
+ * Copyright (c) 2014-2025, Linaro Limited
+ * Copyright (c) 2021-2023, Arm Limited
  */
 
-#include <arm32_macros.S>
 #include <arm.h>
+#include <arm32_macros.S>
 #include <asm.S>
 #include <generated/asm-defines.h>
 #include <keep.h>
 #include <kernel/asan.h>
 #include <kernel/cache_helpers.h>
+#include <kernel/thread.h>
 #include <kernel/thread_private.h>
+#include <kernel/thread_private_arch.h>
+#include <mm/core_mmu.h>
 #include <platform_config.h>
 #include <sm/optee_smc.h>
 #include <sm/teesmc_opteed.h>
@@ -162,51 +165,6 @@ END_FUNC reset_vect_table
 		write_sctlr r0
 	.endm
 
-#if defined(CFG_CORE_SEL1_SPMC) && defined(CFG_WITH_ARM_TRUSTED_FW)
-	/*
-	 * With OP-TEE as SPMC at S-EL1 the SPMD (SPD_spmd) in TF-A passes
-	 * the DTB in r0, pagable part in r1, and the rest of the registers
-	 * are unused
-	 *
-	 * Save boot arguments passed
-	 * entry r0, saved r6: device tree address
-	 * entry r1, saved r4: pagestore
-	 * saved r5, r7: Zero
-	 */
-	.macro bootargs_entry
-	mov	r6, r0
-	mov	r4, r1
-	mov	r5, #0
-	mov	r7, #0
-	.endm
-#else
-	/*
-	 * Save boot arguments
-	 * entry r0, saved r4: pagestore
-	 * entry r1, saved r7: (ARMv7 standard bootarg #1)
-	 * entry r2, saved r6: device tree address, (ARMv7 standard bootarg #2)
-	 * entry lr, saved r5: non-secure entry address (ARMv7 bootarg #0)
-	 */
-	.macro bootargs_entry
-#if defined(CFG_NS_ENTRY_ADDR)
-	ldr	r5, =CFG_NS_ENTRY_ADDR
-#else
-	mov	r5, lr
-#endif
-#if defined(CFG_PAGEABLE_ADDR)
-	ldr	r4, =CFG_PAGEABLE_ADDR
-#else
-	mov	r4, r0
-#endif
-#if defined(CFG_DT_ADDR)
-	ldr	r6, =CFG_DT_ADDR
-#else
-	mov	r6, r2
-#endif
-	mov	r7, r1
-	.endm
-#endif
-
 	.macro maybe_init_spectre_workaround
 #if !defined(CFG_WITH_ARM_TRUSTED_FW) && \
     (defined(CFG_CORE_WORKAROUND_SPECTRE_BP) || \
@@ -238,8 +196,15 @@ END_FUNC reset_vect_table
 
 FUNC _start , :
 UNWIND(	.cantunwind)
-
-	bootargs_entry
+	/*
+	 * Temporary copy of boot argument registers, will be passed to
+	 * boot_save_args() further down.
+	 */
+	mov	r4, r0
+	mov	r5, r1
+	mov	r6, r2
+	mov	r7, r3
+	mov	r8, lr
 
 	/*
 	 * 32bit entry is expected to execute Supervisor mode,
@@ -321,11 +286,13 @@ DECLARE_KEEP_INIT _start
 		assert_flat_mapped_range (\vbase), (\line)
 		bl	pl310_base
 		ldr	r1, \vbase
-		ldr	r2, \vend
+		ldr	r2, =\vend
+		ldr	r2, [r2]
 		bl	arm_cl2_invbypa
 #endif
 		ldr	r0, \vbase
-		ldr	r1, \vend
+		ldr	r1, =\vend
+		ldr	r1, [r1]
 		sub	r1, r1, r0
 		bl	dcache_inv_range
 	.endm
@@ -334,16 +301,19 @@ DECLARE_KEEP_INIT _start
 #if defined(CFG_PL310) && !defined(CFG_PL310_SIP_PROTOCOL)
 		assert_flat_mapped_range (\vbase), (\line)
 		ldr	r0, \vbase
-		ldr	r1, \vend
+		ldr	r1, =\vend
+		ldr	r1, [r1]
 		sub	r1, r1, r0
 		bl	dcache_clean_range
 		bl	pl310_base
 		ldr	r1, \vbase
-		ldr	r2, \vend
+		ldr	r2, =\vend
+		ldr	r2, [r2]
 		bl	arm_cl2_cleaninvbypa
 #endif
 		ldr	r0, \vbase
-		ldr	r1, \vend
+		ldr	r1, =\vend
+		ldr	r1, [r1]
 		sub	r1, r1, r0
 		bl	dcache_cleaninv_range
 	.endm
@@ -364,7 +334,7 @@ DECLARE_KEEP_INIT _start
 LOCAL_FUNC reset_primary , : , .identity_map
 UNWIND(	.cantunwind)
 
-	/* preserve r4-r7: bootargs */
+	/* preserve r4-r8: bootargs */
 
 #ifdef CFG_WITH_PAGER
 	/*
@@ -386,33 +356,42 @@ UNWIND(	.cantunwind)
 	/* Copy backwards (as memmove) in case we're overlapping */
 	add	r0, r0, r2		/* __init_start + len */
 	add	r1, r1, r2		/* __data_end + len */
-	str	r0, cached_mem_end
+	ldr	r3, =boot_cached_mem_end
+	str	r0, [r3]
 	ldr	r2, =__init_start
 copy_init:
-	ldmdb	r1!, {r3, r8-r12}
-	stmdb	r0!, {r3, r8-r12}
+	ldmdb	r1!, {r3, r9-r12}
+	stmdb	r0!, {r3, r9-r12}
 	cmp	r0, r2
 	bgt	copy_init
 #else
 	/*
 	 * The binary is built as:
 	 * [Core, rodata and data] : In correct location
-	 * [struct boot_embdata + data] : Should be moved to __end, first
-	 * uint32_t tells the length of the struct + data
+	 * [struct boot_embdata + data] : Should be moved to right before
+	 * __vcore_free_end, the first uint32_t tells the length of the
+	 * struct + data
 	 */
-	ldr	r0, =__end		/* dst */
 	ldr	r1, =__data_end		/* src */
 	ldr	r2, [r1]		/* struct boot_embdata::total_len */
+	/* dst */
+	ldr	r0, =__vcore_free_end
+	sub	r0, r0, r2
+	/* round down to beginning of page */
+	mov	r3,  #(SMALL_PAGE_SIZE - 1)
+	bic	r0, r0, r3
+	ldr	r3, =boot_embdata_ptr
+	str	r0, [r3]
 	/* Copy backwards (as memmove) in case we're overlapping */
-	add	r0, r0, r2
 	add	r1, r1, r2
-	str	r0, cached_mem_end
-	ldr	r2, =__end
+	add	r2, r0, r2
+	ldr	r3, =boot_cached_mem_end
+	str	r2, [r3]
 
 copy_init:
-	ldmdb	r1!, {r3, r8-r12}
-	stmdb	r0!, {r3, r8-r12}
-	cmp	r0, r2
+	ldmdb	r1!, {r3, r9-r12}
+	stmdb	r2!, {r3, r9-r12}
+	cmp	r2, r0
 	bgt	copy_init
 #endif
 
@@ -429,7 +408,7 @@ clear_bss:
 	cmp	r0, r1
 	bls	clear_bss
 
-#ifdef CFG_VIRTUALIZATION
+#ifdef CFG_NS_VIRTUALIZATION
 	/*
 	 * Clear .nex_bss, this code obviously depends on the linker keeping
 	 * start/end of .bss at least 8 byte aligned.
@@ -454,6 +433,7 @@ shadow_no_access:
 	cmp	r0, r1
 	bls	shadow_no_access
 
+#if !defined(CFG_DYN_CONFIG)
 	/* Mark the entire stack area as OK */
 	ldr	r2, =CFG_ASAN_SHADOW_OFFSET
 	ldr	r0, =__nozi_stack_start	/* start */
@@ -468,16 +448,111 @@ shadow_stack_access_ok:
 	cmp	r0, r1
 	bls	shadow_stack_access_ok
 #endif
+#endif
 
+#if defined(CFG_DYN_CONFIG)
+	ldr	r0, =boot_embdata_ptr
+	ldr	r0, [r0]
+	sub	r1, r0, #THREAD_BOOT_INIT_TMP_ALLOC
+
+	/* Clear the allocated struct thread_core_local */
+	add	r2, r1, #THREAD_CORE_LOCAL_SIZE
+	mov	r3, #0
+1:	str	r3, [r2, #-4]!
+	cmp	r2, r1
+	bgt	1b
+
+	sub	r0, r0, #(__STACK_TMP_OFFS + __STACK_CANARY_SIZE)
+	mov	r2, #THREAD_ID_INVALID
+	str	r2, [r1, #THREAD_CORE_LOCAL_CURR_THREAD]
+	mov	r2, #THREAD_CLF_TMP
+	str	r2, [r1, #THREAD_CORE_LOCAL_FLAGS]
+	str	r0, [r1, #THREAD_CORE_LOCAL_TMP_STACK_VA_END]
+	add	r2, r1, #(THREAD_BOOT_INIT_TMP_ALLOC / 2)
+	sub	r2, r2, #__STACK_CANARY_SIZE
+	str	r2, [r1, #THREAD_CORE_LOCAL_ABT_STACK_VA_END]
+	mov	sp, r0
+	cps	#CPSR_MODE_IRQ
+	mov	sp, r0
+	cps	#CPSR_MODE_FIQ
+	mov	sp, r0
+	cps	#CPSR_MODE_ABT
+	mov	sp, r1
+	cps	#CPSR_MODE_UND
+	mov	sp, r1
+	cps	#CPSR_MODE_SVC
+	/*
+	 * Record a single core, to be changed later before secure world
+	 * boot is done.
+	 */
+	ldr	r2, =thread_core_local
+	str	r1, [r2]
+	ldr	r2, =thread_core_count
+	mov	r0, #1
+	str	r0, [r2]
+#else
 	set_sp
 
-	bl	thread_init_thread_core_local
+	/* Initialize thread_core_local[current_cpu_id] for early boot */
+	bl	thread_get_core_local
+	push	{r0,r1}
+	bl	thread_get_abt_stack
+	pop	{r1,r2}
+	mov	r3, sp
+
+	cps	#CPSR_MODE_IRQ
+	mov	sp, r3
+	cps	#CPSR_MODE_FIQ
+	mov	sp, r3
+	cps	#CPSR_MODE_ABT
+	mov	sp, r1
+	cps	#CPSR_MODE_UND
+	mov	sp, r1
+	cps	#CPSR_MODE_SVC
+
+	str	sp, [r1, #THREAD_CORE_LOCAL_TMP_STACK_VA_END]
+	str	r0, [r1, #THREAD_CORE_LOCAL_ABT_STACK_VA_END]
+	mov	r0, #THREAD_ID_INVALID
+	str	r0, [r1, #THREAD_CORE_LOCAL_CURR_THREAD]
+	mov	r0, #THREAD_CLF_TMP
+	str	r0, [r1, #THREAD_CORE_LOCAL_FLAGS]
+#endif
 
 	/* complete ARM secure MP common configuration */
 	bl	plat_primary_init_early
 
 	/* Enable Console */
 	bl	console_init
+
+	mov	r0, r8
+	mov	r1, #0
+	push	{r0, r1}
+	mov	r0, r4
+	mov	r1, r5
+	mov	r2, r6
+	mov	r3, r7
+	bl	boot_save_args
+	add	sp, sp, #(2 * 4)
+
+#ifdef CFG_WITH_PAGER
+	ldr	r0, =__init_end	/* pointer to boot_embdata */
+	ldr	r1, [r0]	/* struct boot_embdata::total_len */
+	add	r0, r0, r1
+	mov_imm	r1, 0xfff
+	add	r0, r0, r1	/* round up */
+	bic	r0, r0, r1	/* to next page */
+	mov_imm r1, (TEE_RAM_PH_SIZE + TEE_RAM_START)
+	mov	r2, r1
+#else
+	ldr	r0, =__vcore_free_start
+	ldr	r1, =boot_embdata_ptr
+	ldr	r1, [r1]
+#ifdef CFG_DYN_CONFIG
+	sub	r1, r1, #THREAD_BOOT_INIT_TMP_ALLOC
+#endif
+	ldr	r2, =__vcore_free_end
+#endif
+	bl	boot_mem_init
 
 #ifdef CFG_PL310
 	bl	pl310_base
@@ -490,7 +565,7 @@ shadow_stack_access_ok:
 	 * invalidate memory not used by OP-TEE since we may invalidate
 	 * entries used by for instance ARM Trusted Firmware.
 	 */
-	inval_cache_vrange(cached_mem_start, cached_mem_end)
+	inval_cache_vrange(cached_mem_start, boot_cached_mem_end)
 
 #if defined(CFG_PL310) && !defined(CFG_PL310_SIP_PROTOCOL)
 	/* Enable PL310 if not yet enabled */
@@ -498,9 +573,18 @@ shadow_stack_access_ok:
 	bl	arm_cl2_enable
 #endif
 
+#if !defined(CFG_WITH_ARM_TRUSTED_FW)
+	ldr	r0, =thread_core_local
+	ldr	r0, [r0]
+	ldr	r1, =thread_core_local_pa
+	str	r0, [r1]
+#endif
+
 #ifdef CFG_CORE_ASLR
-	mov	r0, r6
 	bl	get_aslr_seed
+#ifdef CFG_CORE_ASLR_SEED
+	mov_imm	r0, CFG_CORE_ASLR_SEED
+#endif
 #else
 	mov	r0, #0
 #endif
@@ -510,19 +594,28 @@ shadow_stack_access_ok:
 
 #ifdef CFG_CORE_ASLR
 	/*
-	 * Process relocation information for updating with the new offset.
-	 * We're doing this now before MMU is enabled as some of the memory
-	 * will become write protected.
+	 * Save a pointer to thread_core_local[core_pos] since we can't
+	 * call thread_get_core_local() again before the recorded end_va's
+	 * have been updated below.
+	 */
+	bl	thread_get_core_local
+	mov	r4, r0
+
+	/*
+	 * Process relocation information for updating with the virtual map
+	 * offset.  We're doing this now before MMU is enabled as some of
+	 * the memory will become write protected.
 	 */
 	ldr	r0, =boot_mmu_config
-	ldr	r0, [r0, #CORE_MMU_CONFIG_LOAD_OFFSET]
+	ldr	r0, [r0, #CORE_MMU_CONFIG_MAP_OFFSET]
 	/*
-	 * Update cached_mem_end address with load offset since it was
+	 * Update boot_cached_mem_end address with load offset since it was
 	 * calculated before relocation.
 	 */
-	ldr	r2, cached_mem_end
+	ldr	r3, =boot_cached_mem_end
+	ldr	r2, [r3]
 	add	r2, r2, r0
-	str	r2, cached_mem_end
+	str	r2, [r3]
 
 	bl	relocate
 #endif
@@ -531,6 +624,42 @@ shadow_stack_access_ok:
 	bl	enable_mmu
 #ifdef CFG_CORE_ASLR
 	/*
+	 * Update recorded end_va, we depend on r4 pointing to the
+	 * pre-relocated thread_core_local[core_pos].
+	 *
+	 * This must be done before calling into C code to make sure that
+	 * the stack pointer matches what we have in thread_core_local[].
+	 */
+	ldr	r1, =boot_mmu_config
+	ldr	r1, [r1, #CORE_MMU_CONFIG_MAP_OFFSET]
+#if defined(CFG_DYN_CONFIG)
+	ldr	r0, =thread_core_local
+	add	r2, r4, r1
+	str	r2, [r0]
+#endif
+	add	r4, r4, r1
+	ldr	r0, [r4, #THREAD_CORE_LOCAL_ABT_STACK_VA_END]
+	add	r0, r0, r1
+	str	r0, [r4, #THREAD_CORE_LOCAL_ABT_STACK_VA_END]
+	ldr	r0, [r4, #THREAD_CORE_LOCAL_TMP_STACK_VA_END]
+	add	r0, r0, r1
+	str	r0, [r4, #THREAD_CORE_LOCAL_TMP_STACK_VA_END]
+
+	cps	#CPSR_MODE_IRQ
+	mov	sp, r0
+	cps	#CPSR_MODE_FIQ
+	mov	sp, r0
+	cps	#CPSR_MODE_ABT
+	mov	sp, r4
+	cps	#CPSR_MODE_UND
+	mov	sp, r4
+	cps	#CPSR_MODE_SVC
+
+	/* Update relocations recorded with boot_mem_add_reloc() */
+	ldr	r0, =boot_mmu_config
+	ldr	r0, [r0, #CORE_MMU_CONFIG_MAP_OFFSET]
+	bl	boot_mem_relocate
+	/*
 	 * Reinitialize console, since register_serial_console() has
 	 * previously registered a PA and with ASLR the VA is different
 	 * from the PA.
@@ -538,7 +667,7 @@ shadow_stack_access_ok:
 	bl	console_init
 #endif
 
-#ifdef CFG_VIRTUALIZATION
+#ifdef CFG_NS_VIRTUALIZATION
 	/*
 	 * Initialize partition tables for each partition to
 	 * default_partition which has been relocated now to a different VA
@@ -546,12 +675,58 @@ shadow_stack_access_ok:
 	bl	core_mmu_set_default_prtn_tbl
 #endif
 
-	mov	r0, r4		/* pageable part address */
-	mov	r1, r5		/* ns-entry address */
 	bl	boot_init_primary_early
-#ifndef CFG_VIRTUALIZATION
+	bl	boot_init_primary_late
+
+#if defined(CFG_DYN_CONFIG)
+#if !defined(CFG_WITH_ARM_TRUSTED_FW)
+	/* Update thread_core_local_pa with a new physical address */
+	ldr	r0, =__thread_core_local_new
+	ldr	r0, [r0]
+	bl	virt_to_phys
+	ldr	r1, =thread_core_local_pa
+	str	r0, [r1]
+#endif
+	bl	__get_core_pos
+
+	/*
+	 * Switch to the new thread_core_local and thread_core_count and
+	 * keep the pointer to the new thread_core_local in r1.
+	 */
+	ldr	r1, =__thread_core_count_new
+	ldr	r1, [r1]
+	ldr 	r2, =thread_core_count;
+	str	r1, [r2]
+	ldr	r1, =__thread_core_local_new
+	ldr	r1, [r1]
+	ldr	r2, =thread_core_local
+	str	r1, [r2]
+
+	/*
+	 * Update to use the new stacks and thread_core_local. Clear
+	 * thread_core_local[0].stackcheck_recursion now that the stack
+	 * pointer matches recorded information.
+	 */
+	mov	r2, #THREAD_CORE_LOCAL_SIZE
+	/* r3 = r2 * r0 + r1 */
+	mla	r3, r2, r0, r1
+	ldr	r0, [r3, #THREAD_CORE_LOCAL_TMP_STACK_VA_END]
+	mov	sp, r0
+	cps	#CPSR_MODE_IRQ
+	mov	sp, r0
+	cps	#CPSR_MODE_FIQ
+	mov	sp, r0
+	cps	#CPSR_MODE_ABT
+	mov	sp, r3
+	cps	#CPSR_MODE_UND
+	mov	sp, r3
+	cps	#CPSR_MODE_SVC
+#endif
+
+#ifndef CFG_NS_VIRTUALIZATION
 	mov	r9, sp
 	ldr	r0, =threads
+	ldr	r0, [r0]
 	ldr	r0, [r0, #THREAD_CTX_STACK_VA_END]
 	mov	sp, r0
 	bl	thread_get_core_local
@@ -559,12 +734,25 @@ shadow_stack_access_ok:
 	mov	r0, #0
 	str	r0, [r8, #THREAD_CORE_LOCAL_FLAGS]
 #endif
-	mov	r0, r6		/* DT address */
-	bl	boot_init_primary_late
-#ifndef CFG_VIRTUALIZATION
+	bl	boot_init_primary_runtime
+	bl	boot_init_primary_final
+#ifndef CFG_NS_VIRTUALIZATION
 	mov	r0, #THREAD_CLF_TMP
 	str	r0, [r8, #THREAD_CORE_LOCAL_FLAGS]
 	mov	sp, r9
+#endif
+
+#ifdef _CFG_CORE_STACK_PROTECTOR
+	/* Update stack canary value */
+	sub	sp, sp, #0x8
+	mov	r0, sp
+	mov	r1, #1
+	mov	r2, #0x4
+	bl	plat_get_random_stack_canaries
+	ldr	r0, [sp]
+	ldr	r1, =__stack_chk_guard
+	str	r0, [r1]
+	add	sp, sp, #0x8
 #endif
 
 	/*
@@ -572,7 +760,7 @@ shadow_stack_access_ok:
 	 * they have turned on their D-cache, clean and invalidate the
 	 * D-cache before exiting to normal world.
 	 */
-	flush_cache_vrange(cached_mem_start, cached_mem_end)
+	flush_cache_vrange(cached_mem_start, boot_cached_mem_end)
 
 	/* release secondary boot cores and sync with them */
 	cpu_is_ready
@@ -595,17 +783,17 @@ shadow_stack_access_ok:
 	 * next entry. Matches the thread_init_boot_thread() in
 	 * boot.c.
 	 */
-#ifndef CFG_VIRTUALIZATION
+#ifndef CFG_NS_VIRTUALIZATION
 	bl 	thread_clr_boot_thread
 #endif
 
 #ifdef CFG_CORE_FFA
 	ldr	r0, =cpu_on_handler
 	/*
-	 * Compensate for the load offset since cpu_on_handler() is
+	 * Compensate for the virtual map offset since cpu_on_handler() is
 	 * called with MMU off.
 	 */
-	ldr	r1, boot_mmu_config + CORE_MMU_CONFIG_LOAD_OFFSET
+	ldr	r1, boot_mmu_config + CORE_MMU_CONFIG_MAP_OFFSET
 	sub	r0, r0, r1
 	bl	thread_spmc_register_secondary_ep
 	b	thread_ffa_msg_wait
@@ -613,15 +801,22 @@ shadow_stack_access_ok:
 
 #if defined(CFG_WITH_ARM_TRUSTED_FW)
 	ldr	r0, =boot_mmu_config
-	ldr	r0, [r0, #CORE_MMU_CONFIG_LOAD_OFFSET]
+	ldr	r0, [r0, #CORE_MMU_CONFIG_MAP_OFFSET]
 	ldr	r1, =thread_vector_table
 	/* Pass the vector address returned from main_init */
 	sub	r1, r1, r0
 #else
-	/* realy standard bootarg #1 and #2 to non secure entry */
+	/* Initialize secure monitor */
+	add	r0, sp, #__STACK_TMP_OFFS
+	bl	sm_init
+	ldr	r0, =boot_arg_nsec_entry
+	ldr	r0, [r0]
+	bl	init_sec_mon
+
+	/* Relay standard bootarg #1 and #2 to non-secure entry */
 	mov	r4, #0
 	mov	r3, r6		/* std bootarg #2 for register R2 */
-	mov	r2, r7		/* std bootarg #1 for register R1 */
+	mov	r2, r5		/* std bootarg #1 for register R1 */
 	mov	r1, #0
 #endif /* CFG_WITH_ARM_TRUSTED_FW */
 
@@ -646,9 +841,11 @@ LOCAL_DATA cached_mem_start , :
 	.word	__text_start
 END_DATA cached_mem_start
 
-LOCAL_DATA cached_mem_end , :
+#ifndef CFG_WITH_PAGER
+LOCAL_DATA boot_embdata_ptr , :
 	.skip	4
-END_DATA cached_mem_end
+END_DATA boot_embdata_ptr
+#endif
 
 LOCAL_FUNC unhandled_cpu , :
 	wfi
@@ -662,12 +859,13 @@ LOCAL_FUNC relocate , :
 #ifdef CFG_WITH_PAGER
 	ldr	r12, =__init_end
 #else
-	ldr	r12, =__end
+	ldr	r12, =boot_embdata_ptr
+	ldr	r12, [r12]
 #endif
 	ldr	r2, [r12, #BOOT_EMBDATA_RELOC_OFFSET]
 	ldr	r3, [r12, #BOOT_EMBDATA_RELOC_LEN]
 
-	mov_imm	r1, TEE_RAM_START
+	mov_imm	r1, TEE_LOAD_ADDR
 	add	r2, r2, r12	/* start of relocations */
 	add	r3, r3, r2	/* end of relocations */
 
@@ -676,9 +874,9 @@ LOCAL_FUNC relocate , :
 	 * compressed format created by get_reloc_bin() in
 	 * scripts/gen_tee_bin.py
 	 *
-	 * All the R_ARM_RELATIVE relocations are translated into a list
-	 * list of 32-bit offsets from TEE_RAM_START. At each address a
-	 * 32-bit value pointed out which increased with the load offset.
+	 * All the R_ARM_RELATIVE relocations are translated into a list of
+	 * 32-bit offsets from TEE_LOAD_ADDR. At each address a 32-bit
+	 * value pointed out which increased with the load offset.
 	 */
 
 #ifdef CFG_WITH_PAGER
@@ -825,6 +1023,7 @@ LOCAL_FUNC enable_mmu , : , .identity_map
 	bx	lr
 END_FUNC enable_mmu
 
+#if !defined(CFG_DYN_CONFIG)
 LOCAL_DATA stack_tmp_rel , :
 	.word	stack_tmp - stack_tmp_rel - STACK_TMP_GUARD
 END_DATA stack_tmp_rel
@@ -832,6 +1031,7 @@ END_DATA stack_tmp_rel
 LOCAL_DATA stack_tmp_stride_rel , :
 	.word	stack_tmp_stride - stack_tmp_stride_rel
 END_DATA stack_tmp_stride_rel
+#endif
 
 DATA boot_mmu_config , : /* struct core_mmu_config */
 	.skip	CORE_MMU_CONFIG_SIZE
@@ -847,7 +1047,7 @@ UNWIND(	.cantunwind)
 	set_sctlr
 	isb
 
-	adr	r0, reset_vect_table
+	ldr	r0, =reset_vect_table
 	write_vbar r0
 
 	mov	r4, lr
@@ -855,7 +1055,26 @@ UNWIND(	.cantunwind)
 	bl	__get_core_pos
 	bl	enable_mmu
 
-	set_sp
+	/*
+	 * Use the stacks from thread_core_local.
+	 */
+	bl	__get_core_pos
+	ldr	r1, =thread_core_local
+	ldr	r1, [r1]
+	mov	r2, #THREAD_CORE_LOCAL_SIZE
+	/* r3 = r2 * r0 + r1 */
+	mla	r3, r2, r0, r1
+	ldr	r0, [r3, #THREAD_CORE_LOCAL_TMP_STACK_VA_END]
+	mov	sp, r0
+	cps	#CPSR_MODE_IRQ
+	mov	sp, r0
+	cps	#CPSR_MODE_FIQ
+	mov	sp, r0
+	cps	#CPSR_MODE_ABT
+	mov	sp, r3
+	cps	#CPSR_MODE_UND
+	mov	sp, r3
+	cps	#CPSR_MODE_SVC
 
 	mov	r0, r4
 	mov	r1, r5
@@ -872,12 +1091,29 @@ DECLARE_KEEP_PAGER cpu_on_handler
 
 LOCAL_FUNC reset_secondary , : , .identity_map
 UNWIND(	.cantunwind)
-	adr	r0, reset_vect_table
+	ldr	r0, =reset_vect_table
 	write_vbar r0
 
 	wait_primary
 
-	set_sp
+	/*
+	 * Initialize stack pointer from thread_core_local, compensate for
+	 * ASLR if enabled.
+	 */
+#ifdef CFG_CORE_ASLR
+	ldr	r4, boot_mmu_config + CORE_MMU_CONFIG_MAP_OFFSET
+#endif
+	bl	__get_core_pos
+	ldr	r1, =thread_core_local_pa
+#ifdef CFG_CORE_ASLR
+	sub	r1, r1, r4
+#endif
+	ldr	r1, [r1]
+	mov	r2, #THREAD_CORE_LOCAL_SIZE
+	/* r3 = r2 * r0 + r1 */
+	mla	r3, r2, r0, r1
+	ldr	r0, [r3, #THREAD_CORE_LOCAL_TMP_STACK_PA_END]
+	mov	sp, r0
 
 #if defined (CFG_BOOT_SECONDARY_REQUEST)
 	/* if L1 is not invalidated before, do it here */
@@ -888,6 +1124,27 @@ UNWIND(	.cantunwind)
 	bl	__get_core_pos
 	bl	enable_mmu
 
+	/*
+	 * Use the stacks from thread_core_local.
+	 */
+	bl	__get_core_pos
+	ldr	r1, =thread_core_local
+	ldr	r1, [r1]
+	mov	r2, #THREAD_CORE_LOCAL_SIZE
+	/* r3 = r2 * r0 + r1 */
+	mla	r3, r2, r0, r1
+	ldr	r0, [r3, #THREAD_CORE_LOCAL_TMP_STACK_VA_END]
+	mov	sp, r0
+	cps	#CPSR_MODE_IRQ
+	mov	sp, r0
+	cps	#CPSR_MODE_FIQ
+	mov	sp, r0
+	cps	#CPSR_MODE_ABT
+	mov	sp, r3
+	cps	#CPSR_MODE_UND
+	mov	sp, r3
+	cps	#CPSR_MODE_SVC
+
 	cpu_is_ready
 
 #if defined (CFG_BOOT_SECONDARY_REQUEST)
@@ -897,11 +1154,17 @@ UNWIND(	.cantunwind)
 	 */
 	bl	boot_core_hpen
 	ldm	r0, {r0, r6}
+	mov	r8, r0
 #else
-	mov	r0, r5		/* ns-entry address */
 	mov	r6, #0
 #endif
 	bl	boot_init_secondary
+
+	/* Initialize secure monitor */
+	add	r0, sp, #__STACK_TMP_OFFS
+	bl	sm_init
+	mov	r0, r8		/* ns-entry address */
+	bl	init_sec_mon
 
 	mov	r0, #TEESMC_OPTEED_RETURN_ENTRY_DONE
 	mov	r1, r6

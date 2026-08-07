@@ -964,10 +964,7 @@ static int stm32_clk_configure_clk(struct clk_stm32_priv *priv __maybe_unused,
 	if (stm32_mux_set_parent(mux, sel))
 		return -1;
 
-	if (enable)
-		stm32_gate_enable(gate);
-	else
-		stm32_gate_disable(gate);
+	stm32_gate_set_init_state(gate, enable);
 
 	return 0;
 }
@@ -1439,7 +1436,7 @@ static int clk_stm32_parse_oscillator_fdt(const void *fdt, int node,
 			return ret;
 
 		if (strncmp(cchar, name, (size_t)ret) ||
-		    _fdt_get_status(fdt, subnode) == DT_STATUS_DISABLED)
+		    fdt_get_status(fdt, subnode) == DT_STATUS_DISABLED)
 			continue;
 
 		cuint = fdt_getprop(fdt, subnode, "clock-frequency", &ret);
@@ -1457,8 +1454,8 @@ static int clk_stm32_parse_oscillator_fdt(const void *fdt, int node,
 		if (fdt_getprop(fdt, subnode, "st,css", NULL))
 			osci->css = true;
 
-		osci->drive = _fdt_read_uint32_default(fdt, subnode, "st,drive",
-						       LSEDRV_MEDIUM_HIGH);
+		osci->drive = fdt_read_uint32_default(fdt, subnode, "st,drive",
+						      LSEDRV_MEDIUM_HIGH);
 
 		return 0;
 	}
@@ -1486,8 +1483,14 @@ static int stm32_clk_parse_fdt_all_oscillator(const void *fdt,
 
 		fdt_err = clk_stm32_parse_oscillator_fdt(fdt, osc_node,
 							 osc_data->name, osci);
-		if (fdt_err < 0)
-			panic();
+		if (fdt_err) {
+			if (fdt_err == -FDT_ERR_NOTFOUND) {
+				/* Oscillator not found means it is not wired */
+				osci->freq = 0;
+			} else {
+				panic();
+			}
+		}
 	}
 
 	return 0;
@@ -1498,13 +1501,13 @@ static int clk_stm32_load_vco_config_fdt(const void *fdt, int subnode,
 {
 	int ret = 0;
 
-	ret = _fdt_read_uint32_array(fdt, subnode, "divmn", vco->div_mn,
-				     PLL_DIV_MN_NB);
+	ret = fdt_read_uint32_array(fdt, subnode, "divmn", vco->div_mn,
+				    PLL_DIV_MN_NB);
 	if (ret != 0)
 		return ret;
 
-	ret = _fdt_read_uint32_array(fdt, subnode, "csg", vco->csg,
-				     PLL_CSG_NB);
+	ret = fdt_read_uint32_array(fdt, subnode, "csg", vco->csg,
+				    PLL_CSG_NB);
 
 	vco->csg_enabled = (ret == 0);
 
@@ -1517,9 +1520,9 @@ static int clk_stm32_load_vco_config_fdt(const void *fdt, int subnode,
 	vco->status = RCC_PLLNCR_DIVPEN | RCC_PLLNCR_DIVQEN |
 		      RCC_PLLNCR_DIVREN | RCC_PLLNCR_PLLON;
 
-	vco->frac = _fdt_read_uint32_default(fdt, subnode, "frac", 0);
+	vco->frac = fdt_read_uint32_default(fdt, subnode, "frac", 0);
 
-	vco->src = _fdt_read_uint32_default(fdt, subnode, "src", UINT32_MAX);
+	vco->src = fdt_read_uint32_default(fdt, subnode, "src", UINT32_MAX);
 
 	return 0;
 }
@@ -1527,8 +1530,8 @@ static int clk_stm32_load_vco_config_fdt(const void *fdt, int subnode,
 static int clk_stm32_load_output_config_fdt(const void *fdt, int subnode,
 					    struct stm32_pll_output *output)
 {
-	return _fdt_read_uint32_array(fdt, subnode, "st,pll_div_pqr",
-				      output->output, (int)PLL_DIV_PQR_NB);
+	return fdt_read_uint32_array(fdt, subnode, "st,pll_div_pqr",
+				     output->output, (int)PLL_DIV_PQR_NB);
 }
 
 static int clk_stm32_parse_pll_fdt(const void *fdt, int subnode,
@@ -1611,17 +1614,17 @@ static int stm32_clk_parse_fdt_opp(const void *fdt, int node,
 			panic();
 		}
 
-		opp_cfg->frq = _fdt_read_uint32_default(fdt, subnode,
-							"hz",
-							UINT32_MAX);
+		opp_cfg->frq = fdt_read_uint32_default(fdt, subnode,
+						       "hz",
+						       UINT32_MAX);
 
-		opp_cfg->src = _fdt_read_uint32_default(fdt, subnode,
-							"st,clksrc",
-							UINT32_MAX);
+		opp_cfg->src = fdt_read_uint32_default(fdt, subnode,
+						       "st,clksrc",
+						       UINT32_MAX);
 
-		opp_cfg->div = _fdt_read_uint32_default(fdt, subnode,
-							"st,clkdiv",
-							UINT32_MAX);
+		opp_cfg->div = fdt_read_uint32_default(fdt, subnode,
+						       "st,clkdiv",
+						       UINT32_MAX);
 
 		ret = clk_stm32_parse_pll_fdt(fdt, subnode, &opp_cfg->pll_cfg);
 		if (ret)
@@ -1744,7 +1747,7 @@ static unsigned long clk_stm32_pll_get_rate(struct clk *clk,
 		fvco = (unsigned long)(prate * (divn + 1U) / (divm + 1U));
 	}
 
-	return fvco;
+	return UDIV_ROUND_NEAREST(fvco, 100000) * 100000;
 };
 
 static bool clk_stm32_pll_is_enabled(struct clk *clk)
@@ -1785,6 +1788,29 @@ static const struct clk_ops clk_stm32_pll_ops = {
 	.get_rate	= clk_stm32_pll_get_rate,
 	.enable		= clk_stm32_pll_enable,
 	.disable	= clk_stm32_pll_disable,
+};
+
+static TEE_Result
+clk_stm32_composite_get_duty_cycle(struct clk *clk,
+				   struct clk_duty_cycle *duty_cycle)
+{
+	struct clk_stm32_composite_cfg *cfg = clk->priv;
+	uint32_t val = stm32_div_get_value(cfg->div_id);
+
+	duty_cycle->num = (val + 1) / 2;
+	duty_cycle->den = val + 1;
+
+	return TEE_SUCCESS;
+}
+
+static const struct clk_ops clk_stm32_composite_duty_cycle_ops = {
+	.get_parent	= clk_stm32_composite_get_parent,
+	.set_parent	= clk_stm32_composite_set_parent,
+	.get_rate	= clk_stm32_composite_get_rate,
+	.set_rate	= clk_stm32_composite_set_rate,
+	.enable		= clk_stm32_composite_gate_enable,
+	.disable	= clk_stm32_composite_gate_disable,
+	.get_duty_cycle	= clk_stm32_composite_get_duty_cycle,
 };
 
 static struct
@@ -1957,7 +1983,7 @@ const struct clk_ops ck_timer_ops = {
 #define STM32_PLL_OUPUT(_name, _nb_parents, _parents, _flags,\
 			_gate_id, _div_id, _mux_id)\
 	struct clk _name = {\
-		.ops	= &clk_stm32_composite_ops,\
+		.ops	= &clk_stm32_composite_duty_cycle_ops,\
 		.priv	= &(struct clk_stm32_composite_cfg) {\
 			.gate_id	= (_gate_id),\
 			.div_id		= (_div_id),\
@@ -1970,11 +1996,53 @@ const struct clk_ops ck_timer_ops = {
 	}
 
 /* Oscillator clocks */
-static STM32_GATE_READY(ck_hsi, NULL, 0, GATE_HSI);
-static STM32_GATE_READY(ck_hse, NULL, 0, GATE_HSE);
-static STM32_GATE_READY(ck_csi, NULL, 0, GATE_CSI);
-static STM32_GATE_READY(ck_lsi, NULL, 0, GATE_LSI);
-static STM32_GATE_READY(ck_lse, NULL, 0, GATE_LSE);
+
+static TEE_Result clk_stm32_oscillator_enable(struct clk *clk)
+{
+	struct clk_stm32_gate_cfg *cfg = clk->priv;
+
+	if (clk->rate == 0U)
+		return TEE_SUCCESS;
+
+	return stm32_gate_rdy_enable(cfg->gate_id);
+}
+
+static void clk_stm32_oscillator_disable(struct clk *clk)
+{
+	struct clk_stm32_gate_cfg *cfg = clk->priv;
+
+	if (clk->rate == 0U)
+		return;
+
+	if (stm32_gate_rdy_disable(cfg->gate_id))
+		panic();
+}
+
+static const struct clk_ops clk_stm32_oscillator_ops = {
+	.enable		= clk_stm32_oscillator_enable,
+	.disable	= clk_stm32_oscillator_disable,
+};
+
+/*
+ * Each oscillator has 1 parent which reference is NULL here
+ * but set during initialization.
+ */
+#define STM32_OSCILLATOR(_name, _gate_id)\
+	struct clk _name = {\
+		.ops = &clk_stm32_oscillator_ops,\
+		.priv = &(struct clk_stm32_gate_cfg) {\
+			.gate_id = (_gate_id),\
+		},\
+		.name = #_name,\
+		.num_parents = 1, \
+		.parents = { NULL }, \
+	}
+
+static STM32_OSCILLATOR(ck_hsi, GATE_HSI);
+static STM32_OSCILLATOR(ck_hse, GATE_HSE);
+static STM32_OSCILLATOR(ck_csi, GATE_CSI);
+static STM32_OSCILLATOR(ck_lsi, GATE_LSI);
+static STM32_OSCILLATOR(ck_lse, GATE_LSE);
 
 static STM32_FIXED_FACTOR(ck_i2sckin, NULL, 0, 1, 1);
 static STM32_FIXED_FACTOR(ck_hse_div2, &ck_hse, 0, 1, 2);
@@ -2004,7 +2072,7 @@ static struct clk ck_pll1p = {
 		.mux_id		= NO_MUX,
 	},
 	.name		= "ck_pll1p",
-	.flags		= 0,
+	.flags		= CLK_SET_RATE_PARENT,
 	.num_parents	= 1,
 	.parents	= { &ck_pll1_vco },
 };
@@ -2019,7 +2087,7 @@ static struct clk ck_pll1p_div = {
 		.div_id	= DIV_MPU,
 	},
 	.name	= "ck_pll1p_div",
-	.flags	= 0,
+	.flags	= CLK_SET_RATE_PARENT,
 	.num_parents	= 1,
 	.parents	= { &ck_pll1p },
 };
@@ -2070,7 +2138,7 @@ static struct clk ck_mpu = {
 		.mux_id	= MUX_MPU,
 	},
 	.name		= "ck_mpu",
-	.flags		= 0,
+	.flags		= CLK_SET_PARENT_PRE_ENABLE | CLK_SET_RATE_PARENT,
 	.num_parents	= 4,
 	.parents	= { &ck_hsi, &ck_hse, &ck_pll1p, &ck_pll1p_div },
 };
@@ -2082,7 +2150,7 @@ static struct clk ck_axi = {
 		.div_id	= DIV_AXI,
 	},
 	.name		= "ck_axi",
-	.flags		= 0,
+	.flags		= CLK_SET_PARENT_PRE_ENABLE | CLK_SET_RATE_PARENT,
 	.num_parents	= 3,
 	.parents	= { &ck_hsi, &ck_hse, &ck_pll2p },
 };
@@ -2094,7 +2162,7 @@ static struct clk ck_mlahb = {
 		.div_id	= DIV_MLAHB,
 	},
 	.name		= "ck_mlahb",
-	.flags		= 0,
+	.flags		= CLK_SET_PARENT_PRE_ENABLE | CLK_SET_RATE_PARENT,
 	.num_parents	= 4,
 	.parents	= { &ck_hsi, &ck_hse, &ck_csi, &ck_pll3p },
 };
@@ -2116,74 +2184,81 @@ static STM32_TIMER(ck_timg2, &ck_pclk2, 0, RCC_APB2DIVR, RCC_TIMG2PRER);
 static STM32_TIMER(ck_timg3, &ck_pclk6, 0, RCC_APB6DIVR, RCC_TIMG3PRER);
 
 /* Peripheral and Kernel Clocks */
-static  STM32_GATE(ck_ddrc1, &ck_axi, 0, GATE_DDRC1);
-static  STM32_GATE(ck_ddrc1lp, &ck_axi, 0, GATE_DDRC1LP);
-static  STM32_GATE(ck_ddrphyc, &ck_pll2r, 0, GATE_DDRPHYC);
-static  STM32_GATE(ck_ddrphyclp, &ck_pll2r, 0, GATE_DDRPHYCLP);
-static  STM32_GATE(ck_ddrcapb, &ck_pclk4, 0, GATE_DDRCAPB);
-static  STM32_GATE(ck_ddrcapblp, &ck_pclk4, 0, GATE_DDRCAPBLP);
-static  STM32_GATE(ck_axidcg, &ck_axi, 0, GATE_AXIDCG);
-static  STM32_GATE(ck_ddrphycapb, &ck_pclk4, 0, 0);
-static  STM32_GATE(ck_ddrphycapblp, &ck_pclk4, 0, GATE_DDRPHYCAPBLP);
-static  STM32_GATE(ck_syscfg, &ck_pclk3, 0, GATE_SYSCFG);
-static  STM32_GATE(ck_ddrperfm, &ck_pclk4, 0, GATE_DDRPERFM);
-static  STM32_GATE(ck_iwdg2, &ck_pclk4, 0, GATE_IWDG2APB);
-static  STM32_GATE(ck_rtcapb, &ck_pclk5, 0, GATE_RTCAPB);
-static  STM32_GATE(ck_tzc, &ck_pclk5, 0, GATE_TZC);
-static  STM32_GATE(ck_etzpcb, &ck_pclk5, 0, GATE_ETZPC);
-static  STM32_GATE(ck_iwdg1apb, &ck_pclk5, 0, GATE_IWDG1APB);
-static  STM32_GATE(ck_bsec, &ck_pclk5, 0, GATE_BSEC);
-static  STM32_GATE(ck_tim12_k, &ck_timg3, 0, GATE_TIM12);
-static  STM32_GATE(ck_tim15_k, &ck_timg3, 0, GATE_TIM15);
-static  STM32_GATE(ck_gpioa, &ck_mlahb, 0, GATE_GPIOA);
-static  STM32_GATE(ck_gpiob, &ck_mlahb, 0, GATE_GPIOB);
-static  STM32_GATE(ck_gpioc, &ck_mlahb, 0, GATE_GPIOC);
-static  STM32_GATE(ck_gpiod, &ck_mlahb, 0, GATE_GPIOD);
-static  STM32_GATE(ck_gpioe, &ck_mlahb, 0, GATE_GPIOE);
-static  STM32_GATE(ck_gpiof, &ck_mlahb, 0, GATE_GPIOF);
-static  STM32_GATE(ck_gpiog, &ck_mlahb, 0, GATE_GPIOG);
-static  STM32_GATE(ck_gpioh, &ck_mlahb, 0, GATE_GPIOH);
-static  STM32_GATE(ck_gpioi, &ck_mlahb, 0, GATE_GPIOI);
-static  STM32_GATE(ck_pka, &ck_axi, 0, GATE_PKA);
-static  STM32_GATE(ck_cryp1, &ck_pclk5, 0, GATE_CRYP1);
-static  STM32_GATE(ck_hash1, &ck_pclk5, 0, GATE_HASH1);
-static  STM32_GATE(ck_bkpsram, &ck_pclk5, 0, GATE_BKPSRAM);
-static  STM32_GATE(ck_dbg, &ck_axi, 0, GATE_DBGCK);
-static  STM32_GATE(ck_mce, &ck_axi, 0, GATE_MCE);
-static  STM32_GATE(ck_tim2_k, &ck_timg1, 0, GATE_TIM2);
-static  STM32_GATE(ck_tim3_k, &ck_timg1, 0, GATE_TIM3);
-static  STM32_GATE(ck_tim4_k, &ck_timg1, 0, GATE_TIM4);
-static  STM32_GATE(ck_tim5_k, &ck_timg1, 0, GATE_TIM5);
-static  STM32_GATE(ck_tim6_k, &ck_timg1, 0, GATE_TIM6);
-static  STM32_GATE(ck_tim7_k, &ck_timg1, 0, GATE_TIM7);
-static  STM32_GATE(ck_tim13_k, &ck_timg3, 0, GATE_TIM13);
-static  STM32_GATE(ck_tim14_k, &ck_timg3, 0, GATE_TIM14);
-static  STM32_GATE(ck_tim1_k, &ck_timg2, 0, GATE_TIM1);
-static  STM32_GATE(ck_tim8_k, &ck_timg2, 0, GATE_TIM8);
-static  STM32_GATE(ck_tim16_k, &ck_timg3, 0, GATE_TIM16);
-static  STM32_GATE(ck_tim17_k, &ck_timg3, 0, GATE_TIM17);
-static  STM32_GATE(ck_ltdc_px, &ck_pll4q, 0, GATE_LTDC);
-static  STM32_GATE(ck_dma1, &ck_mlahb, 0, GATE_DMA1);
-static  STM32_GATE(ck_dma2, &ck_mlahb, 0, GATE_DMA2);
-static  STM32_GATE(ck_mdma, &ck_axi, 0, GATE_MDMA);
-static  STM32_GATE(ck_eth1mac, &ck_axi, 0, GATE_ETH1MAC);
-static  STM32_GATE(ck_usbh, &ck_axi, 0, GATE_USBH);
-static  STM32_GATE(ck_vref, &ck_pclk3, 0, GATE_VREF);
-static  STM32_GATE(ck_tmpsens, &ck_pclk3, 0, GATE_DTS);
-static  STM32_GATE(ck_pmbctrl, &ck_pclk3, 0, GATE_HDP);
-static  STM32_GATE(ck_hdp, &ck_pclk3, 0, GATE_PMBCTRL);
-static  STM32_GATE(ck_stgenro, &ck_pclk4, 0, GATE_DCMIPP);
-static  STM32_GATE(ck_dmamux1, &ck_axi, 0, GATE_DMAMUX1);
-static  STM32_GATE(ck_dmamux2, &ck_axi, 0, GATE_DMAMUX2);
-static  STM32_GATE(ck_dma3, &ck_axi, 0, GATE_DMAMUX2);
-static  STM32_GATE(ck_tsc, &ck_axi, 0, GATE_TSC);
-static  STM32_GATE(ck_aximc, &ck_axi, 0, GATE_AXIMC);
-static  STM32_GATE(ck_crc1, &ck_axi, 0, GATE_ETH1TX);
-static  STM32_GATE(ck_eth1tx, &ck_axi, 0, GATE_ETH1TX);
-static  STM32_GATE(ck_eth1rx, &ck_axi, 0, GATE_ETH1RX);
-static  STM32_GATE(ck_eth2tx, &ck_axi, 0, GATE_ETH2TX);
-static  STM32_GATE(ck_eth2rx, &ck_axi, 0, GATE_ETH2RX);
-static  STM32_GATE(ck_eth2mac, &ck_axi, 0, GATE_ETH2MAC);
+static STM32_GATE(ck_ddrc1, &ck_axi, 0, GATE_DDRC1);
+static STM32_GATE(ck_ddrc1lp, &ck_axi, 0, GATE_DDRC1LP);
+static STM32_GATE(ck_ddrphyc, &ck_pll2r, 0, GATE_DDRPHYC);
+static STM32_GATE(ck_ddrphyclp, &ck_pll2r, 0, GATE_DDRPHYCLP);
+static STM32_GATE(ck_ddrcapb, &ck_pclk4, 0, GATE_DDRCAPB);
+static STM32_GATE(ck_ddrcapblp, &ck_pclk4, 0, GATE_DDRCAPBLP);
+static STM32_GATE(ck_axidcg, &ck_axi, 0, GATE_AXIDCG);
+static STM32_GATE(ck_ddrphycapb, &ck_pclk4, 0, 0);
+static STM32_GATE(ck_ddrphycapblp, &ck_pclk4, 0, GATE_DDRPHYCAPBLP);
+static STM32_GATE(ck_syscfg, &ck_pclk3, 0, GATE_SYSCFG);
+static STM32_GATE(ck_ddrperfm, &ck_pclk4, 0, GATE_DDRPERFM);
+static STM32_GATE(ck_iwdg2, &ck_pclk4, 0, GATE_IWDG2APB);
+static STM32_GATE(ck_rtcapb, &ck_pclk5, 0, GATE_RTCAPB);
+static STM32_GATE(ck_tzc, &ck_pclk5, 0, GATE_TZC);
+static STM32_GATE(ck_etzpcb, &ck_pclk5, 0, GATE_ETZPC);
+static STM32_GATE(ck_iwdg1apb, &ck_pclk5, 0, GATE_IWDG1APB);
+static STM32_GATE(ck_bsec, &ck_pclk5, 0, GATE_BSEC);
+static STM32_GATE(ck_tim12_k, &ck_timg3, 0, GATE_TIM12);
+static STM32_GATE(ck_tim15_k, &ck_timg3, 0, GATE_TIM15);
+static STM32_GATE(ck_gpioa, &ck_mlahb, 0, GATE_GPIOA);
+static STM32_GATE(ck_gpiob, &ck_mlahb, 0, GATE_GPIOB);
+static STM32_GATE(ck_gpioc, &ck_mlahb, 0, GATE_GPIOC);
+static STM32_GATE(ck_gpiod, &ck_mlahb, 0, GATE_GPIOD);
+static STM32_GATE(ck_gpioe, &ck_mlahb, 0, GATE_GPIOE);
+static STM32_GATE(ck_gpiof, &ck_mlahb, 0, GATE_GPIOF);
+static STM32_GATE(ck_gpiog, &ck_mlahb, 0, GATE_GPIOG);
+static STM32_GATE(ck_gpioh, &ck_mlahb, 0, GATE_GPIOH);
+static STM32_GATE(ck_gpioi, &ck_mlahb, 0, GATE_GPIOI);
+static STM32_GATE(ck_pka, &ck_axi, 0, GATE_PKA);
+static STM32_GATE(ck_cryp1, &ck_pclk5, 0, GATE_CRYP1);
+static STM32_GATE(ck_hash1, &ck_pclk5, 0, GATE_HASH1);
+static STM32_GATE(ck_bkpsram, &ck_pclk5, 0, GATE_BKPSRAM);
+static STM32_GATE(ck_dbg, &ck_axi, 0, GATE_DBGCK);
+static STM32_GATE(ck_mce, &ck_axi, 0, GATE_MCE);
+static STM32_GATE(ck_tim2_k, &ck_timg1, 0, GATE_TIM2);
+static STM32_GATE(ck_tim3_k, &ck_timg1, 0, GATE_TIM3);
+static STM32_GATE(ck_tim4_k, &ck_timg1, 0, GATE_TIM4);
+static STM32_GATE(ck_tim5_k, &ck_timg1, 0, GATE_TIM5);
+static STM32_GATE(ck_tim6_k, &ck_timg1, 0, GATE_TIM6);
+static STM32_GATE(ck_tim7_k, &ck_timg1, 0, GATE_TIM7);
+static STM32_GATE(ck_tim13_k, &ck_timg3, 0, GATE_TIM13);
+static STM32_GATE(ck_tim14_k, &ck_timg3, 0, GATE_TIM14);
+static STM32_GATE(ck_tim1_k, &ck_timg2, 0, GATE_TIM1);
+static STM32_GATE(ck_tim8_k, &ck_timg2, 0, GATE_TIM8);
+static STM32_GATE(ck_tim16_k, &ck_timg3, 0, GATE_TIM16);
+static STM32_GATE(ck_tim17_k, &ck_timg3, 0, GATE_TIM17);
+static STM32_GATE(ck_ltdc_px, &ck_pll4q, 0, GATE_LTDC);
+static STM32_GATE(ck_dma1, &ck_mlahb, 0, GATE_DMA1);
+static STM32_GATE(ck_dma2, &ck_mlahb, 0, GATE_DMA2);
+static STM32_GATE(ck_adc1, &ck_mlahb, 0, GATE_ADC1);
+static STM32_GATE(ck_adc2, &ck_mlahb, 0, GATE_ADC2);
+static STM32_GATE(ck_mdma, &ck_axi, 0, GATE_MDMA);
+static STM32_GATE(ck_eth1mac, &ck_axi, 0, GATE_ETH1MAC);
+static STM32_GATE(ck_usbh, &ck_axi, 0, GATE_USBH);
+static STM32_GATE(ck_vref, &ck_pclk3, 0, GATE_VREF);
+static STM32_GATE(ck_tmpsens, &ck_pclk3, 0, GATE_DTS);
+static STM32_GATE(ck_pmbctrl, &ck_pclk3, 0, GATE_PMBCTRL);
+static STM32_GATE(ck_hdp, &ck_pclk3, 0, GATE_HDP);
+static STM32_GATE(ck_stgenro, &ck_pclk4, 0, GATE_STGENRO);
+static STM32_GATE(ck_dmamux1, &ck_axi, 0, GATE_DMAMUX1);
+static STM32_GATE(ck_dmamux2, &ck_axi, 0, GATE_DMAMUX2);
+static STM32_GATE(ck_dma3, &ck_axi, 0, GATE_DMA3);
+static STM32_GATE(ck_tsc, &ck_axi, 0, GATE_TSC);
+static STM32_GATE(ck_aximc, &ck_axi, 0, GATE_AXIMC);
+static STM32_GATE(ck_crc1, &ck_axi, 0, GATE_CRC1);
+static STM32_GATE(ck_eth1tx, &ck_axi, 0, GATE_ETH1TX);
+static STM32_GATE(ck_eth1rx, &ck_axi, 0, GATE_ETH1RX);
+static STM32_GATE(ck_eth2tx, &ck_axi, 0, GATE_ETH2TX);
+static STM32_GATE(ck_eth2rx, &ck_axi, 0, GATE_ETH2RX);
+static STM32_GATE(ck_eth2mac, &ck_axi, 0, GATE_ETH2MAC);
+static STM32_GATE(ck_spi1, &ck_pclk2, 0, GATE_SPI1);
+static STM32_GATE(ck_spi2, &ck_pclk1, 0, GATE_SPI2);
+static STM32_GATE(ck_spi3, &ck_pclk1, 0, GATE_SPI3);
+static STM32_GATE(ck_spi4, &ck_pclk6, 0, GATE_SPI4);
+static STM32_GATE(ck_spi5, &ck_pclk6, 0, GATE_SPI5);
 
 /* Kernel Clocks */
 static STM32_KCLK(ck_usbphy_k, 3,
@@ -2220,7 +2295,7 @@ static STM32_KCLK(ck_saes_k, 4,
 		  0, GATE_SAES, MUX_SAES);
 
 static STM32_KCLK(ck_rng1_k, 4,
-		  PARENT(&ck_csi, &ck_pll4r, &ck_lse, &ck_lsi),
+		  PARENT(&ck_csi, &ck_pll4r, &ck_off, &ck_lsi),
 		  0, GATE_RNG1, MUX_RNG1);
 
 static STM32_KCLK(ck_sdmmc1_k, 4,
@@ -2479,6 +2554,8 @@ static struct clk *stm32mp13_clk_provided[STM32MP13_ALL_CLK_NB] = {
 	[LTDC_PX]	= &ck_ltdc_px,
 	[DMA1]		= &ck_dma1,
 	[DMA2]		= &ck_dma2,
+	[ADC1]		= &ck_adc1,
+	[ADC2]		= &ck_adc2,
 	[MDMA]		= &ck_mdma,
 	[ETH1MAC]	= &ck_eth1mac,
 	[USBH]		= &ck_usbh,
@@ -2531,6 +2608,11 @@ static struct clk *stm32mp13_clk_provided[STM32MP13_ALL_CLK_NB] = {
 	[ADC2_K]	= &ck_adc2_k,
 	[ETH1CK_K]	= &ck_eth1ck_k,
 	[ETH2CK_K]	= &ck_eth2ck_k,
+	[SPI1]		= &ck_spi1,
+	[SPI2]		= &ck_spi2,
+	[SPI3]		= &ck_spi3,
+	[SPI4]		= &ck_spi4,
+	[SPI5]		= &ck_spi5,
 	[CK_MCO1]	= &ck_mco1,
 	[CK_MCO2]	= &ck_mco2,
 	[CK_TRACE]	= &ck_trace,

@@ -19,7 +19,7 @@ TEE_LOAD_ADDR_RE = re.compile(r'TEE load address @ (?P<load_addr>0x[0-9a-f]+)')
 # This gets the address from lines looking like this:
 # E/TC:0  0x001044a8
 STACK_ADDR_RE = re.compile(
-    r'[UEIDFM]/(TC|LD):(\?*|[0-9]*) [0-9]* +(?P<addr>0x[0-9a-f]+)')
+    r'[UEIDFM]/(TC|LD):([0-9]+ )?(\?*|[0-9]*) [0-9]* +(?P<addr>0x[0-9a-f]+)')
 ABORT_ADDR_RE = re.compile(r'-abort at address (?P<addr>0x[0-9a-f]+)')
 TA_PANIC_RE = re.compile(r'TA panicked with code (?P<code>0x[0-9a-f]+)')
 REGION_RE = re.compile(r'region +[0-9]+: va (?P<addr>0x[0-9a-f]+) '
@@ -43,8 +43,8 @@ nm) are used to extract the debug info. If the CROSS_COMPILE environment
 variable is set, it is used as a prefix to the binutils tools. That is, the
 script will invoke $(CROSS_COMPILE)addr2line etc. If it is not set however,
 the prefix will be determined automatically for each ELF file based on its
-architecture (arm-linux-gnueabihf-, aarch64-linux-gnu-). The resulting command
-is then expected to be found in the user's PATH.
+architecture. The resulting command is then expected to be found in the user's
+PATH.
 
 OP-TEE abort and panic messages are sent to the secure console. They look like
 the following:
@@ -170,6 +170,11 @@ class Symbolizer(object):
             self._arch = 'aarch64-linux-gnu-'
         elif b'ARM,' in output[0]:
             self._arch = 'arm-linux-gnueabihf-'
+        elif b'RISC-V,' in output[0]:
+            if b'32-bit' in output[0]:
+                self._arch = 'riscv32-unknown-linux-gnu-'
+            elif b'64-bit' in output[0]:
+                self._arch = 'riscv64-unknown-linux-gnu-'
 
     def arch_prefix(self, cmd, elf):
         self.set_arch(elf)
@@ -249,21 +254,16 @@ class Symbolizer(object):
             ret = '!!!'
         return ret
 
-    # Armv8.5 with Memory Tagging Extension (MTE)
-    def strip_armv85_mte_tag(self, addr):
-        i_addr = int(addr, 16)
-        i_addr &= ~(0xf << 56)
-        return '0x{:x}'.format(i_addr)
-
     def symbol_plus_offset(self, addr):
         ret = ''
         prevsize = 0
-        addr = self.strip_armv85_mte_tag(addr)
         reladdr = self.subtract_load_addr(addr)
         elf_name = self.elf_for_addr(addr)
         if elf_name is None:
             return ''
         elf = self.get_elf(elf_name)
+        if elf is None:
+            return ''
         cmd = self.arch_prefix('nm', elf)
         if not reladdr or not elf or not cmd:
             return ''
@@ -305,6 +305,8 @@ class Symbolizer(object):
         if elf_name is None:
             return ''
         elf = self.get_elf(elf_name)
+        if elf is None:
+            return ''
         cmd = self.arch_prefix('objdump', elf)
         if not reladdr or not elf or not cmd:
             return ''

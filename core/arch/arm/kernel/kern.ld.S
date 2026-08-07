@@ -54,14 +54,6 @@
 #include <util.h>
 
 /*
- * TEE_RAM_VA_START:            The start virtual address of the TEE RAM
- * TEE_TEXT_VA_START:           The start virtual address of the OP-TEE text
- */
-#define TEE_RAM_VA_START        TEE_RAM_START
-#define TEE_TEXT_VA_START       (TEE_RAM_VA_START + \
-					(TEE_LOAD_ADDR - TEE_RAM_START))
-
-/*
  * Note:
  * Clang 11 (ld.lld) generates non-relocatable reference when using ROUNDDOWN()
  * from <util.h>, which does not work with ASLR.
@@ -74,17 +66,13 @@ OUTPUT_ARCH(CFG_KERN_LINKER_ARCH)
 ENTRY(_start)
 SECTIONS
 {
-	. = TEE_TEXT_VA_START;
-#ifdef ARM32
-	ASSERT(!(TEE_TEXT_VA_START & 31), "text start should align to 32bytes")
-#endif
-#ifdef ARM64
-	ASSERT(!(TEE_TEXT_VA_START & 127), "text start should align to 128bytes")
-#endif
+	. = TEE_LOAD_ADDR;
+	ASSERT(!(TEE_LOAD_ADDR & (SMALL_PAGE_SIZE - 1)),
+	       "text start should be page aligned")
 	__text_start = .;
 
 	/*
-	 * Memory between TEE_TEXT_VA_START and page aligned rounded down
+	 * Memory between TEE_LOAD_ADDR and page aligned rounded down
 	 * value will be mapped with unpaged "text" section attributes:
 	 * likely to be read-only/executable.
 	 */
@@ -169,13 +157,13 @@ SECTIONS
 	}
 
 	/* .ARM.exidx is sorted, so has to go in its own output section.  */
-	.ARM.exidx : {
+	.ARM.exidx : ALIGN(8) {
 		__exidx_start = .;
 		*(.ARM.exidx* .gnu.linkonce.armexidx.*)
 		__exidx_end = .;
 	}
 
-	.ARM.extab : {
+	.ARM.extab : ALIGN(8) {
 		__extab_start = .;
 		*(.ARM.extab*)
 		__extab_end = .;
@@ -187,7 +175,7 @@ SECTIONS
 #endif
 	__flatmap_unpg_ro_size = . - __flatmap_unpg_ro_start;
 
-#ifdef CFG_VIRTUALIZATION
+#ifdef CFG_NS_VIRTUALIZATION
 	__flatmap_nex_rw_start = . ;
 	.nex_data : ALIGN(8) {
 		*(.nex_data .nex_data.*)
@@ -291,8 +279,11 @@ SECTIONS
 		. = ALIGN(8);
 		__nozi_stack_end = .;
 	}
-
-#ifdef CFG_WITH_PAGER
+#ifndef CFG_WITH_PAGER
+	. = ALIGN(SMALL_PAGE_SIZE);
+	__flatmap_free_start = .;
+	__flatmap_unpg_rw_size = __flatmap_free_start - __flatmap_unpg_rw_start;
+#else
 	.heap2 (NOLOAD) : {
 		__heap2_start = .;
 		/*
@@ -385,15 +376,28 @@ SECTIONS
 		"Load address before start of physical memory")
 	ASSERT(TEE_LOAD_ADDR < (TEE_RAM_START + TEE_RAM_PH_SIZE),
 		"Load address after end of physical memory")
-	ASSERT((TEE_RAM_VA_START + TEE_RAM_PH_SIZE - __init_end) >
-		SMALL_PAGE_SIZE, "Too few free pages to initialize paging")
+	ASSERT((TEE_RAM_START + TEE_RAM_PH_SIZE - __init_end) >
+		SMALL_PAGE_SIZE * 2 +
+		(__pageable_end - __pageable_start) / 4096 * 32 +
+		SIZEOF(.rel) / 2 + SIZEOF(.rela) / 3 ,
+		"Too few free pages to initialize paging")
 
 
 #endif /*CFG_WITH_PAGER*/
 
 #ifdef CFG_CORE_SANITIZE_KADDRESS
-	. = TEE_RAM_VA_START + (TEE_RAM_VA_SIZE * 8) / 9 - 8;
+	/*
+	 * Guard against moving the location counter backwards in the assignment
+	 * below.
+	 */
+	ASSERT(. <= (TEE_RAM_START + (TEE_RAM_VA_SIZE * 8) / 9 - 8),
+		"TEE_RAM_VA_SIZE is too small")
+	. = TEE_RAM_START + (TEE_RAM_VA_SIZE * 8) / 9 - 8;
 	. = ALIGN(8);
+#ifndef CFG_WITH_PAGER
+	__flatmap_free_size = LD_ROUNDDOWN(. - __flatmap_free_start,
+					   SMALL_PAGE_SIZE);
+#endif
 	.asan_shadow : {
 		__asan_shadow_start = .;
 		. += TEE_RAM_VA_SIZE / 9;
@@ -405,21 +409,23 @@ SECTIONS
 	__end = .;
 
 #ifndef CFG_WITH_PAGER
-	__init_size = __data_end - TEE_TEXT_VA_START;
+	__init_size = __data_end - TEE_LOAD_ADDR;
 #endif
 	/*
 	 * Guard against moving the location counter backwards in the assignment
 	 * below.
 	 */
-	ASSERT(. <= (TEE_RAM_VA_START + TEE_RAM_VA_SIZE),
+	ASSERT(. <= (TEE_RAM_START + TEE_RAM_VA_SIZE),
 		"TEE_RAM_VA_SIZE is too small")
-	. = TEE_RAM_VA_START + TEE_RAM_VA_SIZE;
+	. = TEE_RAM_START + TEE_RAM_VA_SIZE;
 
 	_end_of_ram = .;
 
 #ifndef CFG_WITH_PAGER
-	__flatmap_unpg_rw_size = _end_of_ram - __flatmap_unpg_rw_start;
 	__get_tee_init_end = .;
+#ifndef CFG_CORE_SANITIZE_KADDRESS
+	__flatmap_free_size = _end_of_ram - __flatmap_free_start;
+#endif
 #endif
 
 	/*
@@ -438,7 +444,7 @@ SECTIONS
 	.rela : {
 		*(.rela.*)
 	}
-#ifndef CFG_CORE_ASLR
+#if !defined(CFG_CORE_ASLR) && !defined(CFG_CORE_PHYS_RELOCATABLE)
 	ASSERT(SIZEOF(.rel) == 0, "Relocation entries not expected")
 	ASSERT(SIZEOF(.rela) == 0, "Relocation entries not expected")
 #endif
@@ -470,7 +476,13 @@ __vcore_unpg_rw_start = __flatmap_unpg_rw_start;
 __vcore_unpg_rw_size = __flatmap_unpg_rw_size;
 __vcore_unpg_rw_end = __vcore_unpg_rw_start + __vcore_unpg_rw_size;
 
-#ifdef CFG_VIRTUALIZATION
+#ifndef CFG_WITH_PAGER
+__vcore_free_start = __flatmap_free_start;
+__vcore_free_size = __flatmap_free_size;
+__vcore_free_end = __flatmap_free_start + __flatmap_free_size;
+#endif
+
+#ifdef CFG_NS_VIRTUALIZATION
 /* Nexus read-write memory */
 __vcore_nex_rw_start = __flatmap_nex_rw_start;
 __vcore_nex_rw_size = __flatmap_nex_rw_size;
@@ -478,28 +490,21 @@ __vcore_nex_rw_end = __vcore_nex_rw_start + __vcore_nex_rw_size;
 #endif
 
 #ifdef CFG_WITH_PAGER
-/*
- * Core init mapping shall cover up to end of the physical RAM.
- * This is required since the hash table is appended to the
- * binary data after the firmware build sequence.
- */
-#define __FLATMAP_PAGER_TRAILING_SPACE	\
-	(TEE_RAM_START + TEE_RAM_PH_SIZE - \
-		(__flatmap_init_ro_start + __flatmap_init_ro_size))
-
 /* Paged/init read-only memories */
 __vcore_init_rx_start = __flatmap_init_rx_start;
-__vcore_init_ro_start = __flatmap_init_ro_start;
 #ifdef CFG_CORE_RODATA_NOEXEC
 __vcore_init_rx_size = __flatmap_init_rx_size;
-__vcore_init_ro_size = __flatmap_init_ro_size + __FLATMAP_PAGER_TRAILING_SPACE;
+__vcore_init_ro_start = __flatmap_init_ro_start;
+__vcore_init_ro_size = __flatmap_init_ro_size;
 #else
-__vcore_init_rx_size = __flatmap_init_rx_size + __flatmap_init_ro_size +
-		       __FLATMAP_PAGER_TRAILING_SPACE;
+__vcore_init_rx_size = __flatmap_init_rx_size + __flatmap_init_ro_size;
+__vcore_init_ro_start = __vcore_init_rx_end;
 __vcore_init_ro_size = 0;
 #endif /* CFG_CORE_RODATA_NOEXEC */
 __vcore_init_rx_end = __vcore_init_rx_start + __vcore_init_rx_size;
 __vcore_init_ro_end = __vcore_init_ro_start + __vcore_init_ro_size;
+ASSERT(__vcore_init_ro_start == __vcore_init_rx_end,
+       "__vcore_init_ro_start should follow __vcore_init_rx_end")
 #endif /* CFG_WITH_PAGER */
 
 #ifdef CFG_CORE_SANITIZE_KADDRESS

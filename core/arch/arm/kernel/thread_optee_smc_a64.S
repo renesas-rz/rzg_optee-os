@@ -28,7 +28,7 @@
 	.macro readjust_pc
 #ifdef CFG_CORE_ASLR
 	adr	x16, 1111f
-	ldr	x17, boot_mmu_config + CORE_MMU_CONFIG_LOAD_OFFSET
+	ldr	x17, boot_mmu_config + CORE_MMU_CONFIG_MAP_OFFSET
 	add	x16, x16, x17
 	br	x16
 1111:
@@ -70,7 +70,7 @@ LOCAL_FUNC vector_fiq_entry , : , .identity_map
 	readjust_pc
 	/* Secure Monitor received a FIQ and passed control to us. */
 	bl	thread_check_canaries
-	bl	itr_core_handler
+	bl	interrupt_main_handler
 	ldr	x0, =TEESMC_OPTEED_RETURN_FIQ_DONE
 	smc	#0
 	/* SMC should not return */
@@ -177,12 +177,8 @@ FUNC thread_std_smc_entry , :
 	panic_at_smc_return
 END_FUNC thread_std_smc_entry
 
-/* void thread_rpc(uint32_t rv[THREAD_RPC_NUM_ARGS]) */
-FUNC thread_rpc , :
-	/* Read daif and create an SPSR */
-	mrs	x1, daif
-	orr	x1, x1, #(SPSR_64_MODE_EL1 << SPSR_64_MODE_EL_SHIFT)
-
+/* void thread_rpc_spsr(uint32_t rv[THREAD_RPC_NUM_ARGS], uint64_t spsr) */
+FUNC thread_rpc_spsr , :
 	/* Mask all maskable exceptions before switching to temporary stack */
 	msr	daifset, #DAIFBIT_ALL
 	push	x0, xzr
@@ -236,8 +232,8 @@ FUNC thread_rpc , :
 	pop	x16, xzr	/* Get pointer to rv[] */
 	store_wregs x16, 0, 0, 3	/* Store w0-w3 into rv[] */
 	ret
-END_FUNC thread_rpc
-DECLARE_KEEP_PAGER thread_rpc
+END_FUNC thread_rpc_spsr
+DECLARE_KEEP_PAGER thread_rpc_spsr
 
 /*
  * void thread_foreign_intr_exit(uint32_t thread_index)

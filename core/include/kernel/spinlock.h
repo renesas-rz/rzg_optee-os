@@ -4,8 +4,8 @@
  * Copyright (c) 2016, Linaro Limited
  */
 
-#ifndef KERNEL_SPINLOCK_H
-#define KERNEL_SPINLOCK_H
+#ifndef __KERNEL_SPINLOCK_H
+#define __KERNEL_SPINLOCK_H
 
 #define SPINLOCK_LOCK       1
 #define SPINLOCK_UNLOCK     0
@@ -13,8 +13,8 @@
 #ifndef __ASSEMBLER__
 #include <assert.h>
 #include <compiler.h>
-#include <stdbool.h>
 #include <kernel/thread.h>
+#include <stdbool.h>
 
 #ifdef CFG_TEE_CORE_DEBUG
 void spinlock_count_incr(void);
@@ -40,6 +40,28 @@ static inline void cpu_spin_lock_no_dldetect(unsigned int *lock)
 	assert(thread_foreign_intr_disabled());
 	__cpu_spin_lock(lock);
 	spinlock_count_incr();
+}
+
+static inline bool thread_spin_trylock(unsigned int *lock)
+{
+	assert(thread_get_id_may_fail() != THREAD_ID_INVALID);
+	return !__cpu_spin_trylock(lock);
+}
+
+/*
+ * To be used with lot of care: it is not recommended to spin in a thread
+ * context without masking foreign interrupts
+ */
+static inline void thread_spin_lock(unsigned int *lock)
+{
+	assert(thread_get_id_may_fail() != THREAD_ID_INVALID);
+	__cpu_spin_lock(lock);
+}
+
+static inline void thread_spin_unlock(unsigned int *lock)
+{
+	assert(thread_get_id_may_fail() != THREAD_ID_INVALID);
+	__cpu_spin_unlock(lock);
 }
 
 #ifdef CFG_TEE_CORE_DEBUG
@@ -93,7 +115,8 @@ static inline void cpu_spin_unlock(unsigned int *lock)
 	spinlock_count_decr();
 }
 
-static inline uint32_t cpu_spin_lock_xsave_no_dldetect(unsigned int *lock)
+static inline uint32_t __must_check
+cpu_spin_lock_xsave_no_dldetect(unsigned int *lock)
 {
 	uint32_t exceptions = thread_mask_exceptions(THREAD_EXCP_ALL);
 
@@ -105,9 +128,9 @@ static inline uint32_t cpu_spin_lock_xsave_no_dldetect(unsigned int *lock)
 #define cpu_spin_lock_xsave(lock) \
 	cpu_spin_lock_xsave_dldetect(__func__, __LINE__, lock)
 
-static inline uint32_t cpu_spin_lock_xsave_dldetect(const char *func,
-						    const int line,
-						    unsigned int *lock)
+static inline uint32_t __must_check
+cpu_spin_lock_xsave_dldetect(const char *func, const int line,
+			     unsigned int *lock)
 {
 	uint32_t exceptions = thread_mask_exceptions(THREAD_EXCP_ALL);
 
@@ -115,7 +138,7 @@ static inline uint32_t cpu_spin_lock_xsave_dldetect(const char *func,
 	return exceptions;
 }
 #else
-static inline uint32_t cpu_spin_lock_xsave(unsigned int *lock)
+static inline uint32_t __must_check cpu_spin_lock_xsave(unsigned int *lock)
 {
 	return cpu_spin_lock_xsave_no_dldetect(lock);
 }
@@ -129,4 +152,4 @@ static inline void cpu_spin_unlock_xrestore(unsigned int *lock,
 }
 #endif /* __ASSEMBLER__ */
 
-#endif /* KERNEL_SPINLOCK_H */
+#endif /* __KERNEL_SPINLOCK_H */

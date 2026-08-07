@@ -14,6 +14,7 @@
 #include <keep.h>
 #include <kernel/asan.h>
 #include <kernel/boot.h>
+#include <kernel/interrupt.h>
 #include <kernel/linker.h>
 #include <kernel/lockdep.h>
 #include <kernel/misc.h>
@@ -23,13 +24,13 @@
 #include <kernel/tee_ta_manager.h>
 #include <kernel/thread.h>
 #include <kernel/thread_private.h>
+#include <kernel/user_access.h>
 #include <kernel/user_mode_ctx_struct.h>
 #include <kernel/virtualization.h>
 #include <mm/core_memprot.h>
 #include <mm/mobj.h>
 #include <mm/tee_mm.h>
 #include <mm/tee_pager.h>
-#include <mm/vm.h>
 #include <smccc.h>
 #include <sm/sm.h>
 #include <trace.h>
@@ -48,7 +49,7 @@ static uint8_t thread_user_kdata_page[
 	ROUNDUP(sizeof(struct thread_core_local) * CFG_TEE_CORE_NB_CORE,
 		SMALL_PAGE_SIZE)]
 	__aligned(SMALL_PAGE_SIZE)
-#ifndef CFG_VIRTUALIZATION
+#ifndef CFG_NS_VIRTUALIZATION
 	__section(".nozi.kdata_page");
 #else
 	__section(".nex_nozi.kdata_page");
@@ -218,7 +219,7 @@ static void init_regs(struct thread_ctx *thread, uint32_t a0, uint32_t a1,
 static void __thread_alloc_and_run(uint32_t a0, uint32_t a1, uint32_t a2,
 				   uint32_t a3, uint32_t a4, uint32_t a5,
 				   uint32_t a6, uint32_t a7,
-				   void *pc)
+				   void *pc, uint32_t flags)
 {
 	struct thread_core_local *l = thread_get_core_local();
 	bool found_thread = false;
@@ -243,7 +244,7 @@ static void __thread_alloc_and_run(uint32_t a0, uint32_t a1, uint32_t a2,
 
 	l->curr_thread = n;
 
-	threads[n].flags = 0;
+	threads[n].flags = flags;
 	init_regs(threads + n, a0, a1, a2, a3, a4, a5, a6, a7, pc);
 #ifdef CFG_CORE_PAUTH
 	/*
@@ -266,7 +267,7 @@ void thread_alloc_and_run(uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3,
 			  uint32_t a4, uint32_t a5)
 {
 	__thread_alloc_and_run(a0, a1, a2, a3, a4, a5, 0, 0,
-			       thread_std_smc_entry);
+			       thread_std_smc_entry, 0);
 }
 
 #ifdef CFG_SECURE_PARTITION
@@ -274,7 +275,7 @@ void thread_sp_alloc_and_run(struct thread_smc_args *args __maybe_unused)
 {
 	__thread_alloc_and_run(args->a0, args->a1, args->a2, args->a3, args->a4,
 			       args->a5, args->a6, args->a7,
-			       spmc_sp_thread_entry);
+			       spmc_sp_thread_entry, THREAD_FLAGS_FFA_ONLY);
 }
 #endif
 
@@ -411,6 +412,22 @@ void thread_resume_from_rpc(uint32_t thread_id, uint32_t a0, uint32_t a1,
 }
 
 #ifdef ARM64
+static uint64_t spsr_from_pstate(void)
+{
+	uint64_t spsr = SPSR_64(SPSR_64_MODE_EL1, SPSR_64_MODE_SP_EL0, 0);
+
+	spsr |= read_daif();
+	if (IS_ENABLED(CFG_PAN) && feat_pan_implemented() && read_pan())
+		spsr |= SPSR_64_PAN;
+
+	return spsr;
+}
+
+void __thread_rpc(uint32_t rv[THREAD_RPC_NUM_ARGS])
+{
+	thread_rpc_spsr(rv, spsr_from_pstate());
+}
+
 vaddr_t thread_get_saved_thread_sp(void)
 {
 	struct thread_core_local *l = thread_get_core_local();
@@ -422,7 +439,7 @@ vaddr_t thread_get_saved_thread_sp(void)
 #endif /*ARM64*/
 
 #ifdef ARM32
-bool thread_is_in_normal_mode(void)
+bool __noprof thread_is_in_normal_mode(void)
 {
 	return (read_cpsr() & ARM32_CPSR_MODE_MASK) == ARM32_CPSR_MODE_SVC;
 }
@@ -447,7 +464,7 @@ void thread_state_free(void)
 	threads[ct].flags = 0;
 	l->curr_thread = THREAD_ID_INVALID;
 
-	if (IS_ENABLED(CFG_VIRTUALIZATION))
+	if (IS_ENABLED(CFG_NS_VIRTUALIZATION))
 		virt_unset_guest();
 	thread_unlock_global();
 }
@@ -516,22 +533,21 @@ int thread_state_suspend(uint32_t flags, uint32_t cpsr, vaddr_t pc)
 		core_mmu_set_user_map(NULL);
 	}
 
+	if (IS_ENABLED(CFG_SECURE_PARTITION)) {
+		struct ts_session *ts_sess =
+			TAILQ_FIRST(&threads[ct].tsd.sess_stack);
+
+		spmc_sp_set_to_preempted(ts_sess);
+	}
+
 	l->curr_thread = THREAD_ID_INVALID;
 
-	if (IS_ENABLED(CFG_VIRTUALIZATION))
+	if (IS_ENABLED(CFG_NS_VIRTUALIZATION))
 		virt_unset_guest();
 
 	thread_unlock_global();
 
 	return ct;
-}
-
-bool thread_init_stack(uint32_t thread_id, vaddr_t sp)
-{
-	if (thread_id >= CFG_NUM_THREADS)
-		return false;
-	threads[thread_id].stack_va_end = sp;
-	return true;
 }
 
 static void __maybe_unused
@@ -574,9 +590,6 @@ static void init_user_kcode(void)
 
 void thread_init_primary(void)
 {
-	/* Initialize canaries around the stacks */
-	thread_init_canaries();
-
 	init_user_kcode();
 }
 
@@ -750,19 +763,6 @@ static vaddr_t get_excp_vect(void)
 
 void thread_init_per_cpu(void)
 {
-#ifdef ARM32
-	struct thread_core_local *l = thread_get_core_local();
-
-#if !defined(CFG_WITH_ARM_TRUSTED_FW)
-	/* Initialize secure monitor */
-	sm_init(l->tmp_stack_va_end + STACK_TMP_OFFS);
-#endif
-	thread_set_irq_sp(l->tmp_stack_va_end);
-	thread_set_fiq_sp(l->tmp_stack_va_end);
-	thread_set_abt_sp((vaddr_t)l);
-	thread_set_und_sp((vaddr_t)l);
-#endif
-
 	thread_init_vbar(get_excp_vect());
 
 #ifdef CFG_FTRACE_SUPPORT
@@ -965,7 +965,6 @@ static void set_ctx_regs(struct thread_ctx_regs *regs, unsigned long a0,
 	regs->x[1] = a1;
 	regs->x[2] = a2;
 	regs->x[3] = a3;
-	regs->sp = user_sp;
 	regs->pc = entry_func;
 	regs->cpsr = spsr;
 	regs->x[13] = user_sp;	/* Used when running TA in Aarch32 */
@@ -984,10 +983,18 @@ static struct thread_pauth_keys *thread_get_pauth_keys(void)
 {
 #if defined(CFG_TA_PAUTH)
 	struct ts_session *s = ts_get_current_session();
-	/* Only user TA's support the PAUTH keys */
-	struct user_ta_ctx *utc = to_user_ta_ctx(s->ctx);
 
-	return &utc->uctx.keys;
+	if  (is_user_ta_ctx(s->ctx)) {
+		struct user_ta_ctx *utc = to_user_ta_ctx(s->ctx);
+
+		return &utc->uctx.keys;
+	} else if (is_sp_ctx(s->ctx)) {
+		struct sp_ctx *spc = to_sp_ctx(s->ctx);
+
+		return &spc->uctx.keys;
+	}
+
+	panic("[abort] Only user TAs and SPs support PAUTH keys");
 #else
 	return NULL;
 #endif
@@ -1056,7 +1063,7 @@ void thread_get_user_kdata(struct mobj **mobj, size_t *offset,
 }
 #endif
 
-static void setup_unwind_user_mode(struct thread_svc_regs *regs)
+static void setup_unwind_user_mode(struct thread_scall_regs *regs)
 {
 #ifdef ARM32
 	regs->lr = (uintptr_t)thread_unwind_user_mode;
@@ -1064,8 +1071,7 @@ static void setup_unwind_user_mode(struct thread_svc_regs *regs)
 #endif
 #ifdef ARM64
 	regs->elr = (uintptr_t)thread_unwind_user_mode;
-	regs->spsr = SPSR_64(SPSR_64_MODE_EL1, SPSR_64_MODE_SP_EL0, 0);
-	regs->spsr |= read_daif();
+	regs->spsr = spsr_from_pstate();
 	/*
 	 * Regs is the value of stack pointer before calling the SVC
 	 * handler.  By the addition matches for the reserved space at the
@@ -1090,7 +1096,7 @@ static void gprof_set_status(struct ts_session *s __maybe_unused,
  * Note: this function is weak just to make it possible to exclude it from
  * the unpaged area.
  */
-void __weak thread_svc_handler(struct thread_svc_regs *regs)
+void __weak thread_scall_handler(struct thread_scall_regs *regs)
 {
 	struct ts_session *sess = NULL;
 	uint32_t state = 0;
@@ -1111,8 +1117,8 @@ void __weak thread_svc_handler(struct thread_svc_regs *regs)
 	/* Restore foreign interrupts which are disabled on exception entry */
 	thread_restore_foreign_intr();
 
-	assert(sess && sess->handle_svc);
-	if (sess->handle_svc(regs)) {
+	assert(sess && sess->handle_scall);
+	if (sess->handle_scall(regs)) {
 		/* We're about to switch back to user mode */
 		gprof_set_status(sess, TS_GPROF_RESUME);
 	} else {
@@ -1161,3 +1167,15 @@ unsigned long __weak thread_system_reset_handler(unsigned long a0 __unused,
 }
 DECLARE_KEEP_PAGER(thread_system_reset_handler);
 #endif /*CFG_WITH_ARM_TRUSTED_FW*/
+
+#ifdef CFG_CORE_WORKAROUND_ARM_NMFI
+void __noreturn interrupt_main_handler(void)
+{
+	/*
+	 * Note: overrides the default implementation of this function so that
+	 * if there would be another handler defined there would be duplicate
+	 * symbol error during linking.
+	 */
+	panic("Secure interrupt received but it is not supported");
+}
+#endif

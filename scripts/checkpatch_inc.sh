@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 CHECKPATCH="${CHECKPATCH:-checkpatch.pl}"
 CHECKPATCH_OPT="${CHECKPATCH_OPT:-}"
@@ -13,6 +13,7 @@ CHECKPATCH_IGNORE=$(echo \
 		core/arch/arm/plat-ti/api_monitor_index_a{9,15}.h \
 		core/arch/arm/dts \
 		ta/pkcs11/scripts/verify-helpers.sh \
+		core/lib/qcbor \
 		core/arch/riscv/include/encoding.h )
 _CP_EXCL=$(for p in $CHECKPATCH_IGNORE; do echo ":(exclude)$p" ; done)
 
@@ -23,7 +24,7 @@ function _checkpatch() {
 				typedefs_opt="";
 		# Ignore NOT_UNIFIED_DIFF in case patch has no diff
 		# (e.g., all paths filtered out)
-		$CHECKPATCH $CHECKPATCH_OPT $typedefs_opt -
+		eval "$CHECKPATCH $CHECKPATCH_OPT $typedefs_opt -"
 }
 
 function checkpatch() {

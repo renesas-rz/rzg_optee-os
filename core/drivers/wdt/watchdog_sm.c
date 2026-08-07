@@ -7,14 +7,7 @@
 #include <kernel/spinlock.h>
 #include <sm/optee_smc.h>
 #include <sm/psci.h>
-
-enum smcwd_call {
-	SMCWD_INIT		= 0,
-	SMCWD_SET_TIMEOUT	= 1,
-	SMCWD_ENABLE		= 2,
-	SMCWD_PET		= 3,
-	SMCWD_GET_TIMELEFT	= 4,
-};
+#include <sm/watchdog_smc.h>
 
 static unsigned long wdt_min_timeout;
 static unsigned long wdt_max_timeout;
@@ -27,6 +20,8 @@ enum sm_handler_ret __wdt_sm_handler(struct thread_smc_args *args)
 	uint32_t exceptions = 0;
 	unsigned long min_timeout = 0;
 	unsigned long max_timeout = 0;
+	unsigned long timeleft = 0;
+	bool is_started = false;
 
 	switch (args->a1) {
 	case SMCWD_INIT:
@@ -73,6 +68,18 @@ enum sm_handler_ret __wdt_sm_handler(struct thread_smc_args *args)
 		break;
 	/* SMCWD_GET_TIMELEFT is optional */
 	case SMCWD_GET_TIMELEFT:
+		res = watchdog_gettimeleft(&is_started, &timeleft);
+		if (res == TEE_ERROR_NOT_SUPPORTED) {
+			args->a0 = PSCI_RET_NOT_SUPPORTED;
+		} else if (res) {
+			args->a0 = PSCI_RET_INTERNAL_FAILURE;
+		} else if (!is_started) {
+			args->a0 = PSCI_RET_DISABLED;
+		} else {
+			args->a0 = PSCI_RET_SUCCESS;
+			args->a1 = timeleft;
+		}
+		break;
 	default:
 		args->a0 = PSCI_RET_NOT_SUPPORTED;
 	}
