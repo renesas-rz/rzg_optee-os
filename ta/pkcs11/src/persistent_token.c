@@ -77,7 +77,7 @@ static enum pkcs11_rc do_hash(uint32_t user, const uint8_t *pin,
 {
 	TEE_Result res = TEE_SUCCESS;
 	TEE_OperationHandle oh = TEE_HANDLE_NULL;
-	size_t sz = TEE_MAX_HASH_SIZE;
+	uint32_t sz = TEE_MAX_HASH_SIZE;
 
 	res = TEE_AllocateOperation(&oh, TEE_ALG_SHA256, TEE_MODE_DIGEST, 0);
 	if (res)
@@ -472,7 +472,7 @@ enum pkcs11_rc load_persistent_object_attributes(struct pkcs11_object *obj)
 	TEE_ObjectHandle hdl = obj->attribs_hdl;
 	TEE_ObjectInfo info = { };
 	struct obj_attrs *attr = NULL;
-	size_t read_bytes = 0;
+	uint32_t read_bytes = 0;
 
 	if (obj->attributes)
 		return PKCS11_CKR_OK;
@@ -510,12 +510,12 @@ enum pkcs11_rc load_persistent_object_attributes(struct pkcs11_object *obj)
 
 	if (res) {
 		rc = tee2pkcs_error(res);
-		EMSG("Read %zu bytes, failed %#"PRIx32,
+		EMSG("Read %"PRIu32" bytes, failed %#"PRIx32,
 		     read_bytes, res);
 		goto out;
 	}
 	if (read_bytes != info.dataSize) {
-		EMSG("Read %zu bytes, expected %zu",
+		EMSG("Read %"PRIu32" bytes, expected %"PRIu32,
 		     read_bytes, info.dataSize);
 		rc = PKCS11_CKR_GENERAL_ERROR;
 		goto out;
@@ -584,8 +584,6 @@ struct ck_token *init_persistent_db(unsigned int token_id)
 	struct token_persistent_main *db_main = NULL;
 	struct token_persistent_objs *db_objs = NULL;
 	void *ptr = NULL;
-	void *initial_data = NULL;
-	uint32_t initial_data_size = 0;
 
 	if (!token)
 		return NULL;
@@ -600,7 +598,7 @@ struct ck_token *init_persistent_db(unsigned int token_id)
 	res = open_db_file(token, &db_hdl);
 
 	if (res == TEE_SUCCESS) {
-		size_t size = 0;
+		uint32_t size = 0;
 		size_t idx = 0;
 
 		IMSG("PKCS11 token %u: load db", token_id);
@@ -668,33 +666,33 @@ struct ck_token *init_persistent_db(unsigned int token_id)
 		/*
 		 * Object stores persistent state + persistent object
 		 * references.
-		 *
-		 * Allocate the initial_data buffer to encompass the data from
-		 * both db_main and db_objs. Since the initial data for the
-		 * objects will be zeroed out upon creation, there’s no need
-		 * to copy it from db_objs.
 		 */
-		initial_data_size = sizeof(*db_main) + sizeof(*db_objs);
-		initial_data = TEE_Malloc(initial_data_size,
-					  TEE_MALLOC_FILL_ZERO);
-		if (!initial_data) {
-			EMSG("Failed to allocate initial_data buffer");
-			goto error;
-		}
-		TEE_MemMove(initial_data, db_main, sizeof(*db_main));
 		res = TEE_CreatePersistentObject(TEE_STORAGE_PRIVATE,
 						 file, sizeof(file),
 						 TEE_DATA_FLAG_ACCESS_READ |
 						 TEE_DATA_FLAG_ACCESS_WRITE,
 						 TEE_HANDLE_NULL,
-						 initial_data,
-						 initial_data_size,
+						 db_main, sizeof(*db_main),
 						 &db_hdl);
-		TEE_Free(initial_data);
 		if (res) {
 			EMSG("Failed to create db: %#"PRIx32, res);
 			goto error;
 		}
+
+		res = TEE_TruncateObjectData(db_hdl, sizeof(*db_main) +
+						     sizeof(*db_objs));
+		if (res)
+			TEE_Panic(0);
+
+		res = TEE_SeekObjectData(db_hdl, sizeof(*db_main),
+					 TEE_DATA_SEEK_SET);
+		if (res)
+			TEE_Panic(0);
+
+		db_objs->count = 0;
+		res = TEE_WriteObjectData(db_hdl, db_objs, sizeof(*db_objs));
+		if (res)
+			TEE_Panic(0);
 
 	} else {
 		goto error;

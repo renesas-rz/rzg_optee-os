@@ -2,8 +2,8 @@
 /*
  * Copyright (c) 2014, Linaro Limited
  */
-#ifndef __KERNEL_TRACE_TA_H
-#define __KERNEL_TRACE_TA_H
+#ifndef TRACE_TA_H
+#define TRACE_TA_H
 
 #include <trace.h>
 
@@ -16,5 +16,5 @@
 #define TAMSG_RAW(...)
 #endif
 
-#endif /*__KERNEL_TRACE_TA_H*/
+#endif /*TRACE_TA_H*/
 

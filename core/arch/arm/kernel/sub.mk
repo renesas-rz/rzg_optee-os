@@ -1,10 +1,12 @@
+srcs-$(CFG_WITH_USER_TA) += ldelf_loader.c
+srcs-y += tee_time.c
 srcs-y += rpc_io_i2c.c
+srcs-y += otp_stubs.c
+srcs-y += delay.c
 srcs-y += idle.c
 
 srcs-$(CFG_SECURE_TIME_SOURCE_CNTPCT) += tee_time_arm_cntpct.c
-ifeq ($(CFG_CALLOUT),y)
-srcs-$(CFG_ARM64_core) += generic_timer.c
-endif
+srcs-$(CFG_SECURE_TIME_SOURCE_REE) += tee_time_ree.c
 srcs-$(CFG_ARM64_core) += timer_a64.c
 
 srcs-$(CFG_ARM32_core) += spin_lock_a32.S
@@ -19,14 +21,10 @@ srcs-$(CFG_PL310) += tee_l2cc_mutex.c
 srcs-$(CFG_ARM32_core) += thread_a32.S
 srcs-$(CFG_ARM64_core) += thread_a64.S
 srcs-y += thread.c
-ifeq ($(CFG_WITH_USER_TA),y)
-srcs-y += arch_scall.c
-srcs-$(CFG_ARM32_core) += arch_scall_a32.S
-srcs-$(CFG_ARM64_core) += arch_scall_a64.S
-endif
 ifeq ($(CFG_CORE_FFA),y)
 srcs-y += thread_spmc.c
 cppflags-thread_spmc.c-y += -DTEE_IMPL_GIT_SHA1=$(TEE_IMPL_GIT_SHA1)
+srcs-$(CFG_ARM32_core) += thread_spmc_a32.S
 srcs-$(CFG_ARM64_core) += thread_spmc_a64.S
 else
 srcs-y += thread_optee_smc.c
@@ -39,6 +37,7 @@ ifeq ($(CFG_WITH_VFP),y)
 srcs-$(CFG_ARM32_core) += vfp_a32.S
 srcs-$(CFG_ARM64_core) += vfp_a64.S
 endif
+srcs-y += trace_ext.c
 srcs-$(CFG_ARM32_core) += misc_a32.S
 srcs-$(CFG_ARM64_core) += misc_a64.S
 srcs-$(CFG_WITH_STMM_SP) += stmm_sp.c
@@ -54,10 +53,7 @@ srcs-$(CFG_ARM32_core) += unwind_arm32.c
 srcs-$(CFG_ARM64_core) += unwind_arm64.c
 endif
 
-srcs-$(CFG_NS_VIRTUALIZATION) += virtualization.c
-ifeq ($(CFG_SEMIHOSTING),y)
-srcs-$(CFG_ARM64_core) += semihosting_a64.S
-endif
+srcs-$(CFG_VIRTUALIZATION) += virtualization.c
 
 srcs-y += link_dummies_paged.c
 srcs-y += link_dummies_init.c

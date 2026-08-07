@@ -7,6 +7,7 @@
  */
 #include <arm.h>
 #include <caam_utils_delay.h>
+#include <types_ext.h>
 
 void caam_udelay(uint32_t time)
 {

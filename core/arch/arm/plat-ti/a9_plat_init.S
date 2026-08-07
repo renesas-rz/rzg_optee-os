@@ -12,7 +12,6 @@
  */
 
 #include <asm.S>
-#include <generated/asm-defines.h>
 #include <platform_config.h>
 #include <sm/optee_smc.h>
 #include <sm/teesmc_opteed.h>
@@ -57,13 +56,16 @@ UNWIND(	.cantunwind)
 unhandled_cpu:
 	wfige
 	bge	unhandled_cpu
-
-	ldr	r1, =thread_core_local
+	add	r0, r0, #1
+	ldr	r1, =stack_tmp_stride
 	ldr	r1, [r1]
-	mov	r2, #THREAD_CORE_LOCAL_SIZE
-	/* r3 = r2 * r0 + r1 */
-	mla	r3, r2, r0, r1
-	ldr	sp, [r3, #THREAD_CORE_LOCAL_TMP_STACK_VA_END]
+	mul	r1, r0, r1
+	ldr	r0, =stack_tmp
+#if (STACK_TMP_GUARD != 0)
+	mov_imm	r2, STACK_TMP_GUARD
+	sub	r0, r0, r2
+#endif
+	add	sp, r1, r0
 
 	/* Push our return on the stack as sm_pm_cpu_do_resume expects */
 	adr	lr, after_resume
@@ -80,7 +82,7 @@ after_resume:
 	mov	r0, r5
 	bl	init_sec_mon
 
-	bl	boot_primary_init_intc
+	bl	main_init_gic
 
 	mov	r0, #TEESMC_OPTEED_RETURN_ENTRY_DONE
 	mov	r1, #0

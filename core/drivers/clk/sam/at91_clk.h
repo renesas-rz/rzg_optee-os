@@ -118,19 +118,12 @@ extern const struct clk_master_layout at91sam9x5_master_layout;
 
 vaddr_t at91_pmc_get_base(void);
 
-TEE_Result at91_pmc_clk_get(unsigned int type, unsigned int idx,
-			    struct clk **clk);
-
-TEE_Result pmc_clk_get(struct pmc_data *pmc, unsigned int type,
-		       unsigned int idx, struct clk **clk);
-
-struct clk *at91_sckc_clk_get(void);
-
 struct pmc_data *pmc_data_allocate(unsigned int ncore, unsigned int nsystem,
 				   unsigned int nperiph, unsigned int ngck,
 				   unsigned int npck);
 
-TEE_Result clk_dt_pmc_get(struct dt_pargs *args, void *data, struct clk **clk);
+struct clk *clk_dt_pmc_get(struct dt_driver_phandle_args *args, void *data,
+			   TEE_Result *res);
 
 struct clk *pmc_clk_get_by_name(struct pmc_clk *clks, unsigned int nclk,
 				const char *name);
@@ -158,35 +151,10 @@ struct clk *
 at91_clk_register_plldiv(struct pmc_data *pmc, const char *name,
 			 struct clk *parent);
 
-struct clk *sam9x60_clk_register_frac_pll(struct pmc_data *pmc,
-					  const char *name,
-					  struct clk *parent,
-					  uint8_t id,
-					  const struct clk_pll_charac *charac,
-					  const struct clk_pll_layout *layout,
-					  uint32_t flags);
-
-struct clk *sam9x60_clk_register_div_pll(struct pmc_data *pmc,
-					 const char *name,
-					 struct clk *parent,
-					 uint8_t id,
-					 const struct clk_pll_charac *charac,
-					 const struct clk_pll_layout *layout,
-					 uint32_t flags,
-					 uint32_t safe_div);
-
 /* UTMI */
 struct clk *
 at91_clk_register_utmi(struct pmc_data *pmc, const char *name,
 		       struct clk *parent);
-
-struct clk *at91_clk_sama7g5_register_utmi(struct pmc_data *pmc,
-					   const char *name,
-					   struct clk *parent);
-
-struct clk *sama7_utmi_clk_register(const char *name,
-				    struct clk *parent,
-				    uint8_t id);
 
 /* Master */
 struct clk *
@@ -202,17 +170,6 @@ at91_clk_register_master_div(struct pmc_data *pmc,
 			     const char *name, struct clk *parent,
 			     const struct clk_master_layout *layout,
 			     const struct clk_master_charac *charac);
-
-/*
- * @mux_table: when @mux_table is not NULL it shall hold @num_parents cells
- */
-struct clk *at91_clk_sama7g5_register_master(struct pmc_data *pmc,
-					     const char *name,
-					     int num_parents,
-					     struct clk **parent,
-					     uint32_t *mux_table,
-					     uint8_t id,
-					     int chg_pid);
 
 /* H32MX */
 struct clk *
@@ -245,7 +202,6 @@ struct clk *
 at91_clk_register_generated(struct pmc_data *pmc,
 			    const struct clk_pcr_layout *layout,
 			    const char *name, struct clk **parents,
-			    uint32_t *mux_table,
 			    uint8_t num_parents, uint8_t id,
 			    const struct clk_range *range,
 			    int chg_pid);
@@ -266,15 +222,6 @@ at91_clk_register_audio_pll_pad(struct pmc_data *pmc, const char *name,
 struct clk *
 at91_clk_register_audio_pll_pmc(struct pmc_data *pmc, const char *name,
 				struct clk *parent);
-
-/* CPU OPP (Operation Performance Points) */
-struct clk *at91_cpu_opp_clk_get(void);
-
-TEE_Result at91_clk_register_cpu_opp(const void *fdt, int node,
-				     struct clk *clk);
-
-void sam_set_clock_range(unsigned int pmc_type, unsigned int pmc_id,
-			 const struct clk_range *range);
 
 #ifdef CFG_PM_ARM32
 void pmc_register_id(uint8_t id);

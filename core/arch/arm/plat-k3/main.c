@@ -4,12 +4,15 @@
  *	Andrew F. Davis <afd@ti.com>
  */
 
+#include <platform_config.h>
+
 #include <console.h>
 #include <drivers/gic.h>
 #include <drivers/sec_proxy.h>
 #include <drivers/serial8250_uart.h>
 #include <drivers/ti_sci.h>
 #include <kernel/boot.h>
+#include <kernel/interrupt.h>
 #include <kernel/panic.h>
 #include <kernel/tee_common_otp.h>
 #include <mm/core_memprot.h>
@@ -18,6 +21,7 @@
 #include <stdint.h>
 #include <string_ext.h>
 
+static struct gic_data gic_data;
 static struct serial8250_uart_data console_data;
 
 register_phys_mem_pgdir(MEM_AREA_IO_SEC, GICC_BASE, GICC_SIZE);
@@ -32,24 +36,29 @@ register_phys_mem_pgdir(MEM_AREA_IO_SEC, SEC_PROXY_RT_BASE, SEC_PROXY_RT_SIZE);
 register_ddr(DRAM0_BASE, DRAM0_SIZE);
 register_ddr(DRAM1_BASE, DRAM1_SIZE);
 
-void boot_primary_init_intc(void)
+void main_init_gic(void)
 {
-	gic_init(GICC_BASE, GICD_BASE);
+	gic_init_base_addr(&gic_data, GICC_BASE, GICD_BASE);
+	itr_init(&gic_data.chip);
 }
 
-void boot_secondary_init_intc(void)
+void main_secondary_init_gic(void)
 {
-	gic_init_per_cpu();
+	gic_cpu_init(&gic_data);
 }
 
-void plat_console_init(void)
+void itr_core_handler(void)
+{
+	gic_it_handle(&gic_data);
+}
+
+void console_init(void)
 {
 	serial8250_uart_init(&console_data, CONSOLE_UART_BASE,
 			     CONSOLE_UART_CLK_IN_HZ, CONSOLE_BAUDRATE);
 	register_serial_console(&console_data.chip);
 }
 
-#ifndef PLATFORM_FLAVOR_am62lx
 static TEE_Result init_ti_sci(void)
 {
 	TEE_Result ret = TEE_SUCCESS;
@@ -64,33 +73,7 @@ static TEE_Result init_ti_sci(void)
 
 	return TEE_SUCCESS;
 }
-
-/*
- * TISCI services are required for initialization of TRNG service that gets
- * initialized during service_init_crypto.
- *
- * Initialize TISCI service just before service_init_crypto.
- */
-early_init_late(init_ti_sci);
-
-static TEE_Result secure_boot_information(void)
-{
-	uint32_t keycnt = 0;
-	uint32_t keyrev = 0;
-	uint32_t swrev = 0;
-
-	if (!ti_sci_get_swrev(&swrev))
-		IMSG("Secure Board Configuration Software: Rev %"PRIu32,
-		     swrev);
-
-	if (!ti_sci_get_keycnt_keyrev(&keycnt, &keyrev))
-		IMSG("Secure Boot Keys: Count %"PRIu32 ", Rev %"PRIu32,
-		     keycnt, keyrev);
-
-	return TEE_SUCCESS;
-}
-
-service_init_late(secure_boot_information);
+service_init(init_ti_sci);
 
 TEE_Result tee_otp_get_hw_unique_key(struct tee_hw_unique_key *hwkey)
 {
@@ -112,4 +95,3 @@ TEE_Result tee_otp_get_hw_unique_key(struct tee_hw_unique_key *hwkey)
 
 	return TEE_SUCCESS;
 }
-#endif /* PLATFORM_FLAVOR_am62lx */

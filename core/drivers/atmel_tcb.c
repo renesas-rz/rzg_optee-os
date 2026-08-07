@@ -8,10 +8,10 @@
 #include <drivers/clk_dt.h>
 #include <io.h>
 #include <kernel/boot.h>
-#include <kernel/tee_time.h>
+#include <kernel/time_source.h>
 #include <libfdt.h>
 #include <matrix.h>
-#include <platform_config.h>
+#include <sama5d2.h>
 #include <tee_api_defines.h>
 
 #define TCB_CHAN(chan)		((chan) * 0x40)
@@ -50,12 +50,7 @@
 #define TCB_WPMR		0xe4
 #define  TCB_WPMR_WAKEY		0x54494d
 
-#ifdef CFG_SAMA7G5
-static const char * const tcb_clocks[] = {
-	"t0_clk", "t1_clk", "t2_clk", "slow_clk"};
-#else
 static const char * const tcb_clocks[] = { "t0_clk", "gclk", "slow_clk" };
-#endif
 static vaddr_t tcb_base;
 static uint32_t tcb_rate;
 
@@ -76,7 +71,7 @@ static TEE_Result atmel_tcb_enable_clocks(const void *fdt, int node)
 	return TEE_SUCCESS;
 }
 
-TEE_Result tee_time_get_sys_time(TEE_Time *time)
+static TEE_Result atmel_tcb_get_sys_time(TEE_Time *time)
 {
 	uint64_t cv0 = 0;
 	uint64_t cv1 = 0;
@@ -97,10 +92,13 @@ TEE_Result tee_time_get_sys_time(TEE_Time *time)
 	return TEE_SUCCESS;
 }
 
-uint32_t tee_time_get_sys_time_protection_level(void)
-{
-	return 1000;
-}
+static const struct time_source atmel_tcb_time_source = {
+	.name = "atmel_tcb",
+	.protection_level = 1000,
+	.get_sys_time = atmel_tcb_get_sys_time,
+};
+
+REGISTER_TIME_SOURCE(atmel_tcb_time_source)
 
 static void atmel_tcb_configure(void)
 {
@@ -167,19 +165,20 @@ static TEE_Result atmel_tcb_probe(const void *fdt, int node,
 	if (tcb_base)
 		return TEE_SUCCESS;
 
-	if (fdt_get_status(fdt, node) != DT_STATUS_OK_SEC)
+	if (_fdt_get_status(fdt, node) != DT_STATUS_OK_SEC)
 		return TEE_SUCCESS;
 
 	res = clk_dt_get_by_name(fdt, node, "slow_clk", &clk);
 	if (res)
 		return res;
 
-	res = matrix_dt_get_id(fdt, node, &peri_id);
-	if (res)
-		return res;
-
-	if (dt_map_dev(fdt, node, &tcb_base, &size, DT_MAP_AUTO) < 0)
+	if (dt_map_dev(fdt, node, &tcb_base, &size) < 0)
 		return TEE_ERROR_GENERIC;
+
+	if (tcb_base == AT91C_BASE_TC0)
+		peri_id = AT91C_ID_TC0;
+	else
+		peri_id = AT91C_ID_TC1;
 
 	matrix_configure_periph_secure(peri_id);
 

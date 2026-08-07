@@ -416,12 +416,6 @@
 		reg = <0x00000000 0x80000000 0 0x80000000>;
 	};
 
-	memory@2080000000 {
-		// DRAM space - 1, size : 126 GB DRAM
-		device_type = "memory";
-		reg = <0x00000020 0x80000000 0x0000001F 0x80000000>;
-	};
-
 	ddr1: memory-controller@1080000 {
 		compatible = "fsl,qoriq-memory-controller";
 		reg = <0x0 0x1080000 0x0 0x1000>;
@@ -529,18 +523,6 @@
 			compatible = "fsl,lx2160a-dcfg", "syscon";
 			reg = <0x0 0x1e00000 0x0 0x10000>;
 			little-endian;
-		};
-
-		sfp: sfp@1e80000 {
-			compatible = "fsl,lx2160a-sfp";
-			reg = <0x0 0x1e80000 0x0 0x1000>;
-		};
-
-		sec_mon: sec-mon@1e90000 {
-			compatible = "fsl,lx2160a-sec-mon";
-			reg = <0x0 0x1e90000 0x0 0x1000>;
-			status = "disabled";
-			secure-status = "okay";
 		};
 
 		/* WRIOP0: 0x8b8_0000, E-MDIO1: 0x1_6000 */

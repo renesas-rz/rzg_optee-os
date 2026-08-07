@@ -4,10 +4,10 @@
  *
  */
 
-#ifndef __DRIVERS_PL022_SPI_H
-#define __DRIVERS_PL022_SPI_H
+#ifndef __PL022_SPI_H__
+#define __PL022_SPI_H__
 
-#include <drivers/gpio.h>
+#include <gpio.h>
 #include <spi.h>
 
 #define PL022_REG_SIZE	0x1000
@@ -42,5 +42,5 @@ struct pl022_data {
 
 void pl022_init(struct pl022_data *pd);
 
-#endif	/* __DRIVERS_PL022_SPI_H */
+#endif	/* __PL022_SPI_H__ */
 

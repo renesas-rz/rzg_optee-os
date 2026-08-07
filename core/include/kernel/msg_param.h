@@ -26,10 +26,11 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __KERNEL_MSG_PARAM_H
-#define __KERNEL_MSG_PARAM_H
+#ifndef KERNEL_MSG_PARAM_H
+#define KERNEL_MSG_PARAM_H
 
 #include <compiler.h>
+#include <kernel/msg_param.h>
 #include <mm/mobj.h>
 #include <optee_msg.h>
 #include <stdio.h>
@@ -80,4 +81,4 @@ static inline bool msg_param_attr_is_tmem(uint64_t attr)
 	}
 }
 
-#endif	/*__KERNEL_MSG_PARAM_H*/
+#endif	/*KERNEL_MSG_PARAM_H*/

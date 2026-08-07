@@ -37,27 +37,30 @@ static unsigned int trng_lock = SPINLOCK_UNLOCK;
 
 static vaddr_t xiphera_trng_base;
 
-static bool xiphera_trng_random_available(void)
-{
-	uint32_t status = 0;
-
-	status = io_read32(xiphera_trng_base + STATUS_REG);
-
-	return status == TRNG_NEW_RAND_AVAILABLE;
-}
-
 static uint32_t xiphera_trng_read32(void)
 {
 	uint32_t value = 0;
+	uint32_t exceptions = 0;
+	uint32_t status = 0;
 
-	value = io_read32(xiphera_trng_base + RAND_REG);
+	while (true) {
+		/* Wait until we have value available */
+		status = io_read32(xiphera_trng_base + STATUS_REG);
+		if (status != TRNG_NEW_RAND_AVAILABLE)
+			continue;
 
-	/*
-	 * Ack that RNG value has been consumed and trigger new one to be
-	 * generated
-	 */
-	io_write32(xiphera_trng_base + CONTROL_REG, HOST_TO_TRNG_READ);
-	io_write32(xiphera_trng_base + CONTROL_REG, HOST_TO_TRNG_ENABLE);
+		value = io_read32(xiphera_trng_base + RAND_REG);
+
+		/*
+		 * Ack that RNG value has been consumed and trigger new one to
+		 * be generated
+		 */
+		io_write32(xiphera_trng_base + CONTROL_REG, HOST_TO_TRNG_READ);
+		io_write32(xiphera_trng_base + CONTROL_REG,
+			   HOST_TO_TRNG_ENABLE);
+
+		break;
+	}
 
 	return value;
 }
@@ -69,24 +72,25 @@ void plat_rng_init(void)
 
 TEE_Result hw_get_random_bytes(void *buf, size_t len)
 {
-	uint8_t *rngbuf = buf;
-	uint32_t val = 0;
-	size_t len_to_copy = 0;
+	static union {
+		uint32_t val;
+		uint8_t byte[4];
+	} fifo;
+	static size_t fifo_pos;
+	uint8_t *buffer = buf;
+	size_t buffer_pos = 0;
 
-	assert(buf);
 	assert(xiphera_trng_base);
 
-	while (len) {
+	while (buffer_pos < len) {
 		uint32_t exceptions = cpu_spin_lock_xsave(&trng_lock);
 
-		if (xiphera_trng_random_available()) {
-			val = xiphera_trng_read32();
+		/* Refill our FIFO */
+		if (fifo_pos == 0)
+			fifo.val = xiphera_trng_read32();
 
-			len_to_copy = MIN(len, sizeof(uint32_t));
-			memcpy(rngbuf, &val, len_to_copy);
-			rngbuf += len_to_copy;
-			len -= len_to_copy;
-		}
+		buffer[buffer_pos++] = fifo.byte[fifo_pos++];
+		fifo_pos %= 4;
 
 		cpu_spin_unlock_xrestore(&trng_lock, exceptions);
 	}
@@ -97,7 +101,7 @@ TEE_Result hw_get_random_bytes(void *buf, size_t len)
 static TEE_Result xiphera_trng_probe(const void *fdt, int node,
 				     const void *compat_data __unused)
 {
-	int dt_status = fdt_get_status(fdt, node);
+	int dt_status = _fdt_get_status(fdt, node);
 	uint32_t status = 0;
 	size_t size = 0;
 
@@ -110,7 +114,7 @@ static TEE_Result xiphera_trng_probe(const void *fdt, int node,
 		return TEE_ERROR_GENERIC;
 	}
 
-	if (dt_map_dev(fdt, node, &xiphera_trng_base, &size, DT_MAP_AUTO) < 0)
+	if (dt_map_dev(fdt, node, &xiphera_trng_base, &size) < 0)
 		return TEE_ERROR_GENERIC;
 
 	/*
@@ -134,7 +138,7 @@ static TEE_Result xiphera_trng_probe(const void *fdt, int node,
 		udelay(200);
 		status = io_read32(xiphera_trng_base + STATUS_REG);
 		if (status != TRNG_ACK_RESET) {
-			EMSG("Failed to reset TRNG");
+			EMSG("Failed to reset TRNG\n");
 			return TEE_ERROR_GENERIC;
 		}
 	}
@@ -159,17 +163,17 @@ static TEE_Result xiphera_trng_probe(const void *fdt, int node,
 		 * in debugging TRNG implementation in FPGA
 		 */
 		if (status == TRNG_FAILED_STARTUP) {
-			EMSG("Startup tests have failed");
+			EMSG("Startup tests have failed\n");
 			return TEE_ERROR_GENERIC;
 		}
 
-		EMSG("Startup tests yielded no response -> TRNG stuck");
+		EMSG("Startup tests yielded no response -> TRNG stuck\n");
 		return TEE_ERROR_GENERIC;
 	}
 
 	io_write32(xiphera_trng_base + CONTROL_REG, HOST_TO_TRNG_ACK_ZEROIZE);
 
-	DMSG("TRNG initialized");
+	DMSG("TRNG initialized\n");
 
 	return TEE_SUCCESS;
 }

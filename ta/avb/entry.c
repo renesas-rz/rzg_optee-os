@@ -6,6 +6,7 @@
 #include <tee_internal_api_extensions.h>
 
 #include <string.h>
+#include <util.h>
 
 #define DEFAULT_LOCK_STATE	0
 
@@ -77,7 +78,7 @@ static TEE_Result read_rb_idx(uint32_t pt, TEE_Param params[TEE_NUM_PARAMS])
 						TEE_PARAM_TYPE_NONE);
 	size_t slot_offset;
 	uint64_t idx;
-	size_t count;
+	uint32_t count;
 	TEE_Result res;
 	TEE_ObjectHandle h;
 
@@ -133,7 +134,7 @@ static TEE_Result write_rb_idx(uint32_t pt, TEE_Param params[TEE_NUM_PARAMS])
 	size_t slot_offset;
 	uint64_t widx;
 	uint64_t idx;
-	size_t count;
+	uint32_t count;
 	TEE_Result res;
 	TEE_ObjectHandle h;
 
@@ -181,7 +182,7 @@ static TEE_Result read_lock_state(uint32_t pt, TEE_Param params[TEE_NUM_PARAMS])
 						TEE_PARAM_TYPE_NONE,
 						TEE_PARAM_TYPE_NONE);
 	uint32_t lock_state;
-	size_t count;
+	uint32_t count;
 	TEE_Result res;
 	TEE_ObjectHandle h;
 
@@ -219,7 +220,7 @@ static TEE_Result write_lock_state(uint32_t pt,
 						TEE_PARAM_TYPE_NONE);
 	uint32_t wlock_state;
 	uint32_t lock_state;
-	size_t count;
+	uint32_t count;
 	TEE_Result res;
 	TEE_ObjectHandle h;
 
@@ -238,11 +239,7 @@ static TEE_Result write_lock_state(uint32_t pt,
 	if (count == sizeof(lock_state) && lock_state == wlock_state)
 		goto out;
 
-	res = TEE_SeekObjectData(h, 0, TEE_DATA_SEEK_SET);
-	if (res)
-		goto out;
-
-	res = TEE_WriteObjectData(h, &wlock_state, sizeof(wlock_state));
+	res = create_rb_state(wlock_state, &h);
 out:
 	TEE_CloseObject(h);
 	return res;
@@ -315,7 +312,7 @@ static TEE_Result read_persist_value(uint32_t pt,
 	char *name_buf = NULL;
 	uint32_t value_sz = 0;
 	char *value = NULL;
-	size_t count = 0;
+	uint32_t count = 0;
 
 	if (pt != exp_pt)
 		return TEE_ERROR_BAD_PARAMETERS;

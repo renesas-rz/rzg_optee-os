@@ -7,8 +7,6 @@
 #include <initcall.h>
 #include <kernel/embedded_ts.h>
 #include <kernel/ts_store.h>
-#include <kernel/user_access.h>
-#include <mempool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -26,12 +24,12 @@ struct ts_store_handle {
 static void *zalloc(void *opaque __unused, unsigned int items,
 		    unsigned int size)
 {
-	return mempool_alloc(mempool_default, items * size);
+	return malloc(items * size);
 }
 
 static void zfree(void *opaque __unused, void *address)
 {
-	mempool_free(mempool_default, address);
+	free(address);
 }
 
 static bool decompression_init(z_stream *strm,
@@ -119,48 +117,49 @@ out:
 	return res;
 }
 
-static TEE_Result read_uncompressed(struct ts_store_handle *h, void *data_core,
-				    void *data_user, size_t len)
+static TEE_Result read_uncompressed(struct ts_store_handle *h, void *data,
+				    size_t len)
 {
-	TEE_Result res = TEE_SUCCESS;
 	uint8_t *src = (uint8_t *)h->ts->ts + h->offs;
 	size_t next_offs = 0;
 
 	if (ADD_OVERFLOW(h->offs, len, &next_offs) ||
 	    next_offs > h->ts->size)
 		return TEE_ERROR_BAD_PARAMETERS;
-	if (data_core)
-		memcpy(data_core, src, len);
-	if (data_user)
-		res = copy_to_user(data_user, src, len);
-	if (!res)
-		h->offs = next_offs;
+	if (data)
+		memcpy(data, src, len);
+	h->offs = next_offs;
 
-	return res;
+	return TEE_SUCCESS;
 }
 
-static TEE_Result read_compressed(struct ts_store_handle *h, void *data_core,
-				  void *data_user, size_t len)
+static TEE_Result read_compressed(struct ts_store_handle *h, void *data,
+				  size_t len)
 {
-	TEE_Result res = TEE_SUCCESS;
 	z_stream *strm = &h->strm;
 	size_t total = 0;
-	uint8_t *bb = NULL;
-	size_t bb_len = 0;
+	uint8_t *tmpbuf = NULL;
+	TEE_Result ret = TEE_SUCCESS;
 	size_t out = 0;
 	int st = Z_OK;
 
-	/* Inflate into a 1kB bounce buffer */
-	bb_len = MIN(len, 1024U);
-	bb = bb_alloc(bb_len);
-	if (!bb) {
-		EMSG("Out of memory");
-		return TEE_ERROR_OUT_OF_MEMORY;
+	if (data) {
+		strm->next_out = data;
+		strm->avail_out = len;
+	} else {
+		/*
+		 * inflate() does not support a NULL strm->next_out. So, to
+		 * discard data, we have to allocate a temporary buffer. 1K
+		 * seems reasonable.
+		 */
+		strm->avail_out = MIN(len, 1024U);
+		tmpbuf = malloc(strm->avail_out);
+		if (!tmpbuf) {
+			EMSG("Out of memory");
+			return TEE_ERROR_OUT_OF_MEMORY;
+		}
+		strm->next_out = tmpbuf;
 	}
-
-	strm->avail_out = bb_len;
-	strm->next_out = bb;
-
 	/*
 	 * Loop until we get as many bytes as requested, or an error occurs.
 	 * inflate() returns:
@@ -175,43 +174,36 @@ static TEE_Result read_compressed(struct ts_store_handle *h, void *data_core,
 		out = strm->total_out;
 		st = inflate(strm, Z_SYNC_FLUSH);
 		out = strm->total_out - out;
-		FMSG("%zu bytes", out);
-		if (data_core)
-			memcpy((uint8_t *)data_core + total, bb, out);
-		if (data_user) {
-			res = copy_to_user((uint8_t *)data_user + total, bb,
-					   out);
-			if (res)
-				goto out;
-		}
 		total += out;
-		/*
-		 * Reset the pointer since we've just copied out the last
-		 * data.
-		 */
-		strm->next_out = bb;
-		strm->avail_out = MIN(len - total, bb_len);
+		FMSG("%zu bytes", out);
+		if (!data) {
+			/*
+			 * Reset the pointer to throw away what we've just read
+			 * and read again as much as possible.
+			 */
+			strm->next_out = tmpbuf;
+			strm->avail_out = MIN(len - total, 1024U);
+		}
 	} while ((st == Z_OK || st == Z_BUF_ERROR) && (total != len));
 
 	if (st != Z_OK && st != Z_STREAM_END) {
 		EMSG("Decompression error (%d)", st);
-		res = TEE_ERROR_GENERIC;
+		ret = TEE_ERROR_GENERIC;
 		goto out;
 	}
-	res = TEE_SUCCESS;
+	ret = TEE_SUCCESS;
 out:
-	bb_free(bb, bb_len);
+	free(tmpbuf);
 
-	return res;
+	return ret;
 }
 
-TEE_Result emb_ts_read(struct ts_store_handle *h, void *data_core,
-		       void *data_user, size_t len)
+TEE_Result emb_ts_read(struct ts_store_handle *h, void *data, size_t len)
 {
 	if (h->ts->uncompressed_size)
-		return read_compressed(h, data_core, data_user, len);
+		return read_compressed(h, data, len);
 	else
-		return read_uncompressed(h, data_core, data_user, len);
+		return read_uncompressed(h, data, len);
 }
 
 void emb_ts_close(struct ts_store_handle *h)

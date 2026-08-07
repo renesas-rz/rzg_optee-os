@@ -72,22 +72,12 @@
 #define UART1_BASE		0x09040000
 
 #define IT_UART1		40
-#if defined(CFG_CORE_SEL2_SPMC)
-#define IT_SEC_PHY_TIMER	3
-#else
-#define IT_SEC_PHY_TIMER	29
-#endif
 
 #define CONSOLE_UART_BASE	UART1_BASE
 #define IT_CONSOLE_UART		IT_UART1
 
-#elif defined(PLATFORM_FLAVOR_qemu_sbsa)
-#define GIC_BASE		0x40060000
-#define SECURE_UART_BASE	0x60030000
-#define IT_SECURE_UART		40
+#define TPM2_BASE		0x0c000000
 
-#define CONSOLE_UART_BASE	SECURE_UART_BASE
-#define IT_CONSOLE_UART		IT_SECURE_UART
 #else
 #error "Unknown platform flavor"
 #endif
@@ -108,10 +98,6 @@
 
 #define GICC_OFFSET		0x0
 #define GICD_OFFSET		0x3000000
-#ifdef CFG_ARM_GICV3
-#define GIC_REDIST_BASE		0x2F100000
-#define GIC_REDIST_SIZE		0x00100000
-#endif
 
 #elif defined(PLATFORM_FLAVOR_juno)
 /*
@@ -142,22 +128,15 @@
 
 #define GICD_OFFSET		0
 #define GICC_OFFSET		0x10000
-#ifdef CFG_ARM_GICV3
-#define GIC_REDIST_BASE		0x080A0000
-#define GIC_REDIST_SIZE		0x00F60000
-#endif
 
-#elif defined(PLATFORM_FLAVOR_qemu_sbsa)
-#define GICD_OFFSET		0
-#define GICC_OFFSET		0x10000
-#define GIC_REDIST_BASE		0x40080000
-#define GIC_REDIST_SIZE		0x04000000
 #else
 #error "Unknown platform flavor"
 #endif
 
+#ifdef GIC_BASE
 #define GICD_BASE		(GIC_BASE + GICD_OFFSET)
 #define GICC_BASE		(GIC_BASE + GICC_OFFSET)
+#endif
 
 #ifndef UART_BAUDRATE
 #define UART_BAUDRATE		115200

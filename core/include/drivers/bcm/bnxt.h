@@ -3,8 +3,8 @@
  * Copyright 2019 Broadcom.
  */
 
-#ifndef __DRIVERS_BCM_BNXT_H
-#define __DRIVERS_BCM_BNXT_H
+#ifndef BNXT_H
+#define BNXT_H
 
 #include <compiler.h>
 #include <io.h>

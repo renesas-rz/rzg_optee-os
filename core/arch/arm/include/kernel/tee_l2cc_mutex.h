@@ -2,9 +2,8 @@
 /*
  * Copyright (c) 2014, STMicroelectronics International N.V.
  */
-#ifndef __KERNEL_TEE_L2CC_MUTEX_H
-#define __KERNEL_TEE_L2CC_MUTEX_H
-
+#ifndef TEE_L2CC_MUTEX_H
+#define TEE_L2CC_MUTEX_H
 #include <inttypes.h>
 #include <tee_api_types.h>
 #include <tee_api_defines.h>
@@ -48,4 +47,4 @@ static inline TEE_Result tee_set_l2cc_mutex(paddr_t *mutex __unused)
 }
 #endif
 
-#endif /* __KERNEL_TEE_L2CC_MUTEX_H */
+#endif /* TEE_L2CC_MUTEX_H */

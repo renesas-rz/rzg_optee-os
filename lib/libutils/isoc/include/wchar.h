@@ -2,7 +2,7 @@
 /*
  * Copyright (c) 2014, STMicroelectronics International N.V.
  */
-#ifndef __WCHAR_H
-#define __WCHAR_H
+#ifndef WCHAR_H
+#define WCHAR_H
 
-#endif /*__WCHAR_H*/
+#endif /*WCHAR_H*/

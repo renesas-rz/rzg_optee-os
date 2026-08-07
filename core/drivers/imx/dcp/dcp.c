@@ -299,7 +299,8 @@ TEE_Result dcp_cmac(struct dcp_cipher_init *init, uint8_t *input,
 		goto out;
 
 	/* Get number of block */
-	nb_blocks = ROUNDUP_DIV(input_size, DCP_AES128_BLOCK_SIZE);
+	nb_blocks = ROUNDUP(input_size, DCP_AES128_BLOCK_SIZE) /
+		    DCP_AES128_BLOCK_SIZE;
 
 	block_complete = nb_blocks && !(input_size % DCP_AES128_BLOCK_SIZE);
 	if (nb_blocks == 0)
@@ -693,7 +694,7 @@ static TEE_Result dcp_pbase(paddr_t *base)
 		return TEE_ERROR_ITEM_NOT_FOUND;
 	}
 
-	if (fdt_get_status(fdt, node) == DT_STATUS_DISABLED)
+	if (_fdt_get_status(fdt, node) == DT_STATUS_DISABLED)
 		return TEE_ERROR_ITEM_NOT_FOUND;
 
 	/* Force secure-status = "okay" and status="disabled" */
@@ -702,7 +703,7 @@ static TEE_Result dcp_pbase(paddr_t *base)
 		return TEE_ERROR_NOT_SUPPORTED;
 	}
 
-	*base = fdt_reg_base_address(fdt, node);
+	*base = _fdt_reg_base_address(fdt, node);
 	if (*base == DT_INFO_INVALID_REG) {
 		EMSG("Unable to get the DCP Base address");
 		return TEE_ERROR_ITEM_NOT_FOUND;

@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: BSD-2-Clause
 /*
- * Copyright (c) 2021-2024, Arm Limited
+ * Copyright (c) 2021-2022, Arm Limited
  */
 #include <assert.h>
+#include <bench.h>
 #include <io.h>
 #include <kernel/panic.h>
 #include <kernel/secure_partition.h>
@@ -18,27 +19,30 @@
 
 static unsigned int mem_ref_lock = SPINLOCK_UNLOCK;
 
-void spmc_sp_start_thread(struct thread_smc_1_2_regs *args)
+void spmc_sp_start_thread(struct thread_smc_args *args)
 {
-	thread_sp_alloc_and_run(&args->arg11);
+	thread_sp_alloc_and_run(args);
 }
 
-static void ffa_set_error(struct thread_smc_1_2_regs *args, uint32_t error)
+static void ffa_set_error(struct thread_smc_args *args, uint32_t error)
 {
-	spmc_set_args(args, FFA_ERROR, FFA_PARAM_MBZ, error, FFA_PARAM_MBZ,
-		      FFA_PARAM_MBZ, FFA_PARAM_MBZ);
+	args->a0 = FFA_ERROR;
+	args->a2 = error;
 }
 
-static void ffa_success(struct thread_smc_1_2_regs *args)
+static void ffa_success(struct thread_smc_args *args)
 {
-	spmc_set_args(args, FFA_SUCCESS_32, 0, 0, 0, 0, 0);
+	args->a0 = FFA_SUCCESS_32;
 }
 
-static TEE_Result ffa_get_dst(struct thread_smc_1_2_regs *args,
+static TEE_Result ffa_get_dst(struct thread_smc_args *args,
 			      struct sp_session *caller,
 			      struct sp_session **dst)
 {
 	struct sp_session *s = NULL;
+
+	if (args->a2 != FFA_PARAM_MBZ)
+		return FFA_INVALID_PARAMETERS;
 
 	s = sp_get_session(FFA_DST(args->a1));
 
@@ -121,32 +125,22 @@ static int add_mem_region_to_sp(struct ffa_mem_access *mem_acc,
 	return FFA_OK;
 }
 
-static void spmc_sp_handle_mem_share(struct thread_smc_1_2_regs *args,
+static void spmc_sp_handle_mem_share(struct thread_smc_args *args,
 				     struct ffa_rxtx *rxtx,
 				     struct sp_session *owner_sp)
 {
-	struct ffa_mem_transaction_x mem_trans = { };
-	uint32_t tot_len = args->a1;
-	uint32_t frag_len = args->a2;
 	uint64_t global_handle = 0;
 	int res = FFA_OK;
+	uint32_t ret_w2 = 0;
+	uint32_t ret_w3 = 0;
 
 	cpu_spin_lock(&rxtx->spinlock);
 
-	/* Descriptor fragments or custom buffers aren't supported yet. */
-	if (frag_len != tot_len || args->a3 || args->a4)
-		res = FFA_NOT_SUPPORTED;
-	else if (frag_len > rxtx->size)
-		res = FFA_INVALID_PARAMETERS;
-	else
-		res = spmc_read_mem_transaction(rxtx->ffa_vers, rxtx->rx,
-						frag_len, &mem_trans);
-	if (!res)
-		res = spmc_sp_add_share(&mem_trans, rxtx, tot_len, frag_len,
-					&global_handle, owner_sp);
+	res = spmc_sp_add_share(rxtx, args->a1, &global_handle, owner_sp);
 	if (!res) {
-		args->a3 = high32_from_64(global_handle);
-		args->a2 = low32_from_64(global_handle);
+		reg_pair_from_64(global_handle, &ret_w3, &ret_w2);
+		args->a3 = ret_w3;
+		args->a2 = ret_w2;
 		args->a1 = FFA_PARAM_MBZ;
 		args->a0 = FFA_SUCCESS_32;
 	} else {
@@ -276,9 +270,9 @@ clean_up:
 	return res;
 }
 
-int spmc_sp_add_share(struct ffa_mem_transaction_x *mem_trans,
-		      struct ffa_rxtx *rxtx, size_t blen, size_t flen,
-		      uint64_t *global_handle, struct sp_session *owner_sp)
+int spmc_sp_add_share(struct ffa_rxtx *rxtx,
+		      size_t blen, uint64_t *global_handle,
+		      struct sp_session *owner_sp)
 {
 	int res = FFA_INVALID_PARAMETERS;
 	unsigned int num_mem_accs = 0;
@@ -288,19 +282,10 @@ int spmc_sp_add_share(struct ffa_mem_transaction_x *mem_trans,
 	size_t addr_range_offs = 0;
 	struct ffa_mem_region *mem_reg = NULL;
 	uint8_t highest_permission = 0;
-	struct sp_mem *smem = NULL;
-	uint16_t sender_id = mem_trans->sender_id;
-	size_t addr_range_cnt = 0;
-	struct ffa_address_range *addr_range = NULL;
-	size_t total_page_count = 0;
-	size_t page_count_sum = 0;
+	struct sp_mem *smem = sp_mem_new();
+	struct ffa_mem_transaction *input_descr = rxtx->rx;
+	uint16_t sender_id = READ_ONCE(input_descr->sender_id);
 
-	if (blen != flen) {
-		DMSG("Fragmented memory share is not supported for SPs");
-		return FFA_NOT_SUPPORTED;
-	}
-
-	smem = sp_mem_new();
 	if (!smem)
 		return FFA_NO_MEMORY;
 
@@ -310,85 +295,49 @@ int spmc_sp_add_share(struct ffa_mem_transaction_x *mem_trans,
 		goto cleanup;
 	}
 
-	num_mem_accs = mem_trans->mem_access_count;
-	mem_acc = (void *)((vaddr_t)rxtx->rx + mem_trans->mem_access_offs);
+	num_mem_accs = READ_ONCE(input_descr->mem_access_count);
+	mem_acc = input_descr->mem_access_array;
 
 	if (!num_mem_accs) {
-		res = FFA_INVALID_PARAMETERS;
+		res = FFA_DENIED;
 		goto cleanup;
 	}
 
 	/* Store the ffa_mem_transaction */
 	smem->sender_id = sender_id;
-	smem->mem_reg_attr = mem_trans->mem_reg_attr;
-	smem->flags = mem_trans->flags;
-	smem->tag = mem_trans->tag;
+	smem->mem_reg_attr = READ_ONCE(input_descr->mem_reg_attr);
+	smem->flags = READ_ONCE(input_descr->flags);
+	smem->tag = READ_ONCE(input_descr->tag);
 
 	if (MUL_OVERFLOW(num_mem_accs, sizeof(*mem_acc), &needed_size) ||
-	    ADD_OVERFLOW(needed_size, mem_trans->mem_access_offs,
-			 &needed_size) || needed_size > blen) {
-		res = FFA_INVALID_PARAMETERS;
+	    ADD_OVERFLOW(needed_size, sizeof(*input_descr), &needed_size) ||
+	    needed_size > blen) {
+		res = FFA_NO_MEMORY;
 		goto cleanup;
 	}
 
 	for (i = 0; i < num_mem_accs; i++)
 		highest_permission |= READ_ONCE(mem_acc[i].access_perm.perm);
 
-	/* Check if the memory region array fits into the buffer */
 	addr_range_offs = READ_ONCE(mem_acc[0].region_offs);
-
-	if (ADD_OVERFLOW(addr_range_offs, sizeof(*mem_reg), &needed_size) ||
-	    needed_size > blen) {
-		res = FFA_INVALID_PARAMETERS;
-		goto cleanup;
-	}
-
-	mem_reg = (void *)((char *)rxtx->rx + addr_range_offs);
-	addr_range_cnt = READ_ONCE(mem_reg->address_range_count);
-	total_page_count = READ_ONCE(mem_reg->total_page_count);
-
-	/* Memory transaction without address ranges or pages is invalid */
-	if (!addr_range_cnt || !total_page_count) {
-		res = FFA_INVALID_PARAMETERS;
-		goto cleanup;
-	}
-
-	/* Check if the region descriptors fit into the buffer */
-	if (MUL_OVERFLOW(addr_range_cnt, sizeof(*addr_range), &needed_size) ||
-	    ADD_OVERFLOW(needed_size, addr_range_offs, &needed_size) ||
-	    needed_size > blen) {
-		res = FFA_INVALID_PARAMETERS;
-		goto cleanup;
-	}
-
-	page_count_sum = 0;
-	for (i = 0; i < addr_range_cnt; i++) {
-		addr_range = &mem_reg->address_range_array[i];
-
-		/* Memory region without pages is invalid */
-		if (!addr_range->page_count) {
-			res = FFA_INVALID_PARAMETERS;
-			goto cleanup;
-		}
-
-		/* Sum the page count of each region */
-		if (ADD_OVERFLOW(page_count_sum, addr_range->page_count,
-				 &page_count_sum)) {
-			res = FFA_INVALID_PARAMETERS;
-			goto cleanup;
-		}
-	}
-
-	/* Validate total page count */
-	if (total_page_count != page_count_sum) {
-		res = FFA_INVALID_PARAMETERS;
-		goto cleanup;
-	}
+	mem_reg = (void *)((char *)input_descr + addr_range_offs);
 
 	/* Iterate over all the addresses */
 	if (owner_sp) {
-		for (i = 0; i < addr_range_cnt; i++) {
+		size_t address_range = READ_ONCE(mem_reg->address_range_count);
+
+		for (i = 0; i < address_range; i++) {
+			struct ffa_address_range *addr_range = NULL;
+
 			addr_range = &mem_reg->address_range_array[i];
+
+			if (!core_is_buffer_inside((vaddr_t)addr_range,
+						   sizeof(*addr_range),
+						   (vaddr_t)rxtx->rx,
+						   rxtx->size)) {
+				res = FFA_NO_MEMORY;
+				goto cleanup;
+			}
 			res = spmc_sp_add_sp_region(smem, addr_range,
 						    owner_sp,
 						    highest_permission);
@@ -417,56 +366,30 @@ cleanup:
 	return res;
 }
 
-void spmc_sp_set_to_preempted(struct ts_session *ts_sess)
-{
-	if (ts_sess && is_sp_ctx(ts_sess->ctx)) {
-		struct sp_session *sp_sess = to_sp_session(ts_sess);
-
-		assert(sp_sess->state == sp_busy);
-		sp_sess->state = sp_preempted;
-	}
-}
-
-int spmc_sp_resume_from_preempted(uint16_t endpoint_id)
-{
-	struct sp_session *sp_sess = sp_get_session(endpoint_id);
-
-	if (!sp_sess)
-		return FFA_INVALID_PARAMETERS;
-
-	if (sp_sess->state != sp_preempted)
-		return FFA_DENIED;
-
-	sp_sess->state = sp_busy;
-
-	return FFA_OK;
-}
-
 static bool check_rxtx(struct ffa_rxtx *rxtx)
 {
 	return rxtx && rxtx->rx && rxtx->tx && rxtx->size > 0;
 }
 
-static TEE_Result
-check_retrieve_request(struct sp_mem_receiver *receiver, uint32_t ffa_vers,
-		       struct ffa_mem_transaction_x *mem_trans,
-		       void *rx, struct sp_mem *smem, int64_t tx_len)
+static TEE_Result check_retrieve_request(struct sp_mem_receiver *receiver,
+					 struct ffa_mem_transaction *retr_dsc,
+					 struct sp_mem *smem, int64_t tx_len)
 {
 	struct ffa_mem_access *retr_access = NULL;
 	uint8_t share_perm = receiver->perm.perm;
 	uint32_t retr_perm = 0;
-	uint32_t retr_flags = mem_trans->flags;
-	uint64_t retr_tag = mem_trans->tag;
+	uint32_t retr_flags = READ_ONCE(retr_dsc->flags);
+	uint64_t retr_tag = READ_ONCE(retr_dsc->tag);
 	struct sp_mem_map_region *reg = NULL;
 
 	/*
 	 * The request came from the endpoint. It should only have one
 	 * ffa_mem_access element
 	 */
-	if (mem_trans->mem_access_count != 1)
+	if (READ_ONCE(retr_dsc->mem_access_count) != 1)
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	retr_access = (void *)((vaddr_t)rx + mem_trans->mem_access_offs);
+	retr_access = retr_dsc->mem_access_array;
 	retr_perm = READ_ONCE(retr_access->access_perm.perm);
 
 	/* Check if tag is correct */
@@ -497,11 +420,8 @@ check_retrieve_request(struct sp_mem_receiver *receiver, uint32_t ffa_vers,
 	/*
 	 * Check if there is enough space in the tx buffer to send the respons.
 	 */
-	if (ffa_vers <= FFA_VERSION_1_0)
-		tx_len -= sizeof(struct ffa_mem_transaction_1_0);
-	else
-		tx_len -= sizeof(struct ffa_mem_transaction_1_1);
-	tx_len -= sizeof(struct ffa_mem_access) +
+	tx_len -= sizeof(struct ffa_mem_transaction) +
+		  sizeof(struct ffa_mem_access) +
 		  sizeof(struct ffa_mem_region);
 
 	if (tx_len < 0)
@@ -516,64 +436,42 @@ check_retrieve_request(struct sp_mem_receiver *receiver, uint32_t ffa_vers,
 	return TEE_SUCCESS;
 }
 
-static void create_retrieve_response(uint32_t ffa_vers, void *dst_buffer,
+static void create_retrieve_response(void *dst_buffer,
 				     struct sp_mem_receiver *receiver,
 				     struct sp_mem *smem, struct sp_session *s)
 {
 	size_t off = 0;
 	struct ffa_mem_region *dst_region =  NULL;
+	struct ffa_mem_transaction *d_ds = dst_buffer;
 	struct ffa_address_range *addr_dst = NULL;
 	struct sp_mem_map_region *reg = NULL;
-	struct ffa_mem_access *mem_acc = NULL;
 
 	/*
-	 * we respond with a ffa_mem_retrieve_resp which defines the
-	 * following data in the rx buffer of the sp.
+	 * We respond with a FFA_MEM_RETRIEVE_RESP which defines the
+	 * following data in the rx buffer of the SP.
 	 * struct mem_transaction_descr
-	 * struct mem_access_descr (always 1 element)
+	 * struct mem_access_descr (always 1 Element)
 	 * struct mem_region_descr
 	 */
-	if (ffa_vers <= FFA_VERSION_1_0) {
-		struct ffa_mem_transaction_1_0 *d_ds = dst_buffer;
+	/* Copy the mem_transaction_descr */
+	d_ds->sender_id = receiver->smem->sender_id;
+	d_ds->mem_reg_attr = receiver->smem->mem_reg_attr;
+	d_ds->flags = receiver->smem->flags;
+	d_ds->tag = receiver->smem->tag;
 
-		memset(d_ds, 0, sizeof(*d_ds));
+	off = sizeof(struct ffa_mem_transaction) +
+	      sizeof(struct ffa_mem_access);
 
-		off = sizeof(*d_ds);
-		mem_acc = d_ds->mem_access_array;
-
-		/* copy the mem_transaction_descr */
-		d_ds->sender_id = receiver->smem->sender_id;
-		d_ds->mem_reg_attr = receiver->smem->mem_reg_attr;
-		d_ds->flags = FFA_MEMORY_TRANSACTION_TYPE_SHARE;
-		d_ds->tag = receiver->smem->tag;
-		d_ds->mem_access_count = 1;
-	} else {
-		struct ffa_mem_transaction_1_1 *d_ds = dst_buffer;
-
-		memset(d_ds, 0, sizeof(*d_ds));
-
-		off = sizeof(*d_ds);
-		mem_acc = (void *)(d_ds + 1);
-
-		d_ds->sender_id = receiver->smem->sender_id;
-		d_ds->mem_reg_attr = receiver->smem->mem_reg_attr;
-		d_ds->flags = FFA_MEMORY_TRANSACTION_TYPE_SHARE;
-		d_ds->tag = receiver->smem->tag;
-		d_ds->mem_access_size = sizeof(*mem_acc);
-		d_ds->mem_access_count = 1;
-		d_ds->mem_access_offs = off;
-	}
-
-	off += sizeof(struct ffa_mem_access);
-	dst_region = (struct ffa_mem_region *)(mem_acc + 1);
+	d_ds->mem_access_count = 1;
 
 	/* Copy the mem_accsess_descr */
-	mem_acc[0].region_offs = off;
-	memcpy(&mem_acc[0].access_perm, &receiver->perm,
-	       sizeof(struct ffa_mem_access_perm));
+	d_ds->mem_access_array[0].region_offs = off;
+	memcpy(&d_ds->mem_access_array[0].access_perm,
+	       &receiver->perm, sizeof(struct ffa_mem_access_perm));
 
 	/* Copy the mem_region_descr */
-	memset(dst_region, 0, sizeof(*dst_region));
+	dst_region = (struct ffa_mem_region *)((vaddr_t)d_ds + off);
+
 	dst_region->address_range_count = 0;
 	dst_region->total_page_count = 0;
 
@@ -593,16 +491,13 @@ static void create_retrieve_response(uint32_t ffa_vers, void *dst_buffer,
 	}
 }
 
-static void ffa_mem_retrieve(struct thread_smc_1_2_regs *args,
+static void ffa_mem_retrieve(struct thread_smc_args *args,
 			     struct sp_session *caller_sp,
 			     struct ffa_rxtx *rxtx)
 {
-	struct ffa_mem_transaction_x mem_trans = { };
-	uint32_t tot_len = args->a1;
-	uint32_t frag_len = args->a2;
 	int ret = FFA_OK;
 	size_t tx_len = 0;
-	struct ffa_mem_access *mem_acc = NULL;
+	struct ffa_mem_transaction *retr_dsc = NULL;
 	struct ffa_mem_region *mem_region = NULL;
 	uint64_t va = 0;
 	struct sp_mem *smem = NULL;
@@ -615,24 +510,11 @@ static void ffa_mem_retrieve(struct thread_smc_1_2_regs *args,
 		ret = FFA_DENIED;
 		goto err;
 	}
-	/* Descriptor fragments aren't supported yet. */
-	if (frag_len != tot_len) {
-		ret = FFA_NOT_SUPPORTED;
-		goto err;
-	}
-	if (frag_len > rxtx->size) {
-		ret = FFA_INVALID_PARAMETERS;
-		goto err;
-	}
 
 	tx_len = rxtx->size;
+	retr_dsc = rxtx->rx;
 
-	ret = spmc_read_mem_transaction(rxtx->ffa_vers, rxtx->rx, frag_len,
-					&mem_trans);
-	if (ret)
-		goto err;
-
-	smem = sp_mem_get(mem_trans.global_handle);
+	smem = sp_mem_get(retr_dsc->global_handle);
 	if (!smem) {
 		DMSG("Incorrect handle");
 		ret = FFA_DENIED;
@@ -641,9 +523,7 @@ static void ffa_mem_retrieve(struct thread_smc_1_2_regs *args,
 
 	receiver = sp_mem_get_receiver(caller_sp->endpoint_id, smem);
 
-	mem_acc = (void *)((vaddr_t)rxtx->rx + mem_trans.mem_access_offs);
-
-	address_offset = READ_ONCE(mem_acc[0].region_offs);
+	address_offset = READ_ONCE(retr_dsc->mem_access_array[0].region_offs);
 
 	if (ADD_OVERFLOW(address_offset, sizeof(struct ffa_mem_region),
 			 &needed_size) || needed_size > tx_len) {
@@ -651,8 +531,8 @@ static void ffa_mem_retrieve(struct thread_smc_1_2_regs *args,
 		goto err;
 	}
 
-	if (check_retrieve_request(receiver, rxtx->ffa_vers, &mem_trans,
-				   rxtx->rx, smem, tx_len) != TEE_SUCCESS) {
+	if (check_retrieve_request(receiver, retr_dsc, smem, tx_len) !=
+	    TEE_SUCCESS) {
 		ret = FFA_INVALID_PARAMETERS;
 		goto err;
 	}
@@ -677,7 +557,7 @@ static void ffa_mem_retrieve(struct thread_smc_1_2_regs *args,
 		 * Try to map the memory linked to the handle in
 		 * sp_mem_access_descr.
 		 */
-		mem_region = (struct ffa_mem_region *)((vaddr_t)rxtx->rx +
+		mem_region = (struct ffa_mem_region *)((vaddr_t)retr_dsc +
 						       address_offset);
 
 		va = READ_ONCE(mem_region->address_range_array[0].address);
@@ -695,8 +575,7 @@ static void ffa_mem_retrieve(struct thread_smc_1_2_regs *args,
 		cpu_spin_unlock_xrestore(&mem_ref_lock, exceptions);
 	}
 
-	create_retrieve_response(rxtx->ffa_vers, rxtx->tx, receiver, smem,
-				 caller_sp);
+	create_retrieve_response(rxtx->tx, receiver, smem, caller_sp);
 
 	args->a0 = FFA_MEM_RETRIEVE_RESP;
 	args->a1 = tx_len;
@@ -709,7 +588,7 @@ err:
 	ffa_set_error(args, ret);
 }
 
-static void ffa_mem_relinquish(struct thread_smc_1_2_regs *args,
+static void ffa_mem_relinquish(struct thread_smc_args *args,
 			       struct sp_session *caller_sp,
 			       struct ffa_rxtx  *rxtx)
 {
@@ -804,11 +683,12 @@ static void zero_mem_region(struct sp_mem *smem, struct sp_session *s)
  * After this thread_spmc calls handle_mem_reclaim() to make sure that the
  * region is reclaimed from the OP-TEE endpoint.
  */
-bool ffa_mem_reclaim(struct thread_smc_1_2_regs *args,
+bool ffa_mem_reclaim(struct thread_smc_args *args,
 		     struct sp_session *caller_sp)
 {
 	uint64_t handle = reg_pair_to_64(args->a2, args->a1);
 	uint32_t flags = args->a3;
+	uint32_t endpoint = 0;
 	struct sp_mem *smem = NULL;
 	struct sp_mem_receiver *receiver  = NULL;
 	uint32_t exceptions = 0;
@@ -817,12 +697,12 @@ bool ffa_mem_reclaim(struct thread_smc_1_2_regs *args,
 	if (!smem)
 		return false;
 
-	/*
-	 * If the caller is an SP, make sure that it is the owner of the share.
-	 * If the call comes from NWd this is ensured by the hypervisor.
-	 */
-	if (caller_sp && caller_sp->endpoint_id != smem->sender_id) {
-		ffa_set_error(args, FFA_INVALID_PARAMETERS);
+	if (caller_sp)
+		endpoint = caller_sp->endpoint_id;
+
+	/* Make sure that the caller is the owner of the share */
+	if (smem->sender_id != endpoint) {
+		ffa_set_error(args, FFA_DENIED);
 		return true;
 	}
 
@@ -860,11 +740,16 @@ bool ffa_mem_reclaim(struct thread_smc_1_2_regs *args,
 }
 
 static struct sp_session *
-ffa_handle_sp_direct_req(struct thread_smc_1_2_regs *args,
+ffa_handle_sp_direct_req(struct thread_smc_args *args,
 			 struct sp_session *caller_sp)
 {
 	struct sp_session *dst = NULL;
 	TEE_Result res = FFA_OK;
+
+	if (args->a2 != FFA_PARAM_MBZ) {
+		ffa_set_error(args, FFA_INVALID_PARAMETERS);
+		return NULL;
+	}
 
 	res = ffa_get_dst(args, caller_sp, &dst);
 	if (res) {
@@ -875,65 +760,7 @@ ffa_handle_sp_direct_req(struct thread_smc_1_2_regs *args,
 	if (!dst) {
 		EMSG("Request to normal world not supported");
 		ffa_set_error(args, FFA_NOT_SUPPORTED);
-		return caller_sp;
-	}
-
-	if (dst == caller_sp) {
-		EMSG("Cannot send message to own ID");
-		ffa_set_error(args, FFA_INVALID_PARAMETERS);
-		return caller_sp;
-	}
-
-	if (caller_sp &&
-	    !(caller_sp->props & FFA_PART_PROP_DIRECT_REQ_SEND)) {
-		EMSG("SP 0x%"PRIx16" doesn't support sending direct requests",
-		     caller_sp->endpoint_id);
-		ffa_set_error(args, FFA_NOT_SUPPORTED);
-		return caller_sp;
-	}
-
-	if (!(dst->props & FFA_PART_PROP_DIRECT_REQ_RECV)) {
-		EMSG("SP 0x%"PRIx16" doesn't support receipt of direct requests",
-		     dst->endpoint_id);
-		ffa_set_error(args, FFA_NOT_SUPPORTED);
-		return caller_sp;
-	}
-
-	if (args->a2 & FFA_MSG_FLAG_FRAMEWORK) {
-		switch (args->a2 & FFA_MSG_TYPE_MASK) {
-		case FFA_MSG_SEND_VM_CREATED:
-			/* The sender must be the NWd hypervisor (ID 0) */
-			if (FFA_SRC(args->a1) != 0 || caller_sp) {
-				ffa_set_error(args, FFA_INVALID_PARAMETERS);
-				return caller_sp;
-			}
-
-			/* The SP must be subscribed for this message */
-			if (!(dst->props & FFA_PART_PROP_NOTIF_CREATED)) {
-				ffa_set_error(args, FFA_INVALID_PARAMETERS);
-				return caller_sp;
-			}
-			break;
-		case FFA_MSG_SEND_VM_DESTROYED:
-			/* The sender must be the NWd hypervisor (ID 0) */
-			if (FFA_SRC(args->a1) != 0 || caller_sp) {
-				ffa_set_error(args, FFA_INVALID_PARAMETERS);
-				return caller_sp;
-			}
-
-			/* The SP must be subscribed for this message */
-			if (!(dst->props & FFA_PART_PROP_NOTIF_DESTROYED)) {
-				ffa_set_error(args, FFA_INVALID_PARAMETERS);
-				return caller_sp;
-			}
-			break;
-		default:
-			ffa_set_error(args, FFA_NOT_SUPPORTED);
-			return caller_sp;
-		}
-	} else if (args->a2 != FFA_PARAM_MBZ) {
-		ffa_set_error(args, FFA_INVALID_PARAMETERS);
-		return caller_sp;
+		return NULL;
 	}
 
 	cpu_spin_lock(&dst->spinlock);
@@ -966,7 +793,7 @@ ffa_handle_sp_direct_req(struct thread_smc_1_2_regs *args,
 }
 
 static struct sp_session *
-ffa_handle_sp_direct_resp(struct thread_smc_1_2_regs *args,
+ffa_handle_sp_direct_resp(struct thread_smc_args *args,
 			  struct sp_session *caller_sp)
 {
 	struct sp_session *dst = NULL;
@@ -985,44 +812,7 @@ ffa_handle_sp_direct_resp(struct thread_smc_1_2_regs *args,
 		return caller_sp;
 	}
 
-	if (args->a2 & FFA_MSG_FLAG_FRAMEWORK) {
-		switch (args->a2 & FFA_MSG_TYPE_MASK) {
-		case FFA_MSG_RESP_VM_CREATED:
-			/* The destination must be the NWd hypervisor (ID 0) */
-			if (FFA_DST(args->a1) != 0 || dst) {
-				ffa_set_error(args, FFA_INVALID_PARAMETERS);
-				return caller_sp;
-			}
-
-			/* The SP must be subscribed for this message */
-			if (!(dst->props & FFA_PART_PROP_NOTIF_CREATED)) {
-				ffa_set_error(args, FFA_INVALID_PARAMETERS);
-				return caller_sp;
-			}
-			break;
-		case FFA_MSG_RESP_VM_DESTROYED:
-			/* The destination must be the NWd hypervisor (ID 0) */
-			if (FFA_DST(args->a1) != 0 || dst) {
-				ffa_set_error(args, FFA_INVALID_PARAMETERS);
-				return caller_sp;
-			}
-
-			/* The SP must be subscribed for this message */
-			if (!(dst->props & FFA_PART_PROP_NOTIF_DESTROYED)) {
-				ffa_set_error(args, FFA_INVALID_PARAMETERS);
-				return caller_sp;
-			}
-			break;
-		default:
-			ffa_set_error(args, FFA_NOT_SUPPORTED);
-			return caller_sp;
-		}
-	} else if (args->a2 != FFA_PARAM_MBZ) {
-		ffa_set_error(args, FFA_INVALID_PARAMETERS);
-		return caller_sp;
-	}
-
-	if (dst && dst->state != sp_busy) {
+	if (caller_sp->state != sp_busy) {
 		EMSG("SP is not waiting for a request");
 		ffa_set_error(args, FFA_INVALID_PARAMETERS);
 		return caller_sp;
@@ -1057,25 +847,33 @@ ffa_handle_sp_direct_resp(struct thread_smc_1_2_regs *args,
 }
 
 static struct sp_session *
-ffa_handle_sp_error(struct thread_smc_1_2_regs *args,
+ffa_handle_sp_error(struct thread_smc_args *args,
 		    struct sp_session *caller_sp)
 {
-	/* If caller_sp == NULL send message to Normal World */
-	if (caller_sp && sp_enter(args, caller_sp)) {
+	struct sp_session *dst = NULL;
+
+	dst = sp_get_session(FFA_DST(args->a1));
+
+	/* FFA_ERROR Came from Noral World */
+	if (caller_sp)
+		caller_sp->state = sp_idle;
+
+	/* If dst == NULL send message to Normal World */
+	if (dst && sp_enter(args, dst)) {
 		/*
 		 * We can not return the error. Unwind the call chain with one
 		 * link. Set the state of the SP to dead.
 		 */
-		caller_sp->state = sp_dead;
+		dst->state = sp_dead;
 		/* Create error. */
-		ffa_set_error(args, FFA_ABORTED);
-		return  sp_get_session(caller_sp->caller_id);
+		ffa_set_error(args, FFA_DENIED);
+		return  sp_get_session(dst->caller_id);
 	}
 
-	return caller_sp;
+	return dst;
 }
 
-static void handle_features(struct thread_smc_1_2_regs *args)
+static void handle_features(struct thread_smc_args *args)
 {
 	uint32_t ret_fid = 0;
 	uint32_t ret_w2 = FFA_PARAM_MBZ;
@@ -1104,176 +902,12 @@ static void handle_features(struct thread_smc_1_2_regs *args)
 		      FFA_PARAM_MBZ, FFA_PARAM_MBZ);
 }
 
-static void handle_mem_perm_get(struct thread_smc_1_2_regs *args,
-				struct sp_session *sp_s)
-{
-	struct sp_ctx *sp_ctx = NULL;
-	TEE_Result res = TEE_ERROR_BAD_PARAMETERS;
-	uint16_t attrs = 0;
-	uint32_t ret_fid = FFA_ERROR;
-	uint32_t ret_val = FFA_INVALID_PARAMETERS;
-
-	/*
-	 * The FFA_MEM_PERM_GET interface is only allowed during initialization
-	 */
-	if (sp_s->is_initialized) {
-		ret_val = FFA_DENIED;
-		goto out;
-	}
-
-	sp_ctx = to_sp_ctx(sp_s->ts_sess.ctx);
-	if (!sp_ctx)
-		goto out;
-
-	/* Query memory attributes */
-	ts_push_current_session(&sp_s->ts_sess);
-	res = vm_get_prot(&sp_ctx->uctx, args->a1, SMALL_PAGE_SIZE, &attrs);
-	ts_pop_current_session();
-	if (res)
-		goto out;
-
-	/* Build response value */
-	ret_fid = FFA_SUCCESS_32;
-	ret_val = 0;
-	if ((attrs & TEE_MATTR_URW) == TEE_MATTR_URW)
-		ret_val |= FFA_MEM_PERM_RW;
-	else if (attrs & TEE_MATTR_UR)
-		ret_val |= FFA_MEM_PERM_RO;
-
-	if ((attrs & TEE_MATTR_UX) == 0)
-		ret_val |= FFA_MEM_PERM_NX;
-
-out:
-	spmc_set_args(args, ret_fid, FFA_PARAM_MBZ, ret_val, FFA_PARAM_MBZ,
-		      FFA_PARAM_MBZ, FFA_PARAM_MBZ);
-}
-
-static void handle_mem_perm_set(struct thread_smc_1_2_regs *args,
-				struct sp_session *sp_s)
-{
-	struct sp_ctx *sp_ctx = NULL;
-	TEE_Result res = TEE_ERROR_BAD_PARAMETERS;
-	size_t region_size = 0;
-	uint32_t data_perm = 0;
-	uint32_t instruction_perm = 0;
-	uint16_t attrs = 0;
-	uint32_t ret_fid = FFA_ERROR;
-	uint32_t ret_val = FFA_INVALID_PARAMETERS;
-
-	/*
-	 * The FFA_MEM_PERM_GET interface is only allowed during initialization
-	 */
-	if (sp_s->is_initialized) {
-		ret_val = FFA_DENIED;
-		goto out;
-	}
-
-	sp_ctx = to_sp_ctx(sp_s->ts_sess.ctx);
-	if (!sp_ctx)
-		goto out;
-
-	if (MUL_OVERFLOW(args->a2, SMALL_PAGE_SIZE, &region_size))
-		goto out;
-
-	if (args->a3 & FFA_MEM_PERM_RESERVED) {
-		/* Non-zero reserved bits */
-		goto out;
-	}
-
-	data_perm = args->a3 & FFA_MEM_PERM_DATA_PERM;
-	instruction_perm = args->a3 & FFA_MEM_PERM_INSTRUCTION_PERM;
-
-	/* RWX access right configuration is not permitted */
-	if (data_perm == FFA_MEM_PERM_RW && instruction_perm == FFA_MEM_PERM_X)
-		goto out;
-
-	switch (data_perm) {
-	case FFA_MEM_PERM_RO:
-		attrs = TEE_MATTR_UR;
-		break;
-	case FFA_MEM_PERM_RW:
-		attrs = TEE_MATTR_URW;
-		break;
-	default:
-		/* Invalid permission value */
-		goto out;
-	}
-
-	if (instruction_perm == FFA_MEM_PERM_X)
-		attrs |= TEE_MATTR_UX;
-
-	/* Set access rights */
-	ts_push_current_session(&sp_s->ts_sess);
-	res = vm_set_prot(&sp_ctx->uctx, args->a1, region_size, attrs);
-	ts_pop_current_session();
-	if (res != TEE_SUCCESS)
-		goto out;
-
-	ret_fid = FFA_SUCCESS_32;
-	ret_val = FFA_PARAM_MBZ;
-
-out:
-	spmc_set_args(args, ret_fid, FFA_PARAM_MBZ, ret_val, FFA_PARAM_MBZ,
-		      FFA_PARAM_MBZ, FFA_PARAM_MBZ);
-}
-
-static void spmc_handle_version(struct thread_smc_1_2_regs *args,
-				struct ffa_rxtx *rxtx)
-{
-	spmc_set_args(args, spmc_exchange_version(args->a1, rxtx),
-		      FFA_PARAM_MBZ, FFA_PARAM_MBZ, FFA_PARAM_MBZ,
-		      FFA_PARAM_MBZ, FFA_PARAM_MBZ);
-}
-
-static void handle_console_log(uint32_t ffa_vers,
-			       struct thread_smc_1_2_regs *args)
-{
-	uint32_t ret_fid = FFA_ERROR;
-	uint32_t ret_val = FFA_INVALID_PARAMETERS;
-	size_t char_count = args->a1 & FFA_CONSOLE_LOG_CHAR_COUNT_MASK;
-	char buffer[FFA_CONSOLE_LOG_64_MAX_MSG_LEN + 1] = { 0 };
-	size_t max_length = 0;
-	size_t reg_size = 0;
-	size_t n = 0;
-
-	if (args->a0 == FFA_CONSOLE_LOG_64) {
-		if (ffa_vers >= FFA_VERSION_1_2)
-			max_length = FFA_CONSOLE_LOG_64_MAX_MSG_LEN;
-		else
-			max_length = FFA_CONSOLE_LOG_64_V1_1_MAX_MSG_LEN;
-		reg_size = sizeof(uint64_t);
-	} else {
-		max_length = FFA_CONSOLE_LOG_32_MAX_MSG_LEN;
-		reg_size = sizeof(uint32_t);
-	}
-
-	if (char_count < 1 || char_count > max_length)
-		goto out;
-
-	for (n = 0; n < char_count; n += reg_size) {
-		/* + 2 since we're starting from W2/X2 */
-		memcpy(buffer + n, &args->a[2 + n / reg_size],
-		       MIN(char_count - n, reg_size));
-	}
-
-	buffer[char_count] = '\0';
-
-	trace_ext_puts(buffer);
-
-	ret_fid = FFA_SUCCESS_32;
-	ret_val = FFA_PARAM_MBZ;
-
-out:
-	spmc_set_args(args, ret_fid, FFA_PARAM_MBZ, ret_val, FFA_PARAM_MBZ,
-		      FFA_PARAM_MBZ, FFA_PARAM_MBZ);
-}
-
 /*
  * FF-A messages handler for SP. Every messages for or from a SP is handled
  * here. This is the entry of the sp_spmc kernel thread. The caller_sp is set
  * to NULL when it is the Normal World.
  */
-void spmc_sp_msg_handler(struct thread_smc_1_2_regs *args,
+void spmc_sp_msg_handler(struct thread_smc_args *args,
 			 struct sp_session *caller_sp)
 {
 	thread_check_canaries();
@@ -1328,15 +962,11 @@ void spmc_sp_msg_handler(struct thread_smc_1_2_regs *args,
 			sp_enter(args, caller_sp);
 			break;
 		case FFA_VERSION:
-			spmc_handle_version(args, &caller_sp->rxtx);
+			spmc_handle_version(args);
 			sp_enter(args, caller_sp);
 			break;
 		case FFA_FEATURES:
 			handle_features(args);
-			sp_enter(args, caller_sp);
-			break;
-		case FFA_SPM_ID_GET:
-			spmc_handle_spm_id_get(args);
 			sp_enter(args, caller_sp);
 			break;
 		case FFA_PARTITION_INFO_GET:
@@ -1374,30 +1004,6 @@ void spmc_sp_msg_handler(struct thread_smc_1_2_regs *args,
 			ffa_mem_reclaim(args, caller_sp);
 			sp_enter(args, caller_sp);
 			break;
-#ifdef ARM64
-		case FFA_MEM_PERM_GET_64:
-#endif
-		case FFA_MEM_PERM_GET_32:
-			handle_mem_perm_get(args, caller_sp);
-			sp_enter(args, caller_sp);
-			break;
-
-#ifdef ARM64
-		case FFA_MEM_PERM_SET_64:
-#endif
-		case FFA_MEM_PERM_SET_32:
-			handle_mem_perm_set(args, caller_sp);
-			sp_enter(args, caller_sp);
-			break;
-
-#ifdef ARM64
-		case FFA_CONSOLE_LOG_64:
-#endif
-		case FFA_CONSOLE_LOG_32:
-			handle_console_log(caller_sp->rxtx.ffa_vers, args);
-			sp_enter(args, caller_sp);
-			break;
-
 		default:
 			EMSG("Unhandled FFA function ID %#"PRIx32,
 			     (uint32_t)args->a0);

@@ -9,6 +9,7 @@
 #include <drivers/gic.h>
 #include <drivers/serial8250_uart.h>
 #include <kernel/boot.h>
+#include <kernel/interrupt.h>
 #include <kernel/misc.h>
 #include <kernel/mutex.h>
 #include <kernel/panic.h>
@@ -24,6 +25,7 @@
 
 #define PLAT_HW_UNIQUE_KEY_LENGTH 32
 
+static struct gic_data gic_data;
 static struct serial8250_uart_data console_data;
 static uint8_t plat_huk[PLAT_HW_UNIQUE_KEY_LENGTH];
 
@@ -34,14 +36,20 @@ register_phys_mem_pgdir(MEM_AREA_IO_SEC, GICD_BASE, GICD_SIZE);
 register_phys_mem_pgdir(MEM_AREA_IO_NSEC, CONSOLE_UART_BASE,
 		  SERIAL8250_UART_REG_SIZE);
 
-void boot_primary_init_intc(void)
+void main_init_gic(void)
 {
-	gic_init(GICC_BASE, GICD_BASE);
+	gic_init(&gic_data, GICC_BASE, GICD_BASE);
+	itr_init(&gic_data.chip);
 }
 
-void boot_secondary_init_intc(void)
+void main_secondary_init_gic(void)
 {
-	gic_init_per_cpu();
+	gic_cpu_init(&gic_data);
+}
+
+void itr_core_handler(void)
+{
+	gic_it_handle(&gic_data);
 }
 
 struct plat_nsec_ctx {
@@ -108,7 +116,7 @@ void init_sec_mon(unsigned long nsec_entry)
 	memcpy(plat_huk, plat_boot_args->huk, sizeof(plat_boot_args->huk));
 }
 
-void plat_console_init(void)
+void console_init(void)
 {
 	serial8250_uart_init(&console_data, CONSOLE_UART_BASE,
 			     CONSOLE_UART_CLK_IN_HZ, CONSOLE_BAUDRATE);

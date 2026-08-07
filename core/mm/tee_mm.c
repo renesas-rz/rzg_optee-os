@@ -8,9 +8,32 @@
 #include <kernel/tee_common.h>
 #include <mm/tee_mm.h>
 #include <mm/tee_pager.h>
-#include <pta_stats.h>
 #include <trace.h>
 #include <util.h>
+
+static void *pmalloc(tee_mm_pool_t *pool, size_t size)
+{
+	if (pool->flags & TEE_MM_POOL_NEX_MALLOC)
+		return nex_malloc(size);
+	else
+		return malloc(size);
+}
+
+static void *pcalloc(tee_mm_pool_t *pool, size_t num_el, size_t size)
+{
+	if (pool->flags & TEE_MM_POOL_NEX_MALLOC)
+		return nex_calloc(num_el, size);
+	else
+		return calloc(num_el, size);
+}
+
+static void pfree(tee_mm_pool_t *pool, void *ptr)
+{
+	if (pool->flags & TEE_MM_POOL_NEX_MALLOC)
+		nex_free(ptr);
+	else
+		free(ptr);
+}
 
 bool tee_mm_init(tee_mm_pool_t *pool, paddr_t lo, paddr_size_t size,
 		 uint8_t shift, uint32_t flags)
@@ -21,22 +44,18 @@ bool tee_mm_init(tee_mm_pool_t *pool, paddr_t lo, paddr_size_t size,
 	if (pool == NULL)
 		return false;
 
-	lo = ROUNDUP2(lo, 1 << shift);
+	lo = ROUNDUP(lo, 1 << shift);
 	rounded = lo - initial_lo;
-	size = ROUNDDOWN2(size - rounded, 1 << shift);
+	size = ROUNDDOWN(size - rounded, 1 << shift);
 
 	assert(((uint64_t)size >> shift) < (uint64_t)UINT32_MAX);
 
-	*pool = (tee_mm_pool_t){
-		.lo = lo,
-		.size = size,
-		.shift = shift,
-		.flags = flags,
-	};
+	pool->lo = lo;
+	pool->size = size;
+	pool->shift = shift;
+	pool->flags = flags;
+	pool->entry = pcalloc(pool, 1, sizeof(tee_mm_entry_t));
 
-	pool->entry = malloc_flags(pool->flags | MAF_ZERO_INIT, NULL,
-				   MALLOC_DEFAULT_ALIGNMENT,
-				   sizeof(tee_mm_entry_t));
 	if (pool->entry == NULL)
 		return false;
 
@@ -56,7 +75,7 @@ void tee_mm_final(tee_mm_pool_t *pool)
 
 	while (pool->entry->next != NULL)
 		tee_mm_free(pool->entry->next);
-	free_flags(pool->flags, pool->entry);
+	pfree(pool, pool->entry);
 	pool->entry = NULL;
 }
 
@@ -85,7 +104,7 @@ static size_t tee_mm_stats_allocated(tee_mm_pool_t *pool)
 	return sz << pool->shift;
 }
 
-void tee_mm_get_pool_stats(tee_mm_pool_t *pool, struct pta_stats_alloc *stats,
+void tee_mm_get_pool_stats(tee_mm_pool_t *pool, struct malloc_stats *stats,
 			   bool reset)
 {
 	uint32_t exceptions;
@@ -119,23 +138,19 @@ static inline void update_max_allocated(tee_mm_pool_t *pool __unused)
 }
 #endif /* CFG_WITH_STATS */
 
-tee_mm_entry_t *tee_mm_alloc_flags(tee_mm_pool_t *pool, size_t size,
-				   uint32_t flags)
+tee_mm_entry_t *tee_mm_alloc(tee_mm_pool_t *pool, size_t size)
 {
-	size_t psize = 0;
-	tee_mm_entry_t *entry = NULL;
-	tee_mm_entry_t *nn = NULL;
-	size_t remaining = 0;
-	uint32_t exceptions = 0;
+	size_t psize;
+	tee_mm_entry_t *entry;
+	tee_mm_entry_t *nn;
+	size_t remaining;
+	uint32_t exceptions;
 
 	/* Check that pool is initialized */
 	if (!pool || !pool->entry)
 		return NULL;
 
-	flags &= ~MAF_NEX;	/* This flag must come from pool->flags */
-	flags |= pool->flags;
-	nn  = malloc_flags(flags, NULL, MALLOC_DEFAULT_ALIGNMENT,
-			   sizeof(tee_mm_entry_t));
+	nn = pmalloc(pool, sizeof(tee_mm_entry_t));
 	if (!nn)
 		return NULL;
 
@@ -205,7 +220,7 @@ tee_mm_entry_t *tee_mm_alloc_flags(tee_mm_pool_t *pool, size_t size,
 	return nn;
 err:
 	cpu_spin_unlock_xrestore(&pool->lock, exceptions);
-	free_flags(flags, nn);
+	pfree(pool, nn);
 	return NULL;
 }
 
@@ -246,8 +261,7 @@ tee_mm_entry_t *tee_mm_alloc2(tee_mm_pool_t *pool, paddr_t base, size_t size)
 	if ((base + size) < base || base < pool->lo)
 		return NULL;
 
-	mm  = malloc_flags(pool->flags, NULL, MALLOC_DEFAULT_ALIGNMENT,
-			   sizeof(tee_mm_entry_t));
+	mm = pmalloc(pool, sizeof(tee_mm_entry_t));
 	if (!mm)
 		return NULL;
 
@@ -282,7 +296,7 @@ tee_mm_entry_t *tee_mm_alloc2(tee_mm_pool_t *pool, paddr_t base, size_t size)
 	return mm;
 err:
 	cpu_spin_unlock_xrestore(&pool->lock, exceptions);
-	free_flags(pool->flags, mm);
+	pfree(pool, mm);
 	return NULL;
 }
 
@@ -307,7 +321,7 @@ void tee_mm_free(tee_mm_entry_t *p)
 	entry->next = entry->next->next;
 	cpu_spin_unlock_xrestore(&p->pool->lock, exceptions);
 
-	free_flags(p->pool->flags, p);
+	pfree(p->pool, p);
 }
 
 size_t tee_mm_get_bytes(const tee_mm_entry_t *mm)
@@ -338,6 +352,15 @@ bool tee_mm_is_empty(tee_mm_pool_t *pool)
 
 	return ret;
 }
+
+/* Physical Secure DDR pool */
+tee_mm_pool_t tee_mm_sec_ddr;
+
+/* Virtual eSRAM pool */
+tee_mm_pool_t tee_mm_vcore;
+
+/* Shared memory pool */
+tee_mm_pool_t tee_mm_shm;
 
 tee_mm_entry_t *tee_mm_find(const tee_mm_pool_t *pool, paddr_t addr)
 {

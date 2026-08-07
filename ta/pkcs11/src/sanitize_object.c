@@ -10,6 +10,7 @@
 #include <string.h>
 #include <util.h>
 #include <tee_internal_api.h>
+#include <tee_internal_api_extensions.h>
 #include <trace.h>
 
 #include "attributes.h"

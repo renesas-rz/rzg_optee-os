@@ -57,10 +57,9 @@ struct drvcrypt_rsa_ssa {
 };
 
 /*
- * RSA Encrypt/Decrypt data
+ * RSA Encrypt/Decript data
  */
 struct drvcrypt_rsa_ed {
-	uint32_t algo;		     /* Operation algorithm */
 	enum drvcrypt_rsa_id rsa_id; /* RSA Algorithm Id */
 	uint32_t hash_algo;	     /* HASH Algorithm */
 	size_t digest_size;	     /* Hash Digest Size */
@@ -68,8 +67,6 @@ struct drvcrypt_rsa_ed {
 	struct drvcrypt_buf message; /* Message to encrypt or decrypted */
 	struct drvcrypt_buf cipher;  /* Cipher encrypted or to decrypt */
 	struct drvcrypt_buf label;   /* Additional Label (RSAES) */
-	uint32_t mgf_algo;           /* MGF1 hash algorithm (RSAES) */
-	size_t mgf_size;             /* MGF1 hash digest size (RSAES) */
 
 	/* RSA Mask Generation function */
 	TEE_Result (*mgf)(struct drvcrypt_rsa_mgf *mgf_data);
@@ -136,40 +133,24 @@ struct drvcrypt_secret_data {
 };
 
 /*
- * Encrypt/Decrypt data
- */
-struct drvcrypt_ecc_ed {
-	uint32_t algo;                  /* Operation algorithm */
-	void *key;                      /* Public or Private Key */
-	size_t size_sec;                /* Security size in bytes */
-	struct drvcrypt_buf plaintext;  /* Clear text message */
-	struct drvcrypt_buf ciphertext; /* Encrypted message */
-};
-
-/*
  * Crypto ECC driver operations
  */
 struct drvcrypt_ecc {
 	/* Allocates the ECC keypair */
-	TEE_Result (*alloc_keypair)(struct ecc_keypair *key, uint32_t type,
-				    size_t size_bits);
+	TEE_Result (*alloc_keypair)(struct ecc_keypair *key, size_t size_bits);
 	/* Allocates the ECC public key */
-	TEE_Result (*alloc_publickey)(struct ecc_public_key *key, uint32_t type,
+	TEE_Result (*alloc_publickey)(struct ecc_public_key *key,
 				      size_t size_bits);
 	/* Free ECC public key */
 	void (*free_publickey)(struct ecc_public_key *key);
 	/* Generates the ECC keypair */
-	TEE_Result (*gen_keypair)(struct ecc_keypair *key, size_t size_bits);
+	TEE_Result (*gen_keypair)(struct ecc_keypair *key, size_t size_bytes);
 	/* ECC Sign a message and returns the signature */
 	TEE_Result (*sign)(struct drvcrypt_sign_data *sdata);
 	/* ECC Verify a message's signature */
 	TEE_Result (*verify)(struct drvcrypt_sign_data *sdata);
 	/* ECC Shared Secret */
 	TEE_Result (*shared_secret)(struct drvcrypt_secret_data *sdata);
-	/* ECC Encrypt */
-	TEE_Result (*encrypt)(struct drvcrypt_ecc_ed *cdata);
-	/* ECC Decrypt */
-	TEE_Result (*decrypt)(struct drvcrypt_ecc_ed *cdata);
 };
 
 /*
@@ -234,42 +215,6 @@ struct drvcrypt_dsa {
 static inline TEE_Result drvcrypt_register_dsa(struct drvcrypt_dsa *ops)
 {
 	return drvcrypt_register(CRYPTO_DSA, (void *)ops);
-}
-
-/*
- * Crypto Library Montgomery driver operations
- */
-
-struct drvcrypt_montgomery {
-	/* Allocates the Montgomery key pair */
-	TEE_Result (*alloc_keypair)(struct montgomery_keypair *key,
-				    size_t size_bits);
-	/* Generates the Montgomery key pair */
-	TEE_Result (*gen_keypair)(struct montgomery_keypair *key,
-				  size_t key_size);
-	/* Montgomery Shared Secret */
-	TEE_Result (*shared_secret)(struct drvcrypt_secret_data *sdata);
-};
-
-/*
- * Register a X25519 processing driver in the crypto API
- *
- * @ops - Driver operations in the HW layer
- */
-static inline TEE_Result drvcrypt_register_x25519(struct drvcrypt_montgomery
-						  *ops)
-{
-	return drvcrypt_register(CRYPTO_X25519, (void *)ops);
-}
-
-/*
- * Register a X448 processing driver in the crypto API
- *
- * @ops - Driver operations in the HW layer
- */
-static inline TEE_Result drvcrypt_register_x448(struct drvcrypt_montgomery *ops)
-{
-	return drvcrypt_register(CRYPTO_X448, (void *)ops);
 }
 
 #endif /* __DRVCRYPT_ACIPHER_H__ */

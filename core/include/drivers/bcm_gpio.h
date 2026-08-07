@@ -3,10 +3,10 @@
  * Copyright 2019 Broadcom.
  */
 
-#ifndef __DRIVERS_BCM_GPIO_H
-#define __DRIVERS_BCM_GPIO_H
+#ifndef BCM_GPIO_H
+#define BCM_GPIO_H
 
-#include <drivers/gpio.h>
+#include <gpio.h>
 #include <stdlib.h>
 #include <sys/queue.h>
 
@@ -30,4 +30,4 @@ struct bcm_gpio_chip {
 struct bcm_gpio_chip *bcm_gpio_pin_to_chip(unsigned int pin);
 /* Set gpiopin as secure */
 void iproc_gpio_set_secure(int gpiopin);
-#endif	/* __DRIVERS_BCM_GPIO_H */
+#endif	/* BCM_GPIO_H */

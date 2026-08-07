@@ -1,8 +1,7 @@
-/* SPDX-License-Identifier: BSD-3-Clause */
+/* SPDX-License-Identifier: BSD-2-Clause */
 /*
  * Copyright (C) 2017, Fuzhou Rockchip Electronics Co., Ltd.
  * Copyright (C) 2019, Theobroma Systems Design und Consulting GmbH
- * Copyright (c) 2024, Rockchip, Inc. All rights reserved.
  */
 
 #ifndef PLATFORM_CONFIG_H
@@ -85,41 +84,6 @@
 
 #define FIREWALL_DDR_BASE	0xff534000
 #define FIREWALL_DDR_SIZE	SIZE_K(16)
-
-#elif defined(PLATFORM_FLAVOR_rk3588)
-
-#define GIC_BASE		0xfe600000
-#define GIC_SIZE		SIZE_K(64)
-#define GICC_BASE		0
-#define GICD_BASE		GIC_BASE
-#define GICR_BASE		(GIC_BASE + 0x80000)
-
-#define UART0_BASE		0xfd890000
-#define UART0_SIZE		SIZE_K(64)
-
-#define UART1_BASE		0xfeb40000
-#define UART1_SIZE		SIZE_K(64)
-
-#define UART2_BASE		0xfeb50000
-#define UART2_SIZE		SIZE_K(64)
-
-#define UART3_BASE		0xfeb60000
-#define UART3_SIZE		SIZE_K(64)
-
-#define FIREWALL_DDR_BASE	0xfe030000
-#define FIREWALL_DDR_SIZE	SIZE_K(32)
-
-#define FIREWALL_DSU_BASE	0xfe010000
-#define FIREWALL_DSU_SIZE	SIZE_K(32)
-
-#define TRNG_S_BASE		0xfe398000
-#define TRNG_S_SIZE		SIZE_K(32)
-
-#define OTP_S_BASE		0xfe3a0000
-#define OTP_S_SIZE		SIZE_K(64)
-
-#define ROCKCHIP_OTP_HUK_INDEX	0x104
-#define ROCKCHIP_OTP_HUK_SIZE	0x4
 
 #else
 #error "Unknown platform flavor"

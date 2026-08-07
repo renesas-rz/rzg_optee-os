@@ -26,8 +26,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __SM_PM_H
-#define __SM_PM_H
+#ifndef SM_PM_H
+#define SM_PM_H
 #include <stdint.h>
 #include <types_ext.h>
 

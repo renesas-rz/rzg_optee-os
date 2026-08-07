@@ -22,6 +22,7 @@
 #include <crypto/crypto.h>
 #include <crypto/internal_aes-gcm.h>
 #include <io.h>
+#include <kernel/panic.h>
 #include <string.h>
 #include <tee_api_types.h>
 #include <types_ext.h>

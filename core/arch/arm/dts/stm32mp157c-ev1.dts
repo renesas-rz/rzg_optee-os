@@ -7,6 +7,7 @@
 
 #include "stm32mp157c-ed1.dts"
 #include <dt-bindings/gpio/gpio.h>
+/* #include <dt-bindings/input/input.h> Remove due to BSD license issue */
 
 / {
 	model = "STMicroelectronics STM32MP157C eval daughter on eval mother";
@@ -36,26 +37,31 @@
 		pinctrl-names = "default";
 		button-0 {
 			label = "JoySel";
+			/* linux,code = <KEY_ENTER>; BSD license issue */
 			interrupt-parent = <&stmfx_pinctrl>;
 			interrupts = <0 IRQ_TYPE_EDGE_RISING>;
 		};
 		button-1 {
 			label = "JoyDown";
+			/* linux,code = <KEY_DOWN>; BSD license issue */
 			interrupt-parent = <&stmfx_pinctrl>;
 			interrupts = <1 IRQ_TYPE_EDGE_RISING>;
 		};
 		button-2 {
 			label = "JoyLeft";
+			/* linux,code = <KEY_LEFT>; BSD license issue */
 			interrupt-parent = <&stmfx_pinctrl>;
 			interrupts = <2 IRQ_TYPE_EDGE_RISING>;
 		};
 		button-3 {
 			label = "JoyRight";
+			/* linux,code = <KEY_RIGHT>; BSD license issue */
 			interrupt-parent = <&stmfx_pinctrl>;
 			interrupts = <3 IRQ_TYPE_EDGE_RISING>;
 		};
 		button-4 {
 			label = "JoyUp";
+			/* linux,code = <KEY_UP>; BSD license issue */
 			interrupt-parent = <&stmfx_pinctrl>;
 			interrupts = <4 IRQ_TYPE_EDGE_RISING>;
 		};
@@ -72,11 +78,11 @@
 &cec {
 	pinctrl-names = "default";
 	pinctrl-0 = <&cec_pins_a>;
-	status = "disabled";
+	status = "okay";
 };
 
 &dcmi {
-	status = "disabled";
+	status = "okay";
 	pinctrl-names = "default", "sleep";
 	pinctrl-0 = <&dcmi_pins_a>;
 	pinctrl-1 = <&dcmi_sleep_pins_a>;
@@ -95,7 +101,7 @@
 
 &dsi {
 	phy-dsi-supply = <&reg18>;
-	status = "disabled";
+	status = "okay";
 
 	ports {
 		port@0 {
@@ -130,7 +136,7 @@
 };
 
 &ethernet0 {
-	status = "disabled";
+	status = "okay";
 	pinctrl-0 = <&ethernet0_rgmii_pins_a>;
 	pinctrl-1 = <&ethernet0_rgmii_sleep_pins_a>;
 	pinctrl-names = "default", "sleep";
@@ -152,7 +158,7 @@
 	pinctrl-names = "default", "sleep";
 	pinctrl-0 = <&fmc_pins_a>;
 	pinctrl-1 = <&fmc_sleep_pins_a>;
-	status = "disabled";
+	status = "okay";
 
 	nand-controller@4,0 {
 		status = "okay";
@@ -172,7 +178,7 @@
 	pinctrl-1 = <&i2c2_sleep_pins_a>;
 	i2c-scl-rising-time-ns = <185>;
 	i2c-scl-falling-time-ns = <20>;
-	status = "disabled";
+	status = "okay";
 
 	ov5640: camera@3c {
 		compatible = "ovti,ov5640";
@@ -226,11 +232,11 @@
 	pinctrl-1 = <&i2c5_sleep_pins_a>;
 	i2c-scl-rising-time-ns = <185>;
 	i2c-scl-falling-time-ns = <20>;
-	status = "disabled";
+	status = "okay";
 };
 
 &ltdc {
-	status = "disabled";
+	status = "okay";
 
 	port {
 		ltdc_ep0_out: endpoint@0 {
@@ -244,7 +250,7 @@
 	pinctrl-names = "default", "sleep";
 	pinctrl-0 = <&m_can1_pins_a>;
 	pinctrl-1 = <&m_can1_sleep_pins_a>;
-	status = "disabled";
+	status = "okay";
 };
 
 &qspi {
@@ -254,7 +260,7 @@
 	reg = <0x58003000 0x1000>, <0x70000000 0x4000000>;
 	#address-cells = <1>;
 	#size-cells = <0>;
-	status = "disabled";
+	status = "okay";
 
 	flash0: flash@0 {
 		compatible = "jedec,spi-nor";
@@ -355,7 +361,7 @@
 
 &usbh_ehci {
 	phys = <&usbphyc_port0>;
-	status = "disabled";
+	status = "okay";
 };
 
 &usbotg_hs {
@@ -363,11 +369,11 @@
 	pinctrl-names = "default";
 	phys = <&usbphyc_port1 0>;
 	phy-names = "usb2-phy";
-	status = "disabled";
+	status = "okay";
 };
 
 &usbphyc {
-	status = "disabled";
+	status = "okay";
 };
 
 &usbphyc_port0 {

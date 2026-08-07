@@ -20,6 +20,7 @@
 
 #include "synquacer_rng_pta.h"
 
+static struct gic_data gic_data;
 static struct pl011_data console_data;
 
 register_phys_mem_pgdir(MEM_AREA_IO_NSEC, CONSOLE_UART_BASE,
@@ -28,16 +29,24 @@ register_phys_mem_pgdir(MEM_AREA_IO_SEC, GIC_BASE, CORE_MMU_PGDIR_SIZE);
 register_phys_mem_pgdir(MEM_AREA_IO_SEC, THERMAL_SENSOR_BASE,
 			CORE_MMU_PGDIR_SIZE);
 
-void plat_console_init(void)
+void itr_core_handler(void)
+{
+	gic_it_handle(&gic_data);
+}
+
+void console_init(void)
 {
 	pl011_init(&console_data, CONSOLE_UART_BASE, CONSOLE_UART_CLK_IN_HZ,
 		   CONSOLE_BAUDRATE);
 	register_serial_console(&console_data.chip);
 }
 
-void boot_primary_init_intc(void)
+void main_init_gic(void)
 {
-	gic_init(0, GIC_BASE + GICD_OFFSET);
+	/* On ARMv8-A, GIC configuration is initialized in TF-A */
+	gic_init_base_addr(&gic_data, 0, GIC_BASE + GICD_OFFSET);
+
+	itr_init(&gic_data.chip);
 }
 
 static enum itr_return timer_itr_cb(struct itr_handler *h __unused)
@@ -59,11 +68,8 @@ static struct itr_handler timer_itr = {
 
 static TEE_Result init_timer_itr(void)
 {
-	if (interrupt_add_handler_with_chip(interrupt_get_main_chip(),
-					    &timer_itr))
-		panic();
-
-	interrupt_enable(timer_itr.chip, timer_itr.it);
+	itr_add(&timer_itr);
+	itr_enable(IT_SEC_TIMER);
 
 	/* Enable timer FIQ to fetch entropy required during boot */
 	generic_timer_start(TIMER_PERIOD_MS);

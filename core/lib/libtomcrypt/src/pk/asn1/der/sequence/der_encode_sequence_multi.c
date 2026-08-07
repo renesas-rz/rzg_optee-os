@@ -81,7 +81,7 @@ int der_encode_sequence_multi(unsigned char *out, unsigned long *outlen, ...)
       return CRYPT_NOP;
    }
 
-   list = XCALLOC(x, sizeof(*list));
+   list = XCALLOC(sizeof(*list), x);
    if (list == NULL) {
       return CRYPT_MEM;
    }

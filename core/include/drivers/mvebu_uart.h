@@ -25,8 +25,8 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef __DRIVERS_MVEBU_UART_H
-#define __DRIVERS_MVEBU_UART_H
+#ifndef MVEBU_UART_H
+#define MVEBU_UART_H
 
 #include <types_ext.h>
 #include <drivers/serial.h>
@@ -39,4 +39,4 @@ struct mvebu_uart_data {
 void mvebu_uart_init(struct mvebu_uart_data *pd, paddr_t pbase,
 		uint32_t uart_clk, uint32_t baud_rate);
 
-#endif /* __DRIVERS_MVEBU_UART_H */
+#endif /* MVEBU_UART_H */

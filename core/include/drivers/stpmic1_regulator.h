@@ -1,13 +1,11 @@
 /* SPDX-License-Identifier: BSD-2-Clause */
 /*
- * Copyright (c) 2021-2024, STMicroelectronics
+ * Copyright (c) 2021-2022, STMicroelectronics
  */
 
 #ifndef __DRIVERS_STPMIC1_REGULATOR_H
 #define __DRIVERS_STPMIC1_REGULATOR_H
 
-#include <stdbool.h>
-#include <stddef.h>
 #include <stdint.h>
 
 /*

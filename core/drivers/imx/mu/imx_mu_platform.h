@@ -9,12 +9,12 @@
 /*
  * Return the number of reception channels
  */
-unsigned int imx_mu_plat_get_rx_channel(vaddr_t base);
+unsigned int imx_mu_plat_get_rx_channel(void);
 
 /*
  * Return the number of transmission channels
  */
-unsigned int imx_mu_plat_get_tx_channel(vaddr_t base);
+unsigned int imx_mu_plat_get_tx_channel(void);
 
 /*
  * Send a 32bits word via the MU

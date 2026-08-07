@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: BSD-2-Clause */
 /*
- * Copyright 2018-2021, 2023 NXP
+ * Copyright 2018-2021 NXP
  *
  * Brief   CAAM Descriptor defines.
  */
@@ -136,7 +136,6 @@
  * FIFO LOAD Command fields
  */
 #define CMD_FIFO_LOAD_TYPE	CMD_TYPE(0x04)
-#define CMD_SEQ_FIFO_LOAD_TYPE  CMD_TYPE(0x05)
 
 /* Extended Length */
 #define FIFO_LOAD_EXT		BIT32(22)
@@ -318,7 +317,6 @@
 #define PROT_RSA_FMT(format)	SHIFT_U32((PROT_RSA_FMT_##format) & 0x1, 12)
 #define PROT_RSA_FMT_NO		0
 #define PROT_RSA_FMT_PKCS_V1_5	1
-#define PROT_RSA_FMT_MASK	SHIFT_U32(0x1, 12)
 
 #define PROT_RSA_DEC_KEYFORM(format)	SHIFT_U32(((format) - 1) & 0x3, 0)
 
@@ -327,45 +325,14 @@
 #define PROT_RSA_KEY_ALL	0
 #define PROT_RSA_KEY_N_D	2
 
-#define PROT_RSA_FINISH_KEY_ENC_OUT(alg) PROT_RSA_FINISH_KEY_ENC_OUT_##alg
-#define PROT_RSA_FINISH_KEY_ENC_OUT_ECB	 BIT32(6)
-#define PROT_RSA_FINISH_KEY_ENC_OUT_CCM	 BIT32(6)
-
-#define PROT_RSA_FINISH_KEY_ENC(alg) PROT_RSA_FINISH_KEY_ENC_##alg
-#define PROT_RSA_FINISH_KEY_ENC_ECB  0
-#define PROT_RSA_FINISH_KEY_ENC_CCM  BIT32(4)
-
-#define PROT_RSA_FINISH_KEY(alg) PROT_RSA_FINISH_KEY_##alg
-#define PROT_RSA_FINISH_KEY_NONE 0
-#define PROT_RSA_FINISH_KEY_ECB (PROT_RSA_FINISH_KEY_ENC_OUT_ECB | \
-				 PROT_RSA_FINISH_KEY_ENC_ECB)
-#define PROT_RSA_FINISH_KEY_CCM (PROT_RSA_FINISH_KEY_ENC_OUT_CCM | \
-				 PROT_RSA_FINISH_KEY_ENC_CCM)
-
-#define PROT_RSA_KEY_ENC(format) SHIFT_U32((PROT_RSA_KEY_ENC_##format) & 0x3, 8)
-#define PROT_RSA_KEY_ENC_NONE	 0
-#define PROT_RSA_KEY_ENC_ECB	 1
-#define PROT_RSA_KEY_ENC_CCM	 3
-
 /*
  * ECC Protocol Information
  */
 #define PROT_PK_MSG(type)	SHIFT_U32(PROT_PK_MSG_##type, 10)
-#define PROT_PK_MSG_MES_REP	0
 #define PROT_PK_MSG_HASHED	2
 #define PROT_PK_TYPE(type)	SHIFT_U32(PROT_PK_##type, 1)
 #define PROT_PK_DL		0
 #define PROT_PK_ECC		1
-#define PROT_PRI_ENC(alg)	PROT_PRI_ENC_##alg
-#define PROT_PRI_ENC_ECB	BIT32(2)
-#define PROT_PRI_ENC_CCM	BIT32(2)
-#define PROT_PRI_EXT(type)	PROT_PRI_EXT_##type
-#define PROT_PRI_EXT_ECB	0
-#define PROT_PRI_EXT_CCM	BIT32(4)
-#define PROT_PRI(alg)		PROT_PRI_##alg
-#define PROT_PRI_NONE		0
-#define PROT_PRI_ECB		(PROT_PRI_ENC(ECB) | PROT_PRI_EXT(ECB))
-#define PROT_PRI_CCM		(PROT_PRI_ENC(CCM) | PROT_PRI_EXT(CCM))
 
 /*
  * BLOB Protocol Information
@@ -373,7 +340,6 @@
 #define PROT_BLOB_FMT_MSTR		BIT32(1)
 #define PROT_BLOB_TYPE(type)		SHIFT_U32(1, PROT_BLOB_TYPE_##type)
 #define PROT_BLOB_TYPE_BLACK_KEY	2
-#define PROT_BLOB_SEC_MEM		BIT32(3)
 #define PROT_BLOB_EKT			8
 #define PROT_BLOB_INFO(aes)		SHIFT_U32(PROT_BLOB_AES_##aes, \
 						PROT_BLOB_EKT)
@@ -381,12 +347,6 @@
 #define PROT_BLOB_AES_ECB		0
 #define PROT_BLOB_FORMAT(format)	SHIFT_U32(0, PROT_BLOB_FORMAT_##format)
 #define PROT_BLOB_FORMAT_NORMAL		0
-
-/*
- * MP Protocol Information
- */
-#define PROT_MP_PUBK_SGT	BIT32(31)
-#define PROT_MP_CURVE(curve)	SHIFT_U32((curve) & 0xF, 17)
 
 /*
  * Algorithm Identifier
@@ -684,9 +644,6 @@
 #define PDB_RSA_KEY_N_SIZE(len)	SHIFT_U32((len) & 0x3FF, 16)
 
 /* Manufacturing Curve Select */
-#define PDB_SGT_MP_SIGN_MSG		SHIFT_U32(1, 31)
-#define PDB_SGT_MP_SIGN_C		SHIFT_U32(1, 29)
-#define PDB_SGT_MP_SIGN_D		SHIFT_U32(1, 28)
 #define PDB_MP_CSEL_P256	0x03
 #define PDB_MP_CSEL_P384	0x04
 #define PDB_MP_CSEL_P521	0x05

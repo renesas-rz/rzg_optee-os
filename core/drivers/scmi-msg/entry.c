@@ -15,7 +15,6 @@
 #include "base.h"
 #include "clock.h"
 #include "common.h"
-#include "perf_domain.h"
 #include "reset_domain.h"
 #include "voltage_domain.h"
 
@@ -88,9 +87,6 @@ void scmi_process_message(struct scmi_msg *msg)
 		break;
 	case SCMI_PROTOCOL_ID_VOLTAGE_DOMAIN:
 		handler = scmi_msg_get_voltd_handler(msg);
-		break;
-	case SCMI_PROTOCOL_ID_PERF:
-		handler = scmi_msg_get_perf_handler(msg);
 		break;
 	default:
 		break;

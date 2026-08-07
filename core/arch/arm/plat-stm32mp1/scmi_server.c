@@ -7,17 +7,11 @@
 #include <confine_array_index.h>
 #include <drivers/clk.h>
 #include <drivers/clk_dt.h>
-#include <drivers/firewall_device.h>
-#include <drivers/regulator.h>
 #include <drivers/rstctrl.h>
 #include <drivers/scmi-msg.h>
 #include <drivers/scmi.h>
-#include <drivers/stm32_cpu_opp.h>
-#include <drivers/stm32_remoteproc.h>
-#include <drivers/stm32_vrefbuf.h>
 #include <drivers/stm32mp1_pmic.h>
 #include <drivers/stm32mp1_pwr.h>
-#include <drivers/stm32mp13_regulator_iod.h>
 #include <drivers/stpmic1.h>
 #include <drivers/stpmic1_regulator.h>
 #include <drivers/stm32mp_dt_bindings.h>
@@ -25,7 +19,6 @@
 #include <mm/core_memprot.h>
 #include <mm/core_mmu.h>
 #include <platform_config.h>
-#include <stdbool.h>
 #include <stdint.h>
 #include <speculation_barrier.h>
 #include <stm32_util.h>
@@ -39,20 +32,15 @@
 #define SCMI_RD_NAME_SIZE	16
 #define SCMI_VOLTD_NAME_SIZE	16
 
-#define ETZPC_ID_ALWAYS_ACCESSIBLE	(STM32MP1_ETZPC_MAX_ID + 1)
-#define ETZPC_ID_NEVER_ACCESSIBLE	(STM32MP1_ETZPC_MAX_ID + 2)
-
 /*
  * struct stm32_scmi_clk - Data for the exposed clock
  * @clock_id: Clock identifier in RCC clock driver
- * @etzpc_id: ETZPC ID of the peripheral related to the clock
  * @name: Clock string ID exposed to channel
  * @enabled: State of the SCMI clock
  */
 struct stm32_scmi_clk {
 	unsigned long clock_id;
 	struct clk *clk;
-	unsigned int etzpc_id;
 	const char *name;
 	bool enabled;
 };
@@ -60,13 +48,11 @@ struct stm32_scmi_clk {
 /*
  * struct stm32_scmi_rd - Data for the exposed reset controller
  * @reset_id: Reset identifier in RCC reset driver
- * @etzpc_id: ETZPC ID of the peripheral related to the reset controller
  * @name: Reset string ID exposed to channel
  * @rstctrl: Reset controller device
  */
 struct stm32_scmi_rd {
 	unsigned long reset_id;
-	unsigned int etzpc_id;
 	const char *name;
 	struct rstctrl *rstctrl;
 };
@@ -74,39 +60,20 @@ struct stm32_scmi_rd {
 enum voltd_device {
 	VOLTD_PWR,
 	VOLTD_PMIC,
-	VOLTD_VREFBUF,
-	VOLTD_IOD,
 };
 
 /*
  * struct stm32_scmi_voltd - Data for the exposed voltage domains
  * @name: Power regulator string ID exposed to channel
- * @priv_name: Internal string ID for the PMIC regulators
- * @priv_id: Internal ID for the regulator aside PMIC ones
+ * @priv_id: Internal string ID for the regulator
  * @priv_dev: Internal ID for the device implementing the regulator
- * @regulator: Regulator controller device
- * @state: State of the SCMI voltage domain (true: enable, false: disable)
  */
 struct stm32_scmi_voltd {
 	const char *name;
-	const char *priv_name;
-	unsigned int priv_id;
+	const char *priv_id;
 	enum voltd_device priv_dev;
-	struct regulator *regulator;
-	bool state;
-};
 
-/*
- * struct stm32_scmi_perfd - Data for the exposed performance domains
- * @name: Performance domain string ID (aka name) exposed to channel
- */
-struct stm32_scmi_perfd {
-	const char *name;
 };
-
-#if CFG_STM32MP1_SCMI_SHM_BASE
-register_phys_mem(MEM_AREA_IO_NSEC, CFG_STM32MP1_SCMI_SHM_BASE,
-		  CFG_STM32MP1_SCMI_SHM_SIZE);
 
 /* Locate all non-secure SMT message buffers in last page of SYSRAM */
 #define SMT_BUFFER_BASE		CFG_STM32MP1_SCMI_SHM_BASE
@@ -115,61 +82,29 @@ register_phys_mem(MEM_AREA_IO_NSEC, CFG_STM32MP1_SCMI_SHM_BASE,
 	CFG_STM32MP1_SCMI_SHM_BASE + CFG_STM32MP1_SCMI_SHM_SIZE)
 #error "SCMI shared memory mismatch"
 #endif
-#endif /*CFG_STM32MP1_SCMI_SHM_BASE*/
 
-/* SCMI clock always accessible */
+register_phys_mem(MEM_AREA_IO_NSEC, CFG_STM32MP1_SCMI_SHM_BASE,
+		  CFG_STM32MP1_SCMI_SHM_SIZE);
+
 #define CLOCK_CELL(_scmi_id, _id, _name, _init_enabled) \
 	[(_scmi_id)] = { \
 		.clock_id = (_id), \
-		.etzpc_id = ETZPC_ID_ALWAYS_ACCESSIBLE, \
 		.name = (_name), \
 		.enabled = (_init_enabled), \
 	}
 
-/* SCMI clock accessible upon DECPROT ID assigned to non-secure */
-#define CLOCK_CELL_DECPROT(_scmi_id, _id, _name, _init_enabled, _etzpc_id) \
-	[(_scmi_id)] = { \
-		.clock_id = (_id), \
-		.etzpc_id = (_etzpc_id), \
-		.name = (_name), \
-		.enabled = (_init_enabled), \
-	}
-
-/* SCMI reset domain always accessible */
 #define RESET_CELL(_scmi_id, _id, _name) \
 	[(_scmi_id)] = { \
 		.reset_id = (_id), \
-		.etzpc_id = ETZPC_ID_ALWAYS_ACCESSIBLE, \
 		.name = (_name), \
 	}
 
-/* SCMI reset domain accessible upon DECPROT ID assigned to non-secure */
-#define RESET_CELL_DECPROT(_scmi_id, _id, _name, _etzpc_id) \
+#define VOLTD_CELL(_scmi_id, _dev_id, _priv_id, _name) \
 	[(_scmi_id)] = { \
-		.reset_id = (_id), \
-		.etzpc_id = (_etzpc_id), \
-		.name = (_name), \
-	}
-
-#define VOLTD_CELL(_scmi_id, _dev_id, _priv_id, _priv_name, _name) \
-	[(_scmi_id)] = { \
-		.priv_name = (_priv_name), \
 		.priv_id = (_priv_id), \
 		.priv_dev = (_dev_id), \
 		.name = (_name), \
 	}
-
-#define VOLTD_CELL_PWR(_scmi_id, _priv_id, _name) \
-	VOLTD_CELL((_scmi_id), VOLTD_PWR, (_priv_id), NULL, (_name))
-
-#define VOLTD_CELL_IOD(_scmi_id, _priv_id, _name) \
-	VOLTD_CELL((_scmi_id), VOLTD_IOD, (_priv_id), NULL, (_name))
-
-#define VOLTD_CELL_VREFBUF(_scmi_id, _name) \
-	VOLTD_CELL((_scmi_id), VOLTD_VREFBUF, 0, NULL, (_name))
-
-#define VOLTD_CELL_PMIC(_scmi_id, _priv_name, _name) \
-	VOLTD_CELL((_scmi_id), VOLTD_PMIC, 0, (_priv_name), (_name))
 
 #ifdef CFG_STM32MP13
 static struct stm32_scmi_clk stm32_scmi_clock[] = {
@@ -218,106 +153,104 @@ static struct stm32_scmi_clk stm32_scmi_clock[] = {
 	CLOCK_CELL(CK_SCMI_MPU, CK_MPU, "ck_mpu", true),
 	CLOCK_CELL(CK_SCMI_AXI, CK_AXI, "ck_axi", true),
 	CLOCK_CELL(CK_SCMI_BSEC, BSEC, "bsec", true),
-	CLOCK_CELL_DECPROT(CK_SCMI_CRYP1, CRYP1, "cryp1", false,
-			   STM32MP1_ETZPC_CRYP1_ID),
+	CLOCK_CELL(CK_SCMI_CRYP1, CRYP1, "cryp1", false),
 	CLOCK_CELL(CK_SCMI_GPIOZ, GPIOZ, "gpioz", false),
-	CLOCK_CELL_DECPROT(CK_SCMI_HASH1, HASH1, "hash1", false,
-			   STM32MP1_ETZPC_HASH1_ID),
-	CLOCK_CELL_DECPROT(CK_SCMI_I2C4, I2C4_K, "i2c4_k", false,
-			   STM32MP1_ETZPC_I2C4_ID),
-	CLOCK_CELL_DECPROT(CK_SCMI_I2C6, I2C6_K, "i2c6_k", false,
-			   STM32MP1_ETZPC_I2C6_ID),
-	CLOCK_CELL_DECPROT(CK_SCMI_IWDG1, IWDG1, "iwdg1", false,
-			   STM32MP1_ETZPC_IWDG1_ID),
-	CLOCK_CELL_DECPROT(CK_SCMI_RNG1, RNG1_K, "rng1_k", true,
-			   STM32MP1_ETZPC_RNG1_ID),
+	CLOCK_CELL(CK_SCMI_HASH1, HASH1, "hash1", false),
+	CLOCK_CELL(CK_SCMI_I2C4, I2C4_K, "i2c4_k", false),
+	CLOCK_CELL(CK_SCMI_I2C6, I2C6_K, "i2c6_k", false),
+	CLOCK_CELL(CK_SCMI_IWDG1, IWDG1, "iwdg1", false),
+	CLOCK_CELL(CK_SCMI_RNG1, RNG1_K, "rng1_k", true),
 	CLOCK_CELL(CK_SCMI_RTC, RTC, "ck_rtc", true),
 	CLOCK_CELL(CK_SCMI_RTCAPB, RTCAPB, "rtcapb", true),
-	CLOCK_CELL_DECPROT(CK_SCMI_SPI6, SPI6_K, "spi6_k", false,
-			   STM32MP1_ETZPC_SPI6_ID),
-	CLOCK_CELL_DECPROT(CK_SCMI_USART1, USART1_K, "usart1_k", false,
-			   STM32MP1_ETZPC_USART1_ID),
+	CLOCK_CELL(CK_SCMI_SPI6, SPI6_K, "spi6_k", false),
+	CLOCK_CELL(CK_SCMI_USART1, USART1_K, "usart1_k", false),
 };
 #endif
 
 #ifdef CFG_STM32MP13
 static struct stm32_scmi_rd stm32_scmi_reset_domain[] = {
-	RESET_CELL_DECPROT(RST_SCMI_LTDC, LTDC_R, "ltdc",
-			   STM32MP1_ETZPC_LTDC_ID),
+	RESET_CELL(RST_SCMI_LTDC, LTDC_R, "ltdc"),
 	RESET_CELL(RST_SCMI_MDMA, MDMA_R, "mdma"),
 };
 #endif
 
 #ifdef CFG_STM32MP15
 static struct stm32_scmi_rd stm32_scmi_reset_domain[] = {
-	RESET_CELL_DECPROT(RST_SCMI_SPI6, SPI6_R, "spi6",
-			   STM32MP1_ETZPC_SPI6_ID),
-	RESET_CELL_DECPROT(RST_SCMI_I2C4, I2C4_R, "i2c4",
-			   STM32MP1_ETZPC_I2C4_ID),
-	RESET_CELL_DECPROT(RST_SCMI_I2C6, I2C6_R, "i2c6",
-			   STM32MP1_ETZPC_I2C6_ID),
-	RESET_CELL_DECPROT(RST_SCMI_USART1, USART1_R, "usart1",
-			   STM32MP1_ETZPC_USART1_ID),
-	RESET_CELL_DECPROT(RST_SCMI_STGEN, STGEN_R, "stgen",
-			   STM32MP1_ETZPC_STGENC_ID),
-	RESET_CELL_DECPROT(RST_SCMI_GPIOZ, GPIOZ_R, "gpioz",
-			   ETZPC_ID_NEVER_ACCESSIBLE),
-	RESET_CELL_DECPROT(RST_SCMI_CRYP1, CRYP1_R, "cryp1",
-			   STM32MP1_ETZPC_CRYP1_ID),
-	RESET_CELL_DECPROT(RST_SCMI_HASH1, HASH1_R, "hash1",
-			   STM32MP1_ETZPC_HASH1_ID),
-	RESET_CELL_DECPROT(RST_SCMI_RNG1, RNG1_R, "rng1",
-			   STM32MP1_ETZPC_RNG1_ID),
+	RESET_CELL(RST_SCMI_SPI6, SPI6_R, "spi6"),
+	RESET_CELL(RST_SCMI_I2C4, I2C4_R, "i2c4"),
+	RESET_CELL(RST_SCMI_I2C6, I2C6_R, "i2c6"),
+	RESET_CELL(RST_SCMI_USART1, USART1_R, "usart1"),
+	RESET_CELL(RST_SCMI_STGEN, STGEN_R, "stgen"),
+	RESET_CELL(RST_SCMI_GPIOZ, GPIOZ_R, "gpioz"),
+	RESET_CELL(RST_SCMI_CRYP1, CRYP1_R, "cryp1"),
+	RESET_CELL(RST_SCMI_HASH1, HASH1_R, "hash1"),
+	RESET_CELL(RST_SCMI_RNG1, RNG1_R, "rng1"),
 	RESET_CELL(RST_SCMI_MDMA, MDMA_R, "mdma"),
 	RESET_CELL(RST_SCMI_MCU, MCU_R, "mcu"),
 	RESET_CELL(RST_SCMI_MCU_HOLD_BOOT, MCU_HOLD_BOOT_R, "mcu_hold_boot"),
 };
 #endif
 
+#define PWR_REG11_NAME_ID		"0"
+#define PWR_REG18_NAME_ID		"1"
+#define PWR_USB33_NAME_ID		"2"
+#define PWR_SDMMC1_IO_NAME_ID		"3"
+#define PWR_SDMMC2_IO_NAME_ID		"4"
+#define PWR_VREFBUF_NAME_ID		"5"
+
 #ifdef CFG_STM32MP13
 struct stm32_scmi_voltd scmi_voltage_domain[] = {
-	VOLTD_CELL_PWR(VOLTD_SCMI_REG11, PWR_REG11, "reg11"),
-	VOLTD_CELL_PWR(VOLTD_SCMI_REG18, PWR_REG18, "reg18"),
-	VOLTD_CELL_PWR(VOLTD_SCMI_USB33, PWR_USB33, "usb33"),
-	VOLTD_CELL_IOD(VOLTD_SCMI_SDMMC1_IO, IOD_SDMMC1, "sdmmc1"),
-	VOLTD_CELL_IOD(VOLTD_SCMI_SDMMC2_IO, IOD_SDMMC2, "sdmmc2"),
-	VOLTD_CELL_VREFBUF(VOLTD_SCMI_VREFBUF, "vrefbuf"),
-	VOLTD_CELL_PMIC(VOLTD_SCMI_STPMIC1_BUCK1, "buck1", "buck1"),
-	VOLTD_CELL_PMIC(VOLTD_SCMI_STPMIC1_BUCK2, "buck2", "buck2"),
-	VOLTD_CELL_PMIC(VOLTD_SCMI_STPMIC1_BUCK3, "buck3", "buck3"),
-	VOLTD_CELL_PMIC(VOLTD_SCMI_STPMIC1_BUCK4, "buck4", "buck4"),
-	VOLTD_CELL_PMIC(VOLTD_SCMI_STPMIC1_LDO1, "ldo1", "ldo1"),
-	VOLTD_CELL_PMIC(VOLTD_SCMI_STPMIC1_LDO2, "ldo2", "ldo2"),
-	VOLTD_CELL_PMIC(VOLTD_SCMI_STPMIC1_LDO3, "ldo3", "ldo3"),
-	VOLTD_CELL_PMIC(VOLTD_SCMI_STPMIC1_LDO4, "ldo4", "ldo4"),
-	VOLTD_CELL_PMIC(VOLTD_SCMI_STPMIC1_LDO5, "ldo5", "ldo5"),
-	VOLTD_CELL_PMIC(VOLTD_SCMI_STPMIC1_LDO6, "ldo6", "ldo6"),
-	VOLTD_CELL_PMIC(VOLTD_SCMI_STPMIC1_VREFDDR, "vref_ddr", "vref_ddr"),
-	VOLTD_CELL_PMIC(VOLTD_SCMI_STPMIC1_BOOST, "boost", "bst_out"),
-	VOLTD_CELL_PMIC(VOLTD_SCMI_STPMIC1_PWR_SW1, "pwr_sw1", "pwr_sw1"),
-	VOLTD_CELL_PMIC(VOLTD_SCMI_STPMIC1_PWR_SW2, "pwr_sw2", "pwr_sw2"),
+	VOLTD_CELL(VOLTD_SCMI_REG11, VOLTD_PWR, PWR_REG11_NAME_ID, "reg11"),
+	VOLTD_CELL(VOLTD_SCMI_REG18, VOLTD_PWR, PWR_REG18_NAME_ID, "reg18"),
+	VOLTD_CELL(VOLTD_SCMI_USB33, VOLTD_PWR, PWR_USB33_NAME_ID, "usb33"),
+	VOLTD_CELL(VOLTD_SCMI_SDMMC1_IO, VOLTD_PWR, PWR_SDMMC1_IO_NAME_ID,
+		   "sdmmc1"),
+	VOLTD_CELL(VOLTD_SCMI_SDMMC2_IO, VOLTD_PWR, PWR_SDMMC2_IO_NAME_ID,
+		   "sdmmc2"),
+	VOLTD_CELL(VOLTD_SCMI_VREFBUF, VOLTD_PWR, PWR_VREFBUF_NAME_ID,
+		   "vrefbuf"),
+	VOLTD_CELL(VOLTD_SCMI_STPMIC1_BUCK1, VOLTD_PMIC, "buck1", "buck1"),
+	VOLTD_CELL(VOLTD_SCMI_STPMIC1_BUCK2, VOLTD_PMIC, "buck2", "buck2"),
+	VOLTD_CELL(VOLTD_SCMI_STPMIC1_BUCK3, VOLTD_PMIC, "buck3", "buck3"),
+	VOLTD_CELL(VOLTD_SCMI_STPMIC1_BUCK4, VOLTD_PMIC, "buck4", "buck4"),
+	VOLTD_CELL(VOLTD_SCMI_STPMIC1_LDO1, VOLTD_PMIC, "ldo1", "ldo1"),
+	VOLTD_CELL(VOLTD_SCMI_STPMIC1_LDO2, VOLTD_PMIC, "ldo2", "ldo2"),
+	VOLTD_CELL(VOLTD_SCMI_STPMIC1_LDO3, VOLTD_PMIC, "ldo3", "ldo3"),
+	VOLTD_CELL(VOLTD_SCMI_STPMIC1_LDO4, VOLTD_PMIC, "ldo4", "ldo4"),
+	VOLTD_CELL(VOLTD_SCMI_STPMIC1_LDO5, VOLTD_PMIC, "ldo5", "ldo5"),
+	VOLTD_CELL(VOLTD_SCMI_STPMIC1_LDO6, VOLTD_PMIC, "ldo6", "ldo6"),
+	VOLTD_CELL(VOLTD_SCMI_STPMIC1_VREFDDR, VOLTD_PMIC, "vref_ddr",
+		   "vref_ddr"),
+	VOLTD_CELL(VOLTD_SCMI_STPMIC1_BOOST, VOLTD_PMIC, "boost", "bst_out"),
+	VOLTD_CELL(VOLTD_SCMI_STPMIC1_PWR_SW1, VOLTD_PMIC, "pwr_sw1",
+		   "pwr_sw1"),
+	VOLTD_CELL(VOLTD_SCMI_STPMIC1_PWR_SW2, VOLTD_PMIC, "pwr_sw2",
+		   "pwr_sw2"),
 };
 #endif
 
 #ifdef CFG_STM32MP15
 struct stm32_scmi_voltd scmi_voltage_domain[] = {
-	VOLTD_CELL_PWR(VOLTD_SCMI_REG11, PWR_REG11, "reg11"),
-	VOLTD_CELL_PWR(VOLTD_SCMI_REG18, PWR_REG18, "reg18"),
-	VOLTD_CELL_PWR(VOLTD_SCMI_USB33, PWR_USB33, "usb33"),
-	VOLTD_CELL_PMIC(VOLTD_SCMI_STPMIC1_BUCK1, "buck1", "vddcore"),
-	VOLTD_CELL_PMIC(VOLTD_SCMI_STPMIC1_BUCK2, "buck2", "vdd_ddr"),
-	VOLTD_CELL_PMIC(VOLTD_SCMI_STPMIC1_BUCK3, "buck3", "vdd"),
-	VOLTD_CELL_PMIC(VOLTD_SCMI_STPMIC1_BUCK4, "buck4", "v3v3"),
-	VOLTD_CELL_PMIC(VOLTD_SCMI_STPMIC1_LDO1, "ldo1", "v1v8_audio"),
-	VOLTD_CELL_PMIC(VOLTD_SCMI_STPMIC1_LDO2, "ldo2", "v3v3_hdmi"),
-	VOLTD_CELL_PMIC(VOLTD_SCMI_STPMIC1_LDO3, "ldo3", "vtt_ddr"),
-	VOLTD_CELL_PMIC(VOLTD_SCMI_STPMIC1_LDO4, "ldo4", "vdd_usb"),
-	VOLTD_CELL_PMIC(VOLTD_SCMI_STPMIC1_LDO5, "ldo5", "vdda"),
-	VOLTD_CELL_PMIC(VOLTD_SCMI_STPMIC1_LDO6, "ldo6", "v1v2_hdmi"),
-	VOLTD_CELL_PMIC(VOLTD_SCMI_STPMIC1_VREFDDR, "vref_ddr", "vref_ddr"),
-	VOLTD_CELL_PMIC(VOLTD_SCMI_STPMIC1_BOOST, "boost", "bst_out"),
-	VOLTD_CELL_PMIC(VOLTD_SCMI_STPMIC1_PWR_SW1, "pwr_sw1", "vbus_otg"),
-	VOLTD_CELL_PMIC(VOLTD_SCMI_STPMIC1_PWR_SW2, "pwr_sw2", "vbus_sw"),
+	VOLTD_CELL(VOLTD_SCMI_REG11, VOLTD_PWR, PWR_REG11_NAME_ID, "reg11"),
+	VOLTD_CELL(VOLTD_SCMI_REG18, VOLTD_PWR, PWR_REG18_NAME_ID, "reg18"),
+	VOLTD_CELL(VOLTD_SCMI_USB33, VOLTD_PWR, PWR_USB33_NAME_ID, "usb33"),
+	VOLTD_CELL(VOLTD_SCMI_STPMIC1_BUCK1, VOLTD_PMIC, "buck1", "vddcore"),
+	VOLTD_CELL(VOLTD_SCMI_STPMIC1_BUCK2, VOLTD_PMIC, "buck2", "vdd_ddr"),
+	VOLTD_CELL(VOLTD_SCMI_STPMIC1_BUCK3, VOLTD_PMIC, "buck3", "vdd"),
+	VOLTD_CELL(VOLTD_SCMI_STPMIC1_BUCK4, VOLTD_PMIC, "buck4", "v3v3"),
+	VOLTD_CELL(VOLTD_SCMI_STPMIC1_LDO1, VOLTD_PMIC, "ldo1", "v1v8_audio"),
+	VOLTD_CELL(VOLTD_SCMI_STPMIC1_LDO2, VOLTD_PMIC, "ldo2", "v3v3_hdmi"),
+	VOLTD_CELL(VOLTD_SCMI_STPMIC1_LDO3, VOLTD_PMIC, "ldo3", "vtt_ddr"),
+	VOLTD_CELL(VOLTD_SCMI_STPMIC1_LDO4, VOLTD_PMIC, "ldo4", "vdd_usb"),
+	VOLTD_CELL(VOLTD_SCMI_STPMIC1_LDO5, VOLTD_PMIC, "ldo5", "vdda"),
+	VOLTD_CELL(VOLTD_SCMI_STPMIC1_LDO6, VOLTD_PMIC, "ldo6", "v1v2_hdmi"),
+	VOLTD_CELL(VOLTD_SCMI_STPMIC1_VREFDDR, VOLTD_PMIC, "vref_ddr",
+		   "vref_ddr"),
+	VOLTD_CELL(VOLTD_SCMI_STPMIC1_BOOST, VOLTD_PMIC, "boost", "bst_out"),
+	VOLTD_CELL(VOLTD_SCMI_STPMIC1_PWR_SW1, VOLTD_PMIC, "pwr_sw1",
+		   "vbus_otg"),
+	VOLTD_CELL(VOLTD_SCMI_STPMIC1_PWR_SW2, VOLTD_PMIC, "pwr_sw2",
+		   "vbus_sw"),
 };
 #endif
 
@@ -329,28 +262,13 @@ struct channel_resources {
 	size_t rd_count;
 	struct stm32_scmi_voltd *voltd;
 	size_t voltd_count;
-#ifdef CFG_SCMI_MSG_PERF_DOMAIN
-	struct stm32_scmi_perfd *perfd;
-	size_t perfd_count;
-#endif
-};
-
-#define PERFD_CELL(_scmi_id, _name) \
-	[_scmi_id] = { \
-		.name = (_name), \
-	}
-
-struct stm32_scmi_perfd __maybe_unused scmi_performance_domain[] = {
-	PERFD_CELL(0 /* PERFD_SCMI0_CPU_OPP */, "cpu-opp"),
 };
 
 static const struct channel_resources scmi_channel[] = {
 	[0] = {
 		.channel = &(struct scmi_msg_channel){
-#ifdef SMT_BUFFER_BASE
 			.shm_addr = { .pa = SMT_BUFFER_BASE },
 			.shm_size = SMT_BUF_SLOT_SIZE,
-#endif
 		},
 		.clock = stm32_scmi_clock,
 		.clock_count = ARRAY_SIZE(stm32_scmi_clock),
@@ -358,10 +276,6 @@ static const struct channel_resources scmi_channel[] = {
 		.rd_count = ARRAY_SIZE(stm32_scmi_reset_domain),
 		.voltd = scmi_voltage_domain,
 		.voltd_count = ARRAY_SIZE(scmi_voltage_domain),
-#ifdef CFG_SCMI_MSG_PERF_DOMAIN
-		.perfd = scmi_performance_domain,
-		.perfd_count = ARRAY_SIZE(scmi_performance_domain),
-#endif
 	},
 };
 
@@ -407,14 +321,6 @@ static size_t __maybe_unused plat_scmi_protocol_count_paranoid(void)
 	if (n < channel_count)
 		count++;
 
-#ifdef CFG_SCMI_MSG_PERF_DOMAIN
-	for (n = 0; n < channel_count; n++)
-		if (scmi_channel[n].perfd_count)
-			break;
-	if (n < channel_count)
-		count++;
-#endif
-
 	return count;
 }
 
@@ -436,9 +342,6 @@ static const uint8_t plat_protocol_list[] = {
 	SCMI_PROTOCOL_ID_CLOCK,
 	SCMI_PROTOCOL_ID_RESET_DOMAIN,
 	SCMI_PROTOCOL_ID_VOLTAGE_DOMAIN,
-#ifdef CFG_SCMI_MSG_PERF_DOMAIN
-	SCMI_PROTOCOL_ID_PERF,
-#endif
 	0 /* Null termination */
 };
 
@@ -457,41 +360,6 @@ const uint8_t *plat_scmi_protocol_list(unsigned int channel_id __unused)
 	       (ARRAY_SIZE(plat_protocol_list) - 1));
 
 	return plat_protocol_list;
-}
-
-static bool nsec_can_access_resource(unsigned int etzpc_id)
-{
-	static struct firewall_controller *etzpc_fw_ctrl;
-	uint32_t query_arg = DECPROT(etzpc_id, DECPROT_NS_RW, DECPROT_UNLOCK);
-	struct firewall_query query = {
-		.arg_count = 1,
-		.args = &query_arg,
-		.ctrl = etzpc_fw_ctrl,
-	};
-
-	if (etzpc_id == ETZPC_ID_NEVER_ACCESSIBLE)
-		return false;
-	if (etzpc_id == ETZPC_ID_ALWAYS_ACCESSIBLE)
-		return true;
-
-	if (!etzpc_fw_ctrl) {
-		struct dt_driver_provider *prov = NULL;
-		int node = 0;
-
-		node = fdt_node_offset_by_compatible(get_embedded_dt(), -1,
-						     "st,stm32-etzpc");
-		if (node < 0)
-			panic();
-
-		prov = dt_driver_get_provider_by_node(node, DT_DRIVER_FIREWALL);
-		if (!prov)
-			panic();
-
-		etzpc_fw_ctrl = dt_driver_provider_priv_data(prov);
-		query.ctrl = etzpc_fw_ctrl;
-	}
-
-	return firewall_check_access(&query) == TEE_SUCCESS;
 }
 
 /*
@@ -527,7 +395,7 @@ const char *plat_scmi_clock_get_name(unsigned int channel_id,
 {
 	struct stm32_scmi_clk *clock = find_clock(channel_id, scmi_id);
 
-	if (!clock || !nsec_can_access_resource(clock->etzpc_id))
+	if (!clock || !stm32mp_nsec_can_access_clock(clock->clock_id))
 		return NULL;
 
 	return clock->name;
@@ -542,7 +410,7 @@ int32_t plat_scmi_clock_rates_array(unsigned int channel_id,
 	if (!clock)
 		return SCMI_NOT_FOUND;
 
-	if (!nsec_can_access_resource(clock->etzpc_id))
+	if (!stm32mp_nsec_can_access_clock(clock->clock_id))
 		return SCMI_DENIED;
 
 	/* Exposed clocks are currently fixed rate clocks */
@@ -564,7 +432,7 @@ unsigned long plat_scmi_clock_get_rate(unsigned int channel_id,
 {
 	struct stm32_scmi_clk *clock = find_clock(channel_id, scmi_id);
 
-	if (!clock || !nsec_can_access_resource(clock->etzpc_id))
+	if (!clock || !stm32mp_nsec_can_access_clock(clock->clock_id))
 		return 0;
 
 	return clk_get_rate(clock->clk);
@@ -574,7 +442,7 @@ int32_t plat_scmi_clock_get_state(unsigned int channel_id, unsigned int scmi_id)
 {
 	struct stm32_scmi_clk *clock = find_clock(channel_id, scmi_id);
 
-	if (!clock || !nsec_can_access_resource(clock->etzpc_id))
+	if (!clock || !stm32mp_nsec_can_access_clock(clock->clock_id))
 		return 0;
 
 	return (int32_t)clock->enabled;
@@ -588,18 +456,18 @@ int32_t plat_scmi_clock_set_state(unsigned int channel_id, unsigned int scmi_id,
 	if (!clock)
 		return SCMI_NOT_FOUND;
 
-	if (!nsec_can_access_resource(clock->etzpc_id))
+	if (!stm32mp_nsec_can_access_clock(clock->clock_id))
 		return SCMI_DENIED;
 
 	if (enable_not_disable) {
 		if (!clock->enabled) {
-			FMSG("SCMI clock %u enable", scmi_id);
+			DMSG("SCMI clock %u enable", scmi_id);
 			clk_enable(clock->clk);
 			clock->enabled = true;
 		}
 	} else {
 		if (clock->enabled) {
-			FMSG("SCMI clock %u disable", scmi_id);
+			DMSG("SCMI clock %u disable", scmi_id);
 			clk_disable(clock->clk);
 			clock->enabled = false;
 		}
@@ -654,23 +522,20 @@ int32_t plat_scmi_rd_autonomous(unsigned int channel_id, unsigned int scmi_id,
 	if (!rd)
 		return SCMI_NOT_FOUND;
 
-	if (!rd->rstctrl || !nsec_can_access_resource(rd->etzpc_id))
+	if (!rd->rstctrl || !stm32mp_nsec_can_access_reset(rd->reset_id))
 		return SCMI_DENIED;
+	assert(rd->rstctrl);
 
 #ifdef CFG_STM32MP15
-	/* Reset cycle on MCU hold boot is not supported */
 	if (rd->reset_id == MCU_HOLD_BOOT_R)
 		return SCMI_NOT_SUPPORTED;
-	/* Remoteproc driver may handle all MCU reset controllers */
-	if (rd->reset_id == MCU_R && stm32_rproc_is_secure(STM32_M4_RPROC_ID))
-		return SCMI_DENIED;
 #endif
 
 	/* Supports only reset with context loss */
 	if (state)
 		return SCMI_NOT_SUPPORTED;
 
-	FMSG("SCMI reset %u cycle", scmi_id);
+	DMSG("SCMI reset %u cycle", scmi_id);
 
 	if (rstctrl_assert_to(rd->rstctrl, TIMEOUT_US_1MS))
 		return SCMI_HARDWARE_ERROR;
@@ -690,21 +555,15 @@ int32_t plat_scmi_rd_set_state(unsigned int channel_id, unsigned int scmi_id,
 	if (!rd)
 		return SCMI_NOT_FOUND;
 
-	if (!rd->rstctrl || !nsec_can_access_resource(rd->etzpc_id))
+	if (!rd->rstctrl || !stm32mp_nsec_can_access_reset(rd->reset_id))
 		return SCMI_DENIED;
-
-#ifdef CFG_STM32MP15
-	/* Remoteproc driver may handle all MCU reset controllers */
-	if ((rd->reset_id == MCU_R || rd->reset_id == MCU_HOLD_BOOT_R) &&
-	    stm32_rproc_is_secure(STM32_M4_RPROC_ID))
-		return SCMI_DENIED;
-#endif
+	assert(rd->rstctrl);
 
 	if (assert_not_deassert) {
-		FMSG("SCMI reset %u set", scmi_id);
+		DMSG("SCMI reset %u set", scmi_id);
 		res = rstctrl_assert(rd->rstctrl);
 	} else {
-		FMSG("SCMI reset %u release", scmi_id);
+		DMSG("SCMI reset %u release", scmi_id);
 		res = rstctrl_deassert(rd->rstctrl);
 	}
 
@@ -754,129 +613,247 @@ const char *plat_scmi_voltd_get_name(unsigned int channel_id,
 	return voltd->name;
 }
 
-int32_t plat_scmi_voltd_levels_array(unsigned int channel_id,
-				     unsigned int scmi_id, size_t start_index,
-				     long *out_levels, size_t *nb_elts)
-
+static enum pwr_regulator pwr_scmi_to_regu_id(struct stm32_scmi_voltd *voltd)
 {
-	struct stm32_scmi_voltd *voltd = find_voltd(channel_id, scmi_id);
+	if (!strcmp(voltd->priv_id, PWR_REG11_NAME_ID))
+		return PWR_REG11;
+	if (!strcmp(voltd->priv_id, PWR_REG18_NAME_ID))
+		return PWR_REG18;
+	if (!strcmp(voltd->priv_id, PWR_USB33_NAME_ID))
+		return PWR_USB33;
 
-	if (!voltd)
-		return SCMI_NOT_FOUND;
-
-	if (voltd->regulator) {
-		struct regulator_voltages_desc *desc = NULL;
-		TEE_Result res = TEE_ERROR_GENERIC;
-		const int *levels = NULL;
-		size_t n = 0;
-
-		res = regulator_supported_voltages(voltd->regulator, &desc,
-						   &levels);
-		if (res == TEE_ERROR_NOT_SUPPORTED)
-			return SCMI_NOT_SUPPORTED;
-		if (res)
-			return SCMI_GENERIC_ERROR;
-		if (!desc || desc->type != VOLTAGE_TYPE_FULL_LIST) {
-			/*
-			 * Triplet min/max/step description. Caller should use
-			 * plat_scmi_voltd_levels_by_step().
-			 */
-			return SCMI_NOT_SUPPORTED;
-		}
-
-		if (start_index >= desc->num_levels)
-			return SCMI_OUT_OF_RANGE;
-
-		if (!*nb_elts) {
-			*nb_elts = desc->num_levels - start_index;
-			return SCMI_SUCCESS;
-		}
-
-		*nb_elts = MIN(*nb_elts, desc->num_levels - start_index);
-		for (n = 0; n < *nb_elts; n++)
-			out_levels[n] = levels[start_index + n];
-
-		return SCMI_SUCCESS;
-	}
-
-	return SCMI_DENIED;
+	panic();
 }
 
-int32_t plat_scmi_voltd_levels_by_step(unsigned int channel_id,
-				       unsigned int scmi_id, long *min_max_step)
+static long pwr_get_level(struct stm32_scmi_voltd *voltd)
+{
+	enum pwr_regulator regu_id = pwr_scmi_to_regu_id(voltd);
+
+	return (long)stm32mp1_pwr_regulator_mv(regu_id) * 1000;
+}
+
+static int32_t pwr_set_level(struct stm32_scmi_voltd *voltd, long level_uv)
+{
+	if (level_uv != pwr_get_level(voltd))
+		return SCMI_INVALID_PARAMETERS;
+
+	return SCMI_SUCCESS;
+}
+
+static int32_t pwr_describe_levels(struct stm32_scmi_voltd *voltd,
+				   size_t start_index, long *microvolt,
+				   size_t *nb_elts)
+{
+	if (start_index)
+		return SCMI_INVALID_PARAMETERS;
+
+	if (!microvolt) {
+		*nb_elts = 1;
+		return SCMI_SUCCESS;
+	}
+
+	if (*nb_elts < 1)
+		return SCMI_GENERIC_ERROR;
+
+	*nb_elts = 1;
+	*microvolt = pwr_get_level(voltd);
+
+	return SCMI_SUCCESS;
+}
+
+static uint32_t pwr_get_state(struct stm32_scmi_voltd *voltd)
+{
+	enum pwr_regulator regu_id = pwr_scmi_to_regu_id(voltd);
+
+	if (stm32mp1_pwr_regulator_is_enabled(regu_id))
+		return SCMI_VOLTAGE_DOMAIN_CONFIG_ARCH_ON;
+
+	return SCMI_VOLTAGE_DOMAIN_CONFIG_ARCH_OFF;
+}
+
+static void pwr_set_state(struct stm32_scmi_voltd *voltd, bool enable)
+{
+	enum pwr_regulator regu_id = pwr_scmi_to_regu_id(voltd);
+
+	DMSG("%sable PWR %s (was %s)", enable ? "En" : "Dis", voltd->name,
+	     stm32mp1_pwr_regulator_is_enabled(regu_id) ? "on" : "off");
+
+	stm32mp1_pwr_regulator_set_state(regu_id, enable);
+}
+
+static int32_t pmic_describe_levels(struct stm32_scmi_voltd *voltd,
+				    size_t start_index, long *microvolt,
+				    size_t *nb_elts)
+{
+	const uint16_t *levels = NULL;
+	size_t full_count = 0;
+	size_t out_count = 0;
+	size_t i = 0;
+
+	if (!stm32mp_nsec_can_access_pmic_regu(voltd->priv_id))
+		return SCMI_DENIED;
+
+	stpmic1_regulator_levels_mv(voltd->priv_id, &levels, &full_count);
+
+	if (!microvolt) {
+		*nb_elts = full_count - start_index;
+		return SCMI_SUCCESS;
+	}
+
+	if (SUB_OVERFLOW(full_count, start_index, &out_count))
+		return SCMI_GENERIC_ERROR;
+
+	out_count = MIN(out_count, *nb_elts);
+
+	FMSG("%zu levels: start %zu requested %zu output %zu",
+	     full_count, start_index, *nb_elts, out_count);
+
+	for (i = 0; i < out_count; i++)
+		microvolt[i] = levels[start_index + i] * 1000;
+
+	*nb_elts = out_count;
+
+	return SCMI_SUCCESS;
+}
+
+static long pmic_get_level(struct stm32_scmi_voltd *voltd)
+{
+	unsigned long level_mv = 0;
+
+	if (!stm32mp_nsec_can_access_pmic_regu(voltd->priv_id))
+		return 0;
+
+	stm32mp_get_pmic();
+	level_mv = stpmic1_regulator_voltage_get(voltd->priv_id);
+	stm32mp_put_pmic();
+
+	return (long)level_mv * 1000;
+}
+
+static int32_t pmic_set_level(struct stm32_scmi_voltd *voltd, long level_uv)
+{
+	int rc = 0;
+	unsigned int level_mv = 0;
+
+	if (!stm32mp_nsec_can_access_pmic_regu(voltd->priv_id))
+		return SCMI_DENIED;
+
+	if (level_uv < 0 || level_uv > (UINT16_MAX * 1000))
+		return SCMI_INVALID_PARAMETERS;
+
+	level_mv = (unsigned int)level_uv / 1000;
+
+	DMSG("Set STPMIC1 regulator %s level to %dmV", voltd->name, level_mv);
+
+	stm32mp_get_pmic();
+	rc = stpmic1_regulator_voltage_set(voltd->priv_id, level_mv);
+	stm32mp_put_pmic();
+
+	return rc ? SCMI_GENERIC_ERROR : SCMI_SUCCESS;
+}
+
+static uint32_t pmic_get_state(struct stm32_scmi_voltd *voltd)
+{
+	bool enabled = false;
+
+	if (!stm32mp_nsec_can_access_pmic_regu(voltd->priv_id))
+		return SCMI_VOLTAGE_DOMAIN_CONFIG_ARCH_OFF;
+
+	stm32mp_get_pmic();
+	enabled = stpmic1_is_regulator_enabled(voltd->priv_id);
+	stm32mp_put_pmic();
+
+	if (enabled)
+		return SCMI_VOLTAGE_DOMAIN_CONFIG_ARCH_ON;
+
+	return SCMI_VOLTAGE_DOMAIN_CONFIG_ARCH_OFF;
+}
+
+static int32_t pmic_set_state(struct stm32_scmi_voltd *voltd, bool enable)
+{
+	int rc = 0;
+
+	if (!stm32mp_nsec_can_access_pmic_regu(voltd->priv_id))
+		return SCMI_DENIED;
+
+	stm32mp_get_pmic();
+
+	DMSG("%sable STPMIC1 %s (was %s)", enable ? "En" : "Dis", voltd->name,
+	     stpmic1_is_regulator_enabled(voltd->priv_id) ? "on" : "off");
+
+	if (enable)
+		rc = stpmic1_regulator_enable(voltd->priv_id);
+	else
+		rc = stpmic1_regulator_disable(voltd->priv_id);
+
+	stm32mp_put_pmic();
+
+	return rc ? SCMI_GENERIC_ERROR : SCMI_SUCCESS;
+}
+
+int32_t plat_scmi_voltd_levels_array(unsigned int channel_id,
+				     unsigned int scmi_id, size_t start_index,
+				     long *levels, size_t *nb_elts)
+
 {
 	struct stm32_scmi_voltd *voltd = find_voltd(channel_id, scmi_id);
 
 	if (!voltd)
 		return SCMI_NOT_FOUND;
 
-	if (voltd->regulator) {
-		struct regulator_voltages_desc *desc = NULL;
-		TEE_Result res = TEE_ERROR_GENERIC;
-		const int *levels = NULL;
-
-		res = regulator_supported_voltages(voltd->regulator, &desc,
-						   &levels);
-		if (res == TEE_ERROR_NOT_SUPPORTED)
-			return SCMI_NOT_SUPPORTED;
-		if (res)
-			return SCMI_GENERIC_ERROR;
-		if (!desc || desc->type != VOLTAGE_TYPE_INCREMENT) {
-			/*
-			 * Triplet min/max/step description. Caller should use
-			 * plat_scmi_voltd_levels_by_step().
-			 */
-			return SCMI_NOT_SUPPORTED;
-		}
-
-		min_max_step[0] = levels[0];
-		min_max_step[1] = levels[1];
-		min_max_step[2] = levels[2];
-
-		return SCMI_SUCCESS;
+	switch (voltd->priv_dev) {
+	case VOLTD_PWR:
+		return pwr_describe_levels(voltd, start_index, levels, nb_elts);
+	case VOLTD_PMIC:
+		return pmic_describe_levels(voltd, start_index, levels,
+					    nb_elts);
+	default:
+		return SCMI_GENERIC_ERROR;
 	}
-
-	return SCMI_NOT_SUPPORTED;
 }
 
 int32_t plat_scmi_voltd_get_level(unsigned int channel_id, unsigned int scmi_id,
-				  long *level_uv)
+				  long *level)
 {
 	struct stm32_scmi_voltd *voltd = find_voltd(channel_id, scmi_id);
+	long voltage = 0;
 
 	if (!voltd)
 		return SCMI_INVALID_PARAMETERS;
 
-	if (voltd->regulator) {
-		*level_uv = regulator_get_voltage(voltd->regulator);
+	switch (voltd->priv_dev) {
+	case VOLTD_PWR:
+		*level = pwr_get_level(voltd);
 		return SCMI_SUCCESS;
+	case VOLTD_PMIC:
+		voltage = pmic_get_level(voltd);
+		if (voltage > 0) {
+			*level = voltage;
+			return SCMI_SUCCESS;
+		} else {
+			return SCMI_GENERIC_ERROR;
+		}
+	default:
+		panic();
 	}
-
-	return SCMI_DENIED;
 }
 
 int32_t plat_scmi_voltd_set_level(unsigned int channel_id, unsigned int scmi_id,
-				  long level_uv)
+				  long level)
 {
 	struct stm32_scmi_voltd *voltd = find_voltd(channel_id, scmi_id);
 
 	if (!voltd)
 		return SCMI_NOT_FOUND;
 
-	if (voltd->regulator) {
-		TEE_Result res = TEE_ERROR_GENERIC;
-
-		if (level_uv < INT_MIN || level_uv > INT_MAX)
-			return SCMI_OUT_OF_RANGE;
-
-		res = regulator_set_voltage(voltd->regulator, level_uv);
-		if (res)
-			return SCMI_GENERIC_ERROR;
-		else
-			return SCMI_SUCCESS;
+	switch (voltd->priv_dev) {
+	case VOLTD_PWR:
+		return pwr_set_level(voltd, level);
+	case VOLTD_PMIC:
+		return pmic_set_level(voltd, level);
+	default:
+		return SCMI_GENERIC_ERROR;
 	}
-
-	return SCMI_DENIED;
 }
 
 int32_t plat_scmi_voltd_get_config(unsigned int channel_id,
@@ -887,219 +864,42 @@ int32_t plat_scmi_voltd_get_config(unsigned int channel_id,
 	if (!voltd)
 		return SCMI_NOT_FOUND;
 
-	if (voltd->regulator) {
-		if (voltd->state)
-			*config = SCMI_VOLTAGE_DOMAIN_CONFIG_ARCH_ON;
-		else
-			*config = SCMI_VOLTAGE_DOMAIN_CONFIG_ARCH_OFF;
-
-		return SCMI_SUCCESS;
+	switch (voltd->priv_dev) {
+	case VOLTD_PWR:
+		*config = pwr_get_state(voltd);
+		break;
+	case VOLTD_PMIC:
+		*config = pmic_get_state(voltd);
+		break;
+	default:
+		return SCMI_GENERIC_ERROR;
 	}
 
-	return SCMI_DENIED;
+	return SCMI_SUCCESS;
 }
 
 int32_t plat_scmi_voltd_set_config(unsigned int channel_id,
 				   unsigned int scmi_id, uint32_t config)
 {
 	struct stm32_scmi_voltd *voltd = find_voltd(channel_id, scmi_id);
+	int32_t rc = SCMI_SUCCESS;
 
 	if (!voltd)
 		return SCMI_NOT_FOUND;
 
-	if (voltd->regulator) {
-		switch (config) {
-		case SCMI_VOLTAGE_DOMAIN_CONFIG_ARCH_ON:
-			if (!voltd->state) {
-				if (regulator_enable(voltd->regulator))
-					return SCMI_GENERIC_ERROR;
-
-				voltd->state = true;
-			}
-			break;
-		case SCMI_VOLTAGE_DOMAIN_CONFIG_ARCH_OFF:
-			if (voltd->state) {
-				if (regulator_disable(voltd->regulator))
-					return SCMI_GENERIC_ERROR;
-
-				voltd->state = false;
-			}
-			break;
-		default:
-			return SCMI_INVALID_PARAMETERS;
-		}
-
-		return SCMI_SUCCESS;
-	}
-
-	return SCMI_DENIED;
-}
-
-static void get_voltd_regulator(struct stm32_scmi_voltd *voltd)
-{
 	switch (voltd->priv_dev) {
 	case VOLTD_PWR:
-		voltd->regulator = stm32mp1_pwr_get_regulator(voltd->priv_id);
+		pwr_set_state(voltd, config);
 		break;
 	case VOLTD_PMIC:
-		voltd->regulator = stm32mp_pmic_get_regulator(voltd->priv_name);
+		rc = pmic_set_state(voltd, config);
 		break;
-	case VOLTD_VREFBUF:
-		voltd->regulator = stm32_vrefbuf_regulator();
-		break;
-	case VOLTD_IOD:
-		voltd->regulator = stm32mp1_get_iod_regulator(voltd->priv_id);
-		break;
-	default:
-		break;
-	}
-
-	if (voltd->regulator && voltd->regulator->flags & REGULATOR_BOOT_ON)
-		regulator_enable(voltd->regulator);
-}
-
-#ifdef CFG_SCMI_MSG_PERF_DOMAIN
-/*
- * Platform SCMI performance domains
- *
- * Note: currently exposes a single performance domain that is the CPU DVFS
- * operating point. Non-secure is allowed to access this performance domain.
- */
-static struct stm32_scmi_perfd *find_perfd(unsigned int channel_id,
-					   unsigned int domain_id)
-{
-	const struct channel_resources *resource = find_resource(channel_id);
-	size_t n = 0;
-
-	if (resource) {
-		for (n = 0; n < resource->perfd_count; n++)
-			if (n == domain_id)
-				return &resource->perfd[n];
-	}
-
-	return NULL;
-}
-
-size_t plat_scmi_perf_count(unsigned int channel_id)
-{
-	const struct channel_resources *resource = find_resource(channel_id);
-
-	if (!resource)
-		return 0;
-
-	return resource->perfd_count;
-}
-
-const char *plat_scmi_perf_domain_name(unsigned int channel_id,
-				       unsigned int domain_id)
-{
-	struct stm32_scmi_perfd *perfd = find_perfd(channel_id, domain_id);
-
-	if (!perfd)
-		return NULL;
-
-	return perfd->name;
-}
-
-int32_t plat_scmi_perf_sustained_freq(unsigned int channel_id,
-				      unsigned int domain_id,
-				      unsigned int *freq)
-{
-	struct stm32_scmi_perfd *perfd = find_perfd(channel_id, domain_id);
-
-	if (!perfd)
-		return SCMI_NOT_FOUND;
-
-	*freq = stm32_cpu_opp_sustained_level();
-
-	return SCMI_SUCCESS;
-}
-
-int32_t plat_scmi_perf_level_latency(unsigned int channel_id,
-				     unsigned int domain_id,
-				     unsigned int level __unused,
-				     unsigned int *latency)
-{
-	struct stm32_scmi_perfd *perfd = find_perfd(channel_id, domain_id);
-
-	if (!perfd)
-		return SCMI_NOT_FOUND;
-
-	*latency = CFG_STM32MP_OPP_LATENCY_US;
-
-	return SCMI_SUCCESS;
-}
-
-int32_t plat_scmi_perf_levels_array(unsigned int channel_id,
-				    unsigned int domain_id, size_t start_index,
-				    unsigned int *levels, size_t *nb_elts)
-{
-	struct stm32_scmi_perfd *perfd = find_perfd(channel_id, domain_id);
-	size_t full_count = 0;
-	size_t out_count = 0;
-	size_t n = 0;
-
-	if (!perfd)
-		return SCMI_NOT_FOUND;
-
-	full_count = stm32_cpu_opp_count();
-	if (SUB_OVERFLOW(full_count, start_index, &out_count))
-		return SCMI_OUT_OF_RANGE;
-
-	if (!levels) {
-		*nb_elts = full_count - start_index;
-
-		return SCMI_SUCCESS;
-	}
-
-	out_count = MIN(out_count, *nb_elts);
-
-	FMSG("%zu levels: start %zu requested %zu output %zu",
-	     full_count, start_index, *nb_elts, out_count);
-
-	for (n = 0; n < out_count; n++)
-		levels[n] = stm32_cpu_opp_level(start_index + n);
-
-	*nb_elts = out_count;
-
-	return SCMI_SUCCESS;
-}
-
-int32_t plat_scmi_perf_level_get(unsigned int channel_id,
-				 unsigned int domain_id, unsigned int *level)
-{
-	struct stm32_scmi_perfd *perfd = find_perfd(channel_id, domain_id);
-	unsigned int current_level = 0;
-
-	if (!perfd)
-		return SCMI_NOT_FOUND;
-
-	if (stm32_cpu_opp_read_level(&current_level))
-		return SCMI_GENERIC_ERROR;
-
-	*level = current_level;
-
-	return SCMI_SUCCESS;
-}
-
-int32_t plat_scmi_perf_level_set(unsigned int channel_id,
-				 unsigned int domain_id, unsigned int level)
-{
-	struct stm32_scmi_perfd *perfd = find_perfd(channel_id, domain_id);
-
-	if (!perfd)
-		return SCMI_NOT_FOUND;
-
-	switch (stm32_cpu_opp_set_level(level)) {
-	case TEE_SUCCESS:
-		return SCMI_SUCCESS;
-	case TEE_ERROR_BAD_PARAMETERS:
-		return SCMI_OUT_OF_RANGE;
 	default:
 		return SCMI_GENERIC_ERROR;
 	}
+
+	return rc;
 }
-#endif
 
 /*
  * Initialize platform SCMI resources
@@ -1113,17 +913,12 @@ static TEE_Result stm32mp1_init_scmi_server(void)
 		const struct channel_resources *res = scmi_channel + i;
 		struct scmi_msg_channel *chan = res->channel;
 
-		if (chan->shm_addr.pa) {
-			struct io_pa_va *addr = &chan->shm_addr;
+		/* Enforce non-secure shm mapped as device memory */
+		chan->shm_addr.va = (vaddr_t)phys_to_virt(chan->shm_addr.pa,
+							  MEM_AREA_IO_NSEC, 1);
+		assert(chan->shm_addr.va);
 
-			/* Enforce non-secure shm mapped as device memory */
-			addr->va = (vaddr_t)phys_to_virt(addr->pa,
-							 MEM_AREA_IO_NSEC,
-							 chan->shm_size);
-			assert(addr->va);
-
-			scmi_smt_init_agent_channel(chan);
-		}
+		scmi_smt_init_agent_channel(chan);
 
 		for (j = 0; j < res->clock_count; j++) {
 			struct stm32_scmi_clk *clk = &res->clock[j];
@@ -1137,7 +932,7 @@ static TEE_Result stm32mp1_init_scmi_server(void)
 
 			/* Sync SCMI clocks with their targeted initial state */
 			if (clk->enabled &&
-			    nsec_can_access_resource(clk->etzpc_id))
+			    stm32mp_nsec_can_access_clock(clk->clock_id))
 				clk_enable(clk->clk);
 		}
 
@@ -1148,6 +943,9 @@ static TEE_Result stm32mp1_init_scmi_server(void)
 			if (!rd->name ||
 			    strlen(rd->name) >= SCMI_RD_NAME_SIZE)
 				panic("SCMI reset domain name invalid");
+
+			if (stm32mp_nsec_can_access_clock(rd->reset_id))
+				continue;
 
 			rstctrl = stm32mp_rcc_reset_id_to_rstctrl(rd->reset_id);
 			assert(rstctrl);
@@ -1163,8 +961,6 @@ static TEE_Result stm32mp1_init_scmi_server(void)
 			if (!voltd->name ||
 			    strlen(voltd->name) >= SCMI_VOLTD_NAME_SIZE)
 				panic("SCMI voltage domain name invalid");
-
-			get_voltd_regulator(voltd);
 		}
 	}
 

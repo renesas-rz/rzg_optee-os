@@ -49,24 +49,13 @@ typedef struct {
 typedef union {
 	struct {
 		void *buffer;
-		size_t size;
-	} memref;
-	struct {
-		uint32_t a;
-		uint32_t b;
-	} value;
-} TEE_Param;
-
-typedef union {
-	struct {
-		void *buffer;
 		uint32_t size;
 	} memref;
 	struct {
 		uint32_t a;
 		uint32_t b;
 	} value;
-} __GP11_TEE_Param;
+} TEE_Param;
 
 /*
  * The type of opaque handles on TA Session. These handles are returned by
@@ -93,16 +82,6 @@ typedef uint32_t TEE_ObjectType;
 
 typedef struct {
 	uint32_t objectType;
-	uint32_t objectSize;
-	uint32_t maxObjectSize;
-	uint32_t objectUsage;
-	size_t dataSize;
-	size_t dataPosition;
-	uint32_t handleFlags;
-} TEE_ObjectInfo;
-
-typedef struct {
-	uint32_t objectType;
 	__extension__ union {
 		uint32_t keySize;	/* used in 1.1 spec */
 		uint32_t objectSize;	/* used in 1.1.1 spec */
@@ -115,22 +94,13 @@ typedef struct {
 	uint32_t dataSize;
 	uint32_t dataPosition;
 	uint32_t handleFlags;
-} __GP11_TEE_ObjectInfo;
+} TEE_ObjectInfo;
 
-typedef uint32_t TEE_Whence;
-
-typedef struct {
-	uint32_t attributeID;
-	union {
-		struct {
-			void *buffer;
-			size_t length;
-		} ref;
-		struct {
-			uint32_t a, b;
-		} value;
-	} content;
-} TEE_Attribute;
+typedef enum {
+	TEE_DATA_SEEK_SET = 0,
+	TEE_DATA_SEEK_CUR = 1,
+	TEE_DATA_SEEK_END = 2
+} TEE_Whence;
 
 typedef struct {
 	uint32_t attributeID;
@@ -143,11 +113,19 @@ typedef struct {
 			uint32_t a, b;
 		} value;
 	} content;
-} __GP11_TEE_Attribute;
+} TEE_Attribute;
 
 /* Cryptographic Operations API */
 
-typedef uint32_t TEE_OperationMode;
+typedef enum {
+	TEE_MODE_ENCRYPT = 0,
+	TEE_MODE_DECRYPT = 1,
+	TEE_MODE_SIGN = 2,
+	TEE_MODE_VERIFY = 3,
+	TEE_MODE_MAC = 4,
+	TEE_MODE_DIGEST = 5,
+	TEE_MODE_DERIVE = 6
+} TEE_OperationMode;
 
 typedef struct {
 	uint32_t algorithm;
@@ -190,7 +168,7 @@ typedef uint32_t TEE_BigInt;
 
 typedef uint32_t TEE_BigIntFMM;
 
-typedef uint32_t TEE_BigIntFMMContext;
+typedef uint32_t TEE_BigIntFMMContext __aligned(__alignof__(void *));
 
 /* Tee Secure Element APIs */
 

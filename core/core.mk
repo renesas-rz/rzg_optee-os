@@ -11,27 +11,11 @@ include mk/config.mk
 # $(ARCH).mk also sets the compiler for the core module
 include core/arch/$(ARCH)/$(ARCH).mk
 
-ifeq ($(CFG_OS_REV_REPORTS_GIT_SHA1),y)
-ifeq ($(arch-bits-core),64)
-git-sha1-len := 16
-else
-git-sha1-len := 8
-endif
-TEE_IMPL_GIT_SHA1 := 0x$(shell git rev-parse --short=$(git-sha1-len) HEAD 2>/dev/null || echo 0 | cut -c -$(git-sha1-len))
-else
-TEE_IMPL_GIT_SHA1 := 0x0
-endif
-
 PLATFORM_$(PLATFORM) := y
 PLATFORM_FLAVOR_$(PLATFORM_FLAVOR) := y
 
 $(eval $(call cfg-depends-all,CFG_PAGED_USER_TA,CFG_WITH_PAGER CFG_WITH_USER_TA))
-_CFG_CORE_ASYNC_NOTIF_DEFAULT_IMPL ?= $(CFG_CORE_ASYNC_NOTIF)
 include core/crypto.mk
-
-ifeq ($(CFG_SCMI_SCPFW),y)
-include core/lib/scmi-server/conf.mk
-endif
 
 cppflags$(sm)	+= -D__KERNEL__
 
@@ -40,16 +24,6 @@ cppflags$(sm)	+= -include $(conf-file)
 cppflags$(sm)	+= -I$(out-dir)/core/include
 cppflags$(sm)	+= $(core-platform-cppflags)
 cflags$(sm)	+= $(core-platform-cflags)
-
-ifeq ($(_CFG_CORE_STACK_PROTECTOR),y)
-core-stackp-cflags-$(CFG_CORE_STACK_PROTECTOR) := -fstack-protector
-core-stackp-cflags-$(CFG_CORE_STACK_PROTECTOR_STRONG) := -fstack-protector-strong
-core-stackp-cflags-$(CFG_CORE_STACK_PROTECTOR_ALL) := -fstack-protector-all
-else
-core-stackp-cflags-y := -fno-stack-protector
-endif
-cflags$(sm)	+= $(core-stackp-cflags-y)
-
 ifeq ($(CFG_CORE_SANITIZE_UNDEFINED),y)
 cflags$(sm)	+= -fsanitize=undefined
 endif
@@ -62,11 +36,8 @@ $(error error: CFG_CORE_SANITIZE_KADDRESS not supported with Clang)
 endif
 cflags_kasan	+= -fsanitize=kernel-address \
 		   -fasan-shadow-offset=$(CFG_ASAN_SHADOW_OFFSET)\
-		   --param asan-globals=1 \
+		   --param asan-stack=1 --param asan-globals=1 \
 		   --param asan-instrumentation-with-call-threshold=0
-ifneq ($(CFG_DYN_CONFIG),y)
-cflags_kasan	+= --param asan-stack=1
-endif
 cflags$(sm)	+= $(cflags_kasan)
 endif
 ifeq ($(CFG_CORE_DEBUG_CHECK_STACKS),y)
@@ -171,27 +142,9 @@ libdir = core/lib/zlib
 include mk/lib.mk
 endif
 
-ifeq ($(CFG_EFILIB),y)
-libname = efi
-libdir = core/lib/libefi
-include mk/lib.mk
-endif
-
 libname = unw
 libdir = lib/libunw
 include mk/lib.mk
-
-ifeq ($(CFG_SCMI_SCPFW),y)
-libname = scmi-server
-libdir = core/lib/scmi-server
-include mk/lib.mk
-endif
-
-ifeq ($(CFG_QCBOR),y)
-libname = qcbor
-libdir = core/lib/qcbor
-include mk/lib.mk
-endif
 
 #
 # Do main source

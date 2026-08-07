@@ -12,7 +12,6 @@
 #include <kernel/boot.h>
 #include <kernel/dt.h>
 #include <kernel/pm.h>
-#include <kernel/tlb_helpers.h>
 #include <libfdt.h>
 #include <matrix.h>
 #include <mm/core_memprot.h>
@@ -108,8 +107,8 @@ void atmel_pm_cpu_idle(void)
 	io_write32(soc_pm.ramc + AT91_DDRSDRC_LPR, saved_lpr0);
 }
 
-static void at91_sam_config_shdwc_ws(vaddr_t shdwc, uint32_t *mode,
-				     uint32_t *polarity)
+static void at91_sama5d2_config_shdwc_ws(vaddr_t shdwc, uint32_t *mode,
+					 uint32_t *polarity)
 {
 	uint32_t val = 0;
 
@@ -119,11 +118,11 @@ static void at91_sam_config_shdwc_ws(vaddr_t shdwc, uint32_t *mode,
 	*polarity |= (val >> AT91_SHDW_WKUPT_SHIFT) & AT91_SHDW_WKUPT_MASK;
 }
 
-static int at91_sam_config_pmc_ws(vaddr_t pmc, uint32_t mode, uint32_t polarity)
+static int at91_sama5d2_config_pmc_ws(vaddr_t pmc, uint32_t mode,
+				      uint32_t polarity)
 {
 	io_write32(pmc + AT91_PMC_FSMR, mode);
-	if (IS_ENABLED(CFG_SAMA5D2))
-		io_write32(pmc + AT91_PMC_FSPR, polarity);
+	io_write32(pmc + AT91_PMC_FSPR, polarity);
 
 	return 0;
 }
@@ -139,8 +138,6 @@ static const struct wakeup_source_info ws_info[] = {
 	{ .pmc_fsmr_bit = AT91_PMC_RTCAL,	.shdwc_mr_bit = BIT(17) },
 	{ .pmc_fsmr_bit = AT91_PMC_USBAL },
 	{ .pmc_fsmr_bit = AT91_PMC_SDMMC_CD },
-	{ .pmc_fsmr_bit = AT91_PMC_RTTAL },
-	{ .pmc_fsmr_bit = AT91_PMC_RXLP_MCE },
 };
 
 struct wakeup_src {
@@ -148,8 +145,7 @@ struct wakeup_src {
 	const struct wakeup_source_info *info;
 };
 
-static const struct wakeup_src sam_ws_ids[] = {
-#ifdef CFG_SAMA5D2
+static const struct wakeup_src sama5d2_ws_ids[] = {
 	{ .compatible = "atmel,sama5d2-gem",		.info = &ws_info[0] },
 	{ .compatible = "atmel,at91rm9200-rtc",		.info = &ws_info[1] },
 	{ .compatible = "atmel,sama5d3-udc",		.info = &ws_info[2] },
@@ -158,16 +154,6 @@ static const struct wakeup_src sam_ws_ids[] = {
 	{ .compatible = "atmel,at91sam9g45-ehci",	.info = &ws_info[2] },
 	{ .compatible = "usb-ehci",			.info = &ws_info[2] },
 	{ .compatible = "atmel,sama5d2-sdhci",		.info = &ws_info[3] }
-#endif
-#ifdef CFG_SAMA7G5
-	{ .compatible = "microchip,sama7g5-rtc",	.info = &ws_info[1] },
-	{ .compatible = "microchip,sama7g5-ohci",	.info = &ws_info[2] },
-	{ .compatible = "usb-ohci",			.info = &ws_info[2] },
-	{ .compatible = "atmel,at91sam9g45-ehci",	.info = &ws_info[2] },
-	{ .compatible = "usb-ehci",			.info = &ws_info[2] },
-	{ .compatible = "microchip,sama7g5-sdhci",	.info = &ws_info[3] },
-	{ .compatible = "microchip,sama7g5-rtt",	.info = &ws_info[4] },
-#endif
 };
 
 static bool dev_is_wakeup_source(const void *fdt, int node)
@@ -190,13 +176,13 @@ static int at91_pm_config_ws_ulp1(bool set)
 		return TEE_SUCCESS;
 	}
 
-	at91_sam_config_shdwc_ws(soc_pm.shdwc, &mode, &polarity);
+	at91_sama5d2_config_shdwc_ws(soc_pm.shdwc, &mode, &polarity);
 
 	val = io_read32(soc_pm.shdwc + AT91_SHDW_MR);
 
 	/* Loop through defined wakeup sources. */
-	for (src = 0; src < ARRAY_SIZE(sam_ws_ids); src++) {
-		wsrc = &sam_ws_ids[src];
+	for (src = 0; src < ARRAY_SIZE(sama5d2_ws_ids); src++) {
+		wsrc = &sama5d2_ws_ids[src];
 		wsi = wsrc->info;
 
 		node = fdt_node_offset_by_compatible(soc_pm.fdt, -1,
@@ -223,7 +209,7 @@ next_node:
 		return TEE_ERROR_BAD_STATE;
 	}
 
-	at91_sam_config_pmc_ws(soc_pm.pmc, mode, polarity);
+	at91_sama5d2_config_pmc_ws(soc_pm.pmc, mode, polarity);
 
 	return TEE_SUCCESS;
 }
@@ -245,8 +231,8 @@ static bool at91_pm_verify_clocks(void)
 		return false;
 	}
 
-	/* PCK0..PCKx must be disabled, or configured to use clk32k */
-	for (i = 0; i < AT91_PMC_PCK_COUNT; i++) {
+	/* PCK0..PCK3 must be disabled, or configured to use clk32k */
+	for (i = 0; i < 4; i++) {
 		uint32_t css = 0;
 
 		if ((scsr & (AT91_PMC_PCK0 << i)) == 0)
@@ -280,21 +266,6 @@ static TEE_Result at91_write_backup_data(void)
 	return TEE_SUCCESS;
 }
 
-static void at91_pm_change_state(enum pm_op op)
-{
-	int type = 0;
-	uint32_t hint = 0;
-
-	if (soc_pm.mode == AT91_PM_STANDBY)
-		type = PM_SUSPEND_STANDBY;
-	else
-		type = PM_SUSPEND_TO_MEM;
-
-	hint = SHIFT_U32(type, PM_HINT_SUSPEND_TYPE_SHIFT);
-
-	pm_change_state(op, hint);
-}
-
 static TEE_Result at91_enter_backup(void)
 {
 	int ret = -1;
@@ -304,7 +275,7 @@ static TEE_Result at91_enter_backup(void)
 	if (res)
 		return res;
 
-	at91_pm_change_state(PM_OP_SUSPEND);
+	pm_change_state(PM_OP_SUSPEND, 0);
 	ret = sm_pm_cpu_suspend((uint32_t)&soc_pm,
 				(void *)at91_suspend_sram_fn);
 	if (ret < 0) {
@@ -314,7 +285,7 @@ static TEE_Result at91_enter_backup(void)
 		res = TEE_SUCCESS;
 	}
 
-	at91_pm_change_state(PM_OP_RESUME);
+	pm_change_state(PM_OP_RESUME, 0);
 	if (res)
 		return res;
 
@@ -327,7 +298,6 @@ static TEE_Result at91_enter_backup(void)
 TEE_Result atmel_pm_suspend(uintptr_t entry, struct sm_nsec_ctx *nsec)
 {
 	TEE_Result res = TEE_ERROR_GENERIC;
-	uint32_t sctlr = 0;
 
 	DMSG("Entering suspend mode %d", soc_pm.mode);
 
@@ -341,32 +311,11 @@ TEE_Result atmel_pm_suspend(uintptr_t entry, struct sm_nsec_ctx *nsec)
 
 	sm_save_unbanked_regs(&nsec->ub_regs);
 
-	/*
-	 * In order to run code for low-power out of SRAM without abort,
-	 * configure regions with write permission with not forced to
-	 * XN (Execute-never) attribute.
-	 */
-	if (IS_ENABLED(CFG_HWSUPP_MEM_PERM_WXN)) {
-		sctlr = read_sctlr();
-		if (sctlr & SCTLR_WXN) {
-			write_sctlr(sctlr & ~SCTLR_WXN);
-			tlbi_all();
-		}
-	}
-
 	if (soc_pm.mode == AT91_PM_BACKUP) {
 		res = at91_enter_backup();
 	} else {
 		at91_suspend_sram_fn(&soc_pm);
 		res = TEE_SUCCESS;
-	}
-
-	/* Restore the XN attribute */
-	if (IS_ENABLED(CFG_HWSUPP_MEM_PERM_WXN)) {
-		if (sctlr & SCTLR_WXN) {
-			write_sctlr(sctlr);
-			tlbi_all();
-		}
 	}
 
 	if (soc_pm.mode == AT91_PM_ULP1)
@@ -388,49 +337,21 @@ TEE_Result atmel_pm_suspend(uintptr_t entry, struct sm_nsec_ctx *nsec)
 
 static TEE_Result at91_pm_dt_dram_init(const void *fdt)
 {
-	const struct {
-		const char *compatible;
-		vaddr_t *address;
-	} dram_map[] = {
-#ifdef CFG_SAMA5D2
-		{
-			.compatible = "atmel,sama5d3-ddramc",
-			.address = &soc_pm.ramc,
-		},
-#endif
-#ifdef CFG_SAMA7G5
-		{
-			.compatible = "microchip,sama7g5-uddrc",
-			.address = &soc_pm.ramc,
-		},
-		{
-			.compatible = "microchip,sama7g5-ddr3phy",
-			.address = &soc_pm.ramc_phy,
-		},
-#endif
-	};
-	uint32_t i = 0;
 	int node = -1;
 	size_t size = 0;
 
-	for (i = 0; i < ARRAY_SIZE(dram_map); i++) {
-		node = fdt_node_offset_by_compatible(fdt, -1,
-						     dram_map[i].compatible);
+	node = fdt_node_offset_by_compatible(fdt, -1, "atmel,sama5d3-ddramc");
+	if (node < 0)
+		return TEE_ERROR_ITEM_NOT_FOUND;
 
-		if (node < 0)
-			return TEE_ERROR_ITEM_NOT_FOUND;
-
-		if (dt_map_dev(fdt, node,
-			       dram_map[i].address, &size, DT_MAP_AUTO) < 0)
-			return TEE_ERROR_GENERIC;
-	}
+	if (dt_map_dev(fdt, node, &soc_pm.ramc, &size) < 0)
+		return TEE_ERROR_GENERIC;
 
 	return TEE_SUCCESS;
 }
 
 static TEE_Result at91_pm_backup_init(const void *fdt)
 {
-	enum dt_map_dev_directive mapping = DT_MAP_AUTO;
 	int node = -1;
 	size_t size = 0;
 
@@ -438,16 +359,11 @@ static TEE_Result at91_pm_backup_init(const void *fdt)
 	if (node < 0)
 		return TEE_ERROR_ITEM_NOT_FOUND;
 
-	if (IS_ENABLED(CFG_SAMA7G5))
-		mapping = DT_MAP_SECURE;
-
-	if (dt_map_dev(fdt, node, &soc_pm.sfrbu, &size, mapping) < 0)
+	if (dt_map_dev(fdt, node, &soc_pm.sfrbu, &size) < 0)
 		return TEE_ERROR_GENERIC;
 
-	if (fdt_get_status(fdt, node) == DT_STATUS_OK_SEC)
-		/* for SAMA7G5 SFRBU is always secured, no need to configre */
-		if (!IS_ENABLED(CFG_SAMA7G5))
-			matrix_configure_periph_secure(AT91C_ID_SFRBU);
+	if (_fdt_get_status(fdt, node) == DT_STATUS_OK_SEC)
+		matrix_configure_periph_secure(AT91C_ID_SFRBU);
 
 	return TEE_SUCCESS;
 }
@@ -463,22 +379,16 @@ static TEE_Result at91_pm_sram_init(const void *fdt)
 	if (node < 0)
 		return TEE_ERROR_ITEM_NOT_FOUND;
 
-	if (fdt_get_status(fdt, node) != DT_STATUS_OK_SEC)
+	if (_fdt_get_status(fdt, node) != DT_STATUS_OK_SEC)
 		return TEE_ERROR_GENERIC;
 
-	if (dt_map_dev(fdt, node, &at91_suspend_sram_base, &size,
-		       DT_MAP_AUTO) < 0)
+	if (dt_map_dev(fdt, node, &at91_suspend_sram_base, &size) < 0)
 		return TEE_ERROR_GENERIC;
 
 	at91_suspend_sram_pbase = virt_to_phys((void *)at91_suspend_sram_base);
 
-	/*
-	 * Map the secure ram suspend code with the memory area type
-	 * "MEM_AREA_TEE_COHERENT" to make it non-cacheable.
-	 * Mapping with memory area type "MEM_AREA_TEE_RAM" would enable
-	 * cacheable attribute and might cause abort in some cases.
-	 */
-	at91_suspend_sram_fn = core_mmu_add_mapping(MEM_AREA_TEE_COHERENT,
+	/* Map the secure ram suspend code to be executable */
+	at91_suspend_sram_fn = core_mmu_add_mapping(MEM_AREA_TEE_RAM,
 						    at91_suspend_sram_pbase,
 						    suspend_sz);
 	if (!at91_suspend_sram_fn) {
@@ -502,10 +412,10 @@ static TEE_Result at91_securam_init(const void *fdt)
 	if (node < 0)
 		return TEE_ERROR_ITEM_NOT_FOUND;
 
-	if (fdt_get_status(fdt, node) != DT_STATUS_OK_SEC)
+	if (_fdt_get_status(fdt, node) != DT_STATUS_OK_SEC)
 		return TEE_ERROR_GENERIC;
 
-	if (dt_map_dev(fdt, node, &soc_pm.securam, &size, DT_MAP_AUTO) < 0)
+	if (dt_map_dev(fdt, node, &soc_pm.securam, &size) < 0)
 		return TEE_ERROR_GENERIC;
 
 	res = clk_dt_get_by_index(fdt, node, 0, &clk);
@@ -524,16 +434,16 @@ static TEE_Result at91_securam_init(const void *fdt)
 	if (node < 0)
 		return TEE_ERROR_ITEM_NOT_FOUND;
 
-	if (fdt_get_status(fdt, node) != DT_STATUS_OK_SEC)
+	if (_fdt_get_status(fdt, node) != DT_STATUS_OK_SEC)
 		return TEE_ERROR_GENERIC;
 
-	if (dt_map_dev(fdt, node, &soc_pm.secumod, &size, DT_MAP_AUTO) < 0)
+	if (dt_map_dev(fdt, node, &soc_pm.secumod, &size) < 0)
 		return TEE_ERROR_GENERIC;
 
 	return TEE_SUCCESS;
 }
 
-static TEE_Result sam_pm_init_all(const void *fdt, vaddr_t shdwc)
+static TEE_Result sama5d2_pm_init_all(const void *fdt, vaddr_t shdwc)
 {
 	TEE_Result res = TEE_ERROR_GENERIC;
 
@@ -564,10 +474,10 @@ static TEE_Result sam_pm_init_all(const void *fdt, vaddr_t shdwc)
 	return TEE_SUCCESS;
 }
 
-TEE_Result sam_pm_init(const void *fdt, vaddr_t shdwc)
+TEE_Result sama5d2_pm_init(const void *fdt, vaddr_t shdwc)
 {
-	if (sam_pm_init_all(fdt, shdwc))
-		panic("Failed to setup PM for this MPU");
+	if (sama5d2_pm_init_all(fdt, shdwc))
+		panic("Failed to setup PM for sama5d2");
 
 	return TEE_SUCCESS;
 }

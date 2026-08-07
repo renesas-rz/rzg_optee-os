@@ -8,7 +8,6 @@
 #include <kernel/linker.h>
 #include <kernel/pseudo_ta.h>
 #include <kernel/ts_store.h>
-#include <kernel/user_access.h>
 #include <kernel/user_mode_ctx.h>
 #include <mm/file.h>
 #include <pta_attestation.h>
@@ -56,11 +55,9 @@ static TEE_Result generate_key(void)
 
 	res = allocate_key();
 	if (res)
-		goto err;
+		return res;
 
-	res = crypto_bignum_bin2bn((uint8_t *)&e, sizeof(e), key->e);
-	if (res)
-		goto err;
+	crypto_bignum_bin2bn((uint8_t *)&e, sizeof(e), key->e);
 
 	/*
 	 * For security reasons, the RSA modulus size has to be at least the
@@ -70,12 +67,9 @@ static TEE_Result generate_key(void)
 	COMPILE_TIME_ASSERT(CFG_ATTESTATION_PTA_KEY_SIZE >=
 			    TEE_SHA256_HASH_SIZE);
 	res = crypto_acipher_gen_rsa_key(key, CFG_ATTESTATION_PTA_KEY_SIZE);
-	if (!res)
-		goto out;
+	if (res)
+		free_key();
 
-err:
-	free_key();
-out:
 	return res;
 }
 
@@ -228,8 +222,8 @@ static TEE_Result sec_storage_obj_read(TEE_UUID *uuid, uint32_t storage_id,
 	if (obj_id_len > TEE_OBJECT_ID_MAX_LEN)
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	res = tee_pobj_get(uuid, (void *)obj_id, obj_id_len, flags,
-			   TEE_POBJ_USAGE_OPEN, fops, &po);
+	res = tee_pobj_get(uuid, (void *)obj_id, obj_id_len, flags, false, fops,
+			   &po);
 	if (res)
 		return res;
 
@@ -238,7 +232,7 @@ static TEE_Result sec_storage_obj_read(TEE_UUID *uuid, uint32_t storage_id,
 		goto out;
 
 	read_len = *len;
-	res = po->fops->read(fh, offset, data, NULL, &read_len);
+	res = po->fops->read(fh, offset, data, &read_len);
 	if (res == TEE_ERROR_CORRUPT_OBJECT) {
 		EMSG("Object corrupt");
 		po->fops->remove(po);
@@ -272,17 +266,17 @@ static TEE_Result sec_storage_obj_write(TEE_UUID *uuid, uint32_t storage_id,
 	if (obj_id_len > TEE_OBJECT_ID_MAX_LEN)
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	res = tee_pobj_get(uuid, (void *)obj_id, obj_id_len, flags,
-			   TEE_POBJ_USAGE_OPEN, fops, &po);
+	res = tee_pobj_get(uuid, (void *)obj_id, obj_id_len, flags, false,
+			   fops, &po);
 	if (res)
 		return res;
 
 	res = po->fops->open(po, NULL, &fh);
 	if (res == TEE_ERROR_ITEM_NOT_FOUND)
-		res = po->fops->create(po, false, NULL, 0, NULL, 0,
-				       NULL, NULL, 0, &fh);
+		res = po->fops->create(po, false, NULL, 0, NULL, 0, NULL, 0,
+				       &fh);
 	if (!res) {
-		res = po->fops->write(fh, offset, data, NULL, len);
+		res = po->fops->write(fh, offset, data, len);
 		po->fops->close(&fh);
 	}
 
@@ -361,9 +355,9 @@ static TEE_Result cmd_get_pubkey(uint32_t param_types,
 {
 	TEE_Result res = TEE_ERROR_GENERIC;
 	uint8_t *e = params[0].memref.buffer;
-	size_t *e_out_sz = &params[0].memref.size;
+	uint32_t *e_out_sz = &params[0].memref.size;
 	uint8_t *n = params[1].memref.buffer;
-	size_t *n_out_sz = &params[1].memref.size;
+	uint32_t *n_out_sz = &params[1].memref.size;
 	size_t sz = 0;
 
 	if (param_types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_OUTPUT,
@@ -489,11 +483,10 @@ static TEE_Result sign_buffer(uint8_t *buf, size_t buf_sz, uint8_t *nonce,
  */
 static bool is_region_valid(struct vm_region *r)
 {
-	uint32_t dontwant = VM_FLAG_EPHEMERAL | VM_FLAG_PERMANENT |
-			    VM_FLAG_LDELF;
-	uint32_t want = VM_FLAG_READONLY;
+	uint32_t skip_flags = VM_FLAG_EPHEMERAL | VM_FLAG_PERMANENT |
+			      VM_FLAG_LDELF;
 
-	return ((r->flags & want) == want && !(r->flags & dontwant));
+	return !(r->flags & skip_flags || r->attr & TEE_MATTR_UW);
 }
 
 /*
@@ -551,8 +544,6 @@ static TEE_Result hash_regions(struct vm_info *vm_info, uint8_t *hash)
 		if (is_region_valid(r))
 			regions[i++] = r;
 
-	enter_user_access();
-
 	/*
 	 * Sort regions so that they are in a consistent order even when TA ASLR
 	 * is enabled.
@@ -565,13 +556,8 @@ static TEE_Result hash_regions(struct vm_info *vm_info, uint8_t *hash)
 		DMSG("va %p size %zu", (void *)r->va, r->size);
 		res = crypto_hash_update(ctx, (uint8_t *)r->va, r->size);
 		if (res)
-			break;
+			goto out;
 	}
-
-	exit_user_access();
-
-	if (res)
-		goto out;
 
 	res = crypto_hash_final(ctx, hash, TEE_SHA256_HASH_SIZE);
 out:
@@ -764,37 +750,19 @@ static TEE_Result invoke_command(void *sess_ctx __unused, uint32_t cmd_id,
 				 uint32_t param_types,
 				 TEE_Param params[TEE_NUM_PARAMS])
 {
-	TEE_Result res = TEE_ERROR_BAD_PARAMETERS;
-	TEE_Result res2 = TEE_ERROR_GENERIC;
-	TEE_Param bparams[TEE_NUM_PARAMS] = { };
-	TEE_Param *eparams = NULL;
-
-	res = to_bounce_params(param_types, params, bparams, &eparams);
-	if (res)
-		return res;
-
 	switch (cmd_id) {
 	case PTA_ATTESTATION_GET_PUBKEY:
-		res = cmd_get_pubkey(param_types, eparams);
-		break;
+		return cmd_get_pubkey(param_types, params);
 	case PTA_ATTESTATION_GET_TA_SHDR_DIGEST:
-		res = cmd_get_ta_shdr_digest(param_types, eparams);
-		break;
+		return cmd_get_ta_shdr_digest(param_types, params);
 	case PTA_ATTESTATION_HASH_TA_MEMORY:
-		res = cmd_hash_ta_memory(param_types, eparams);
-		break;
+		return cmd_hash_ta_memory(param_types, params);
 	case PTA_ATTESTATION_HASH_TEE_MEMORY:
-		res = cmd_hash_tee_memory(param_types, eparams);
-		break;
+		return cmd_hash_tee_memory(param_types, params);
 	default:
 		break;
 	}
-
-	res2 = from_bounce_params(param_types, params, bparams, eparams);
-	if (!res && res2)
-		res = res2;
-
-	return res;
+	return TEE_ERROR_BAD_PARAMETERS;
 }
 
 pseudo_ta_register(.uuid = PTA_ATTESTATION_UUID, .name = PTA_NAME,

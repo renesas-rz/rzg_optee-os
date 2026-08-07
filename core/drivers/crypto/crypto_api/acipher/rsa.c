@@ -4,10 +4,8 @@
  *
  * Crypto RSA interface implementation to enable HW driver.
  */
-#include <crypto/crypto.h>
-#include <crypto/crypto_impl.h>
 #include <drvcrypt.h>
-#include <fault_mitigation.h>
+#include <crypto/crypto.h>
 #include <tee_api_defines_extensions.h>
 #include <tee/tee_cryp_utl.h>
 #include <utee_defines.h>
@@ -199,7 +197,6 @@ TEE_Result crypto_acipher_rsanopad_encrypt(struct rsa_public_key *key,
 
 TEE_Result crypto_acipher_rsaes_decrypt(uint32_t algo, struct rsa_keypair *key,
 					const uint8_t *label, size_t label_len,
-					uint32_t mgf_algo,
 					const uint8_t *cipher,
 					size_t cipher_len, uint8_t *msg,
 					size_t *msg_len)
@@ -232,12 +229,6 @@ TEE_Result crypto_acipher_rsaes_decrypt(uint32_t algo, struct rsa_keypair *key,
 			if (ret != TEE_SUCCESS)
 				return ret;
 
-			rsa_data.mgf_algo = mgf_algo;
-			ret = tee_alg_get_digest_size(rsa_data.mgf_algo,
-						      &rsa_data.mgf_size);
-			if (ret != TEE_SUCCESS)
-				return ret;
-
 			rsa_data.mgf = &drvcrypt_rsa_mgf1;
 		}
 
@@ -252,7 +243,6 @@ TEE_Result crypto_acipher_rsaes_decrypt(uint32_t algo, struct rsa_keypair *key,
 		rsa_data.label.data =
 			((label_len > 0) ? (uint8_t *)label : NULL);
 		rsa_data.label.length = label_len;
-		rsa_data.algo = algo;
 
 		ret = rsa->decrypt(&rsa_data);
 
@@ -268,7 +258,6 @@ TEE_Result crypto_acipher_rsaes_decrypt(uint32_t algo, struct rsa_keypair *key,
 TEE_Result crypto_acipher_rsaes_encrypt(uint32_t algo,
 					struct rsa_public_key *key,
 					const uint8_t *label, size_t label_len,
-					uint32_t mgf_algo,
 					const uint8_t *msg, size_t msg_len,
 					uint8_t *cipher, size_t *cipher_len)
 {
@@ -330,12 +319,6 @@ TEE_Result crypto_acipher_rsaes_encrypt(uint32_t algo,
 			    rsa_data.key.n_size - 2 * rsa_data.digest_size - 2)
 				return TEE_ERROR_BAD_PARAMETERS;
 
-			rsa_data.mgf_algo = mgf_algo;
-			ret = tee_alg_get_digest_size(rsa_data.mgf_algo,
-						      &rsa_data.mgf_size);
-			if (ret != TEE_SUCCESS)
-				return ret;
-
 			rsa_data.mgf = &drvcrypt_rsa_mgf1;
 		}
 
@@ -345,7 +328,6 @@ TEE_Result crypto_acipher_rsaes_encrypt(uint32_t algo,
 		rsa_data.cipher.length = rsa_data.key.n_size;
 		rsa_data.label.data = (label_len > 0) ? (uint8_t *)label : NULL;
 		rsa_data.label.length = label_len;
-		rsa_data.algo = algo;
 
 		ret = rsa->encrypt(&rsa_data);
 
@@ -451,7 +433,7 @@ TEE_Result crypto_acipher_rsassa_verify(uint32_t algo,
 
 	if (!key || !msg || !sig) {
 		CRYPTO_TRACE("Input parameters reference error");
-		goto out;
+		return ret;
 	}
 
 	if (algo != TEE_ALG_RSASSA_PKCS1_V1_5) {
@@ -462,13 +444,12 @@ TEE_Result crypto_acipher_rsassa_verify(uint32_t algo,
 		ret = tee_alg_get_digest_size(TEE_DIGEST_HASH_TO_ALGO(algo),
 					      &rsa_ssa.digest_size);
 		if (ret != TEE_SUCCESS)
-			goto out;
+			return ret;
 
 		if (msg_len != rsa_ssa.digest_size) {
 			CRYPTO_TRACE("Input msg length (%zu expected %zu)",
 				     msg_len, rsa_ssa.digest_size);
-			ret = TEE_ERROR_BAD_PARAMETERS;
-			goto out;
+			return TEE_ERROR_BAD_PARAMETERS;
 		}
 	} else {
 		rsa_ssa.hash_algo = 0;
@@ -483,8 +464,7 @@ TEE_Result crypto_acipher_rsassa_verify(uint32_t algo,
 	if (rsa_ssa.key.n_size > sig_len) {
 		CRYPTO_TRACE("Signature length expected %zu",
 			     rsa_ssa.key.n_size);
-		ret = TEE_ERROR_SIGNATURE_INVALID;
-		goto out;
+		return TEE_ERROR_SIGNATURE_INVALID;
 	}
 
 	rsa = drvcrypt_get_ops(CRYPTO_RSA);
@@ -512,7 +492,5 @@ TEE_Result crypto_acipher_rsassa_verify(uint32_t algo,
 	CRYPTO_TRACE("Signature verif algo (0x%" PRIx32 ") returned 0x%" PRIx32,
 		     algo, ret);
 
-out:
-	FTMN_CALLEE_DONE(ret);
 	return ret;
 }

@@ -2,7 +2,7 @@
 /*
  * Copyright (c) 2014, STMicroelectronics International N.V.
  */
-#ifndef __SIGNAL_H
-#define __SIGNAL_H
+#ifndef SIGNAL_H
+#define SIGNAL_H
 
-#endif /*__SIGNAL_H*/
+#endif /*SIGNAL_H*/

@@ -18,7 +18,6 @@
 		ldrh	w\tmp0, [\core_local, \
 				#THREAD_CORE_LOCAL_CURR_THREAD]
 		adr_l	x\res, threads
-		ldr     x\res, [x\res]
 		mov	x\tmp1, #THREAD_CTX_SIZE
 		madd	x\res, x\tmp0, x\tmp1, x\res
 	.endm
@@ -97,13 +96,6 @@ FUNC thread_resume , :
 	store_xregs sp, THREAD_CORE_LOCAL_X0, 0, 1
 	b	eret_to_el0
 END_FUNC thread_resume
-
-#ifdef CFG_CORE_SEL2_SPMC
-FUNC thread_hvc , :
-	hvc	#0
-	ret
-END_FUNC thread_hvc
-#endif
 
 FUNC thread_smc , :
 	smc	#0
@@ -233,7 +225,7 @@ END_FUNC thread_unwind_user_mode
 
 		/* Update the mapping to use the full kernel mapping */
 		mrs	x0, ttbr0_el1
-		sub_imm	x0, __CORE_MMU_BASE_TABLE_OFFSET
+		sub	x0, x0, #CORE_MMU_BASE_TABLE_OFFSET
 		/* switch to kernel mode ASID */
 		bic	x0, x0, #BIT(TTBR_ASID_SHIFT)
 		msr	ttbr0_el1, x0
@@ -658,7 +650,7 @@ BTI(	bti	j)
 
 	/* Update the mapping to exclude the full kernel mapping */
 	mrs	x0, ttbr0_el1
-	add_imm	x0, __CORE_MMU_BASE_TABLE_OFFSET
+	add	x0, x0, #CORE_MMU_BASE_TABLE_OFFSET
 	orr	x0, x0, #BIT(TTBR_ASID_SHIFT) /* switch to user mode ASID */
 	msr	ttbr0_el1, x0
 	isb
@@ -730,8 +722,8 @@ icache_inv_user_range:
 BTI(	bti	j)
 	/* Update the mapping to exclude the full kernel mapping */
 	mrs	x5, ttbr0_el1	/* this register must be preserved */
-	orr	x2, x5, #BIT(TTBR_ASID_SHIFT) /* switch to user mode ASID */
-	add_imm	x2, __CORE_MMU_BASE_TABLE_OFFSET
+	add	x2, x5, #CORE_MMU_BASE_TABLE_OFFSET
+	orr	x2, x2, #BIT(TTBR_ASID_SHIFT) /* switch to user mode ASID */
 	msr	ttbr0_el1, x2
 	isb
 
@@ -809,15 +801,15 @@ LOCAL_FUNC el0_svc , :
 	mov	x2, sp	/* Save SP_EL0 */
 	mov	sp, x3
 
-	/* Make room for struct thread_scall_regs */
-	sub	sp, sp, #THREAD_SCALL_REG_SIZE
-	stp	x30, x2, [sp, #THREAD_SCALL_REG_X30]
+	/* Make room for struct thread_svc_regs */
+	sub	sp, sp, #THREAD_SVC_REG_SIZE
+	stp	x30, x2, [sp, #THREAD_SVC_REG_X30]
 
 #ifdef CFG_TA_PAUTH
 	/* Save APIAKEY */
 	read_apiakeyhi	x2
 	read_apiakeylo	x3
-	stp	x2, x3, [sp, #THREAD_SCALL_REG_APIAKEY_HI]
+	stp	x2, x3, [sp, #THREAD_SVC_REG_APIAKEY_HI]
 #endif
 
 #ifdef CFG_CORE_PAUTH
@@ -835,10 +827,10 @@ LOCAL_FUNC el0_svc , :
 	ldp	x0, x1, [x1, #THREAD_CORE_LOCAL_X0]
 
 	/* Prepare the argument for the handler */
-	store_xregs sp, THREAD_SCALL_REG_X0, 0, 14
+	store_xregs sp, THREAD_SVC_REG_X0, 0, 14
 	mrs	x0, elr_el1
 	mrs	x1, spsr_el1
-	store_xregs sp, THREAD_SCALL_REG_ELR, 0, 1
+	store_xregs sp, THREAD_SVC_REG_ELR, 0, 1
 
 	mov	x0, sp
 
@@ -847,14 +839,14 @@ LOCAL_FUNC el0_svc , :
 	 * nothing left in sp_el1. Note that the SVC handler is excepted to
 	 * re-enable foreign interrupts by itself.
 	 */
-#if defined(CFG_CORE_IRQ_IS_NATIVE_INTR)
+#if defined(CFG_ARM_GICV3)
 	msr	daifclr, #(DAIFBIT_IRQ | DAIFBIT_ABT | DAIFBIT_DBG)
 #else
 	msr	daifclr, #(DAIFBIT_FIQ | DAIFBIT_ABT | DAIFBIT_DBG)
 #endif
 
 	/* Call the handler */
-	bl	thread_scall_handler
+	bl	thread_svc_handler
 
 	/* Mask all maskable exceptions since we're switching back to sp_el1 */
 	msr	daifset, #DAIFBIT_ALL
@@ -868,35 +860,35 @@ LOCAL_FUNC el0_svc , :
 	msr	spsel, #1
 	get_thread_ctx sp, 0, 1, 2
 	msr	spsel, #0
-	add	x1, sp, #THREAD_SCALL_REG_SIZE
+	add	x1, sp, #THREAD_SVC_REG_SIZE
 	str	x1, [x0, #THREAD_CTX_KERN_SP]
 
 	/* Restore registers to the required state and return*/
 	ldr	x1, [x0, #THREAD_CTX_REGS_TPIDR_EL0]
 	msr	tpidr_el0, x1
-	load_xregs sp, THREAD_SCALL_REG_ELR, 0, 1
+	load_xregs sp, THREAD_SVC_REG_ELR, 0, 1
 	msr	elr_el1, x0
 	msr	spsr_el1, x1
-	load_xregs sp, THREAD_SCALL_REG_X2, 2, 14
+	load_xregs sp, THREAD_SVC_REG_X2, 2, 14
 	mov	x30, sp
-	ldr	x0, [x30, #THREAD_SCALL_REG_SP_EL0]
+	ldr	x0, [x30, #THREAD_SVC_REG_SP_EL0]
 	mov	sp, x0
 	b_if_spsr_is_el0 w1, 1f
-	ldp	x0, x1, [x30, THREAD_SCALL_REG_X0]
-	ldr	x30, [x30, #THREAD_SCALL_REG_X30]
+	ldp	x0, x1, [x30, THREAD_SVC_REG_X0]
+	ldr	x30, [x30, #THREAD_SVC_REG_X30]
 
 	return_from_exception
 
 1:
 #ifdef	CFG_TA_PAUTH
 	/* Restore APIAKEY */
-	load_xregs x30, THREAD_SCALL_REG_APIAKEY_HI, 0, 1
+	load_xregs x30, THREAD_SVC_REG_APIAKEY_HI, 0, 1
 	write_apiakeyhi	x0
 	write_apiakeylo	x1
 #endif
 
-	ldp	x0, x1, [x30, THREAD_SCALL_REG_X0]
-	ldr	x30, [x30, #THREAD_SCALL_REG_X30]
+	ldp	x0, x1, [x30, THREAD_SVC_REG_X0]
+	ldr	x30, [x30, #THREAD_SVC_REG_X30]
 
 	msr	spsel, #1
 	store_xregs sp, THREAD_CORE_LOCAL_X0, 0, 1
@@ -1154,15 +1146,6 @@ END_FUNC el0_sync_abort
 	write_apiakeylo	x2
 	isb
 #endif
-
-#ifdef CFG_CORE_FFA
-	/* x0 is still pointing to the current thread_ctx */
-	/* load curr_thread_ctx->tsd.rpc_target_info into w19 */
-	ldr	w19, [x0, #THREAD_CTX_TSD_RPC_TARGET_INFO]
-	/* load curr_thread_ctx->flags into w19 */
-	ldr	w20, [x0, #THREAD_CTX_FLAGS]
-#endif
-
 	/* load tmp_stack_va_end */
 	ldr	x1, [sp, #THREAD_CORE_LOCAL_TMP_STACK_VA_END]
 	/* Switch to SP_EL0 */
@@ -1203,10 +1186,6 @@ END_FUNC el0_sync_abort
 	 */
 
 	/* Passing thread index in w0 */
-#ifdef CFG_CORE_FFA
-	mov	w1, w19		/* rpc_target_info */
-	mov	w2, w20		/* flags */
-#endif
 	b	thread_foreign_intr_exit
 .endm
 
@@ -1286,7 +1265,7 @@ END_FUNC el0_sync_abort
 	mov	sp, x1
 
 	bl	thread_check_canaries
-	bl	interrupt_main_handler
+	bl	itr_core_handler
 
 	/*
 	 * Restore registers
@@ -1332,7 +1311,7 @@ END_FUNC el0_sync_abort
 .endm
 
 LOCAL_FUNC elx_irq , :
-#if defined(CFG_CORE_IRQ_IS_NATIVE_INTR)
+#if defined(CFG_ARM_GICV3)
 	native_intr_handler	irq
 #else
 	foreign_intr_handler	irq
@@ -1340,7 +1319,7 @@ LOCAL_FUNC elx_irq , :
 END_FUNC elx_irq
 
 LOCAL_FUNC elx_fiq , :
-#if defined(CFG_CORE_IRQ_IS_NATIVE_INTR)
+#if defined(CFG_ARM_GICV3)
 	foreign_intr_handler	fiq
 #else
 	native_intr_handler	fiq

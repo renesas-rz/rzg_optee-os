@@ -56,8 +56,7 @@ int der_decode_utf8_string(const unsigned char *in,  unsigned long inlen,
 
         https://tools.ietf.org/html/rfc3629#section-3
     */
-   len += x;
-   for (y = 0; x < len; ) {
+   for (y = 0; x < inlen; ) {
       /* read first byte */
       tmp = in[x++];
 
@@ -88,7 +87,7 @@ int der_decode_utf8_string(const unsigned char *in,  unsigned long inlen,
       /* now update z so it equals the number of additional bytes to read */
       if (z > 0) { --z; }
 
-      if (x + z > len) {
+      if (x + z > inlen) {
          return CRYPT_INVALID_PACKET;
       }
 

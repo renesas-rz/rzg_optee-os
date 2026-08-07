@@ -169,7 +169,6 @@ int pkcs_5_test (void)
                               (unsigned char*)cases_5_2[i].S, cases_5_2[i].S_len,
                               cases_5_2[i].c, hash,
                               DK, &dkLen)) != CRYPT_OK) {
-            LTC_UNUSED_PARAM(err);
 #ifdef LTC_TEST_DBG
             printf("\npkcs_5_alg2() #%d: Failed/1 (%s)\n", i, error_to_string(err));
 #endif
@@ -187,7 +186,6 @@ int pkcs_5_test (void)
                               (unsigned char*)cases_5_1[i].S,
                               cases_5_1[i].c, hash,
                               DK, &dkLen)) != CRYPT_OK) {
-            LTC_UNUSED_PARAM(err);
 #ifdef LTC_TEST_DBG
             printf("\npkcs_5_alg1() #%d: Failed/1 (%s)\n", i, error_to_string(err));
 #endif
@@ -205,7 +203,6 @@ int pkcs_5_test (void)
                                        (unsigned char*)cases_5_1o[i].S,
                                        cases_5_1o[i].c, hash,
                                        DK, &dkLen)) != CRYPT_OK) {
-            LTC_UNUSED_PARAM(err);
 #ifdef LTC_TEST_DBG
             printf("\npkcs_5_alg1_openssl() #%d: Failed/1 (%s)\n", i, error_to_string(err));
 #endif

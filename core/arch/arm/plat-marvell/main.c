@@ -40,6 +40,7 @@
 #include <io.h>
 #include <keep.h>
 #include <kernel/boot.h>
+#include <kernel/interrupt.h>
 #include <kernel/misc.h>
 #include <kernel/panic.h>
 #include <kernel/tee_common_otp.h>
@@ -50,6 +51,7 @@
 #include <stdint.h>
 #include <string.h>
 
+static struct gic_data gic_data;
 #if defined(PLATFORM_FLAVOR_armada7k8k)
 static struct serial8250_uart_data console_data;
 #elif defined(PLATFORM_FLAVOR_armada3700)
@@ -71,9 +73,9 @@ register_phys_mem_pgdir(MEM_AREA_IO_SEC, GICD_BASE, CORE_MMU_PGDIR_SIZE);
 register_phys_mem_pgdir(MEM_AREA_IO_SEC, GICC_BASE, CORE_MMU_PGDIR_SIZE);
 #endif
 
-void boot_primary_init_intc(void)
+void main_init_gic(void)
 {
-	paddr_t gicd_base = 0;
+	paddr_t gicd_base;
 	paddr_t gicc_base = 0;
 
 #ifdef GICC_BASE
@@ -81,11 +83,18 @@ void boot_primary_init_intc(void)
 #endif
 	gicd_base = GIC_BASE + GICD_OFFSET;
 
-	gic_init(gicc_base, gicd_base);
+	gic_init_base_addr(&gic_data, gicc_base, gicd_base);
+
+	itr_init(&gic_data.chip);
 }
 #endif
 
-void plat_console_init(void)
+void itr_core_handler(void)
+{
+	gic_it_handle(&gic_data);
+}
+
+void console_init(void)
 {
 #if defined(PLATFORM_FLAVOR_armada7k8k)
 	serial8250_uart_init(&console_data, CONSOLE_UART_BASE,

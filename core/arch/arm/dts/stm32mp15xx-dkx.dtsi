@@ -42,12 +42,6 @@
 			no-map;
 		};
 
-		ipc_shmem: ipc-shmem@1004f000 {
-			compatible = "shared-dma-pool";
-			reg = <0x10048000 0x8000>;
-			no-map;
-		};
-
 		mcuram: mcuram@30000000 {
 			compatible = "shared-dma-pool";
 			reg = <0x30000000 0x40000>;
@@ -73,7 +67,6 @@
 			gpios = <&gpiod 11 GPIO_ACTIVE_HIGH>;
 			linux,default-trigger = "heartbeat";
 			default-state = "off";
-			status = "disabled";
 		};
 	};
 
@@ -85,7 +78,7 @@
 			"Capture" , "MCLK",
 			"MICL" , "Mic Bias";
 		dais = <&sai2a_port &sai2b_port &i2s2_port>;
-		status = "disabled";
+		status = "okay";
 	};
 
 	vin: vin {
@@ -128,19 +121,19 @@
 	pinctrl-names = "default", "sleep";
 	pinctrl-0 = <&cec_pins_b>;
 	pinctrl-1 = <&cec_sleep_pins_b>;
-	status = "disabled";
+	status = "okay";
 };
 
 &crc1 {
-	status = "disabled";
+	status = "okay";
 };
 
 &dts {
-	status = "disabled";
+	status = "okay";
 };
 
 &ethernet0 {
-	status = "disabled";
+	status = "okay";
 	pinctrl-0 = <&ethernet0_rgmii_pins_a>;
 	pinctrl-1 = <&ethernet0_rgmii_sleep_pins_a>;
 	pinctrl-names = "default", "sleep";
@@ -163,7 +156,7 @@
 };
 
 &hash1 {
-	status = "disabled";
+	status = "okay";
 };
 
 &i2c1 {
@@ -172,7 +165,7 @@
 	pinctrl-1 = <&i2c1_sleep_pins_a>;
 	i2c-scl-rising-time-ns = <100>;
 	i2c-scl-falling-time-ns = <7>;
-	status = "disabled";
+	status = "okay";
 	/delete-property/dmas;
 	/delete-property/dma-names;
 
@@ -242,7 +235,6 @@
 };
 
 &i2c4 {
-	compatible = "st,stm32mp15-i2c-non-secure";
 	pinctrl-names = "default", "sleep";
 	pinctrl-0 = <&i2c4_pins_a>;
 	pinctrl-1 = <&i2c4_sleep_pins_a>;
@@ -367,7 +359,6 @@
 			vdd_usb: ldo4 {
 				regulator-name = "vdd_usb";
 				interrupts = <IT_CURLIM_LDO4 0>;
-				regulator-always-on;
 			};
 
 			vdda: ldo5 {
@@ -442,7 +433,7 @@
 	pinctrl-names = "default", "sleep";
 	pinctrl-0 = <&i2s2_pins_a>;
 	pinctrl-1 = <&i2s2_sleep_pins_a>;
-	status = "disabled";
+	status = "okay";
 
 	i2s2_port: port {
 		i2s2_endpoint: endpoint {
@@ -454,24 +445,24 @@
 };
 
 &ipcc {
-	status = "disabled";
+	status = "okay";
 };
 
 &iwdg1 {
 	timeout-sec = <32>;
-	status = "okay";
 };
 
 &iwdg2 {
 	timeout-sec = <32>;
-	status = "disabled";
+	status = "okay";
+	secure-status = "disabled";
 };
 
 &ltdc {
 	pinctrl-names = "default", "sleep";
 	pinctrl-0 = <&ltdc_pins_a>;
 	pinctrl-1 = <&ltdc_sleep_pins_a>;
-	status = "disabled";
+	status = "okay";
 
 	port {
 		ltdc_ep0_out: endpoint@0 {
@@ -483,7 +474,7 @@
 
 &m4_rproc {
 	memory-region = <&retram>, <&mcuram>, <&mcuram2>, <&vdev0vring0>,
-			<&vdev0vring1>, <&vdev0buffer>, <&ipc_shmem>;
+			<&vdev0vring1>, <&vdev0buffer>;
 	mboxes = <&ipcc 0>, <&ipcc 1>, <&ipcc 2>, <&ipcc 3>;
 	mbox-names = "vq0", "vq1", "shutdown", "detach";
 	interrupt-parent = <&exti>;
@@ -496,12 +487,11 @@
 	vdd_3v3_usbfs-supply = <&vdd_usb>;
 };
 
-&rcc {
-	compatible = "st,stm32mp1-rcc";
+&rng1 {
 	status = "okay";
 };
 
-&rng1 {
+&rtc {
 	status = "okay";
 };
 
@@ -511,7 +501,7 @@
 	pinctrl-names = "default", "sleep";
 	pinctrl-0 = <&sai2a_pins_a>, <&sai2b_pins_b>;
 	pinctrl-1 = <&sai2a_sleep_pins_a>, <&sai2b_sleep_pins_b>;
-	status = "disabled";
+	status = "okay";
 
 	sai2a: audio-controller@4400b004 {
 		#clock-cells = <0>;
@@ -560,7 +550,7 @@
 	st,neg-edge;
 	bus-width = <4>;
 	vmmc-supply = <&v3v3>;
-	status = "disabled";
+	status = "okay";
 };
 
 &sdmmc3 {
@@ -573,11 +563,6 @@
 	bus-width = <4>;
 	vmmc-supply = <&v3v3>;
 	status = "disabled";
-};
-
-&tamp {
-	st,tamp-passive-nb-sample = <4>;
-	st,tamp-passive-sample-clk-div = <16384>;
 };
 
 &timers1 {
@@ -696,14 +681,14 @@
 
 &usbh_ehci {
 	phys = <&usbphyc_port0>;
-	status = "disabled";
+	status = "okay";
 };
 
 &usbotg_hs {
 	phys = <&usbphyc_port1 0>;
 	phy-names = "usb2-phy";
 	usb-role-switch;
-	status = "disabled";
+	status = "okay";
 
 	port {
 		usbotg_hs_ep: endpoint {
@@ -713,7 +698,7 @@
 };
 
 &usbphyc {
-	status = "disabled";
+	status = "okay";
 };
 
 &usbphyc_port0 {
@@ -744,5 +729,5 @@
 	regulator-min-microvolt = <2500000>;
 	regulator-max-microvolt = <2500000>;
 	vdda-supply = <&vdd>;
-	status = "disabled";
+	status = "okay";
 };

@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 # SPDX-License-Identifier: BSD-2-Clause
 
 SHOW_DETAILS=1

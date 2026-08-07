@@ -9,6 +9,7 @@
 #include <crypto/crypto_impl.h>
 #include <drvcrypt.h>
 #include <drvcrypt_cipher.h>
+#include <kernel/panic.h>
 #include <malloc.h>
 #include <util.h>
 

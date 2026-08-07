@@ -44,7 +44,7 @@ static TEE_Result install_ta(struct shdr *shdr, const uint8_t *nw,
 	struct tee_tadb_ta_write *ta;
 	void *hash_ctx = NULL;
 	size_t offs;
-	const size_t buf_size = 1024;
+	const size_t buf_size = 2 * 4096;
 	void *buf;
 	struct tee_tadb_property property;
 	struct shdr_bootstrap_ta bs_ta;
@@ -149,8 +149,7 @@ static TEE_Result bootstrap(uint32_t param_types,
 	if (param_types != exp_pt)
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	shdr = shdr_alloc_and_copy(0, params->memref.buffer,
-				   params->memref.size);
+	shdr = shdr_alloc_and_copy(params->memref.buffer, params->memref.size);
 	if (!shdr)
 		return TEE_ERROR_SECURITY;
 

@@ -17,8 +17,7 @@ define check-conf-h
 	cnf='$(strip $(foreach var,				\
 		$(call cfg-vars-by-prefix,$1),			\
 		$(call cfg-make-define,$(var))))';		\
-	guardpath="$(patsubst $(out-dir)/%,%,$@)"		\
-	guard="_`echo "$${guardpath}" | tr -- -/.+ _`_";	\
+	guard="_`echo $@ | tr -- -/.+ _`_";			\
 	mkdir -p $(dir $@);					\
 	echo "#ifndef $${guard}" >$@.tmp;			\
 	echo "#define $${guard}" >>$@.tmp;			\
@@ -54,6 +53,16 @@ define check-conf-mk
 	echo "PLATFORM_FLAVOR=${PLATFORM_FLAVOR}" >>$@.tmp; 	\
 	echo -n "$${cnf}" | sed 's/_nl_ */\n/g' >>$@.tmp;	\
 	$(call mv-if-changed,$@.tmp,$@)
+endef
+
+# Rename $1 to $2 only if file content differs. Otherwise just delete $1.
+define mv-if-changed
+	if cmp -s $2 $1; then					\
+		rm -f $1;					\
+	else							\
+		$(cmd-echo-silent) '  UPD     $2';		\
+		mv $1 $2;					\
+	fi
 endef
 
 define cfg-vars-by-prefix

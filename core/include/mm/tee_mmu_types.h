@@ -4,8 +4,8 @@
  * Copyright (c) 2021, Linaro Limited
  * Copyright (c) 2022, Arm Limited.
  */
-#ifndef __MM_TEE_MMU_TYPES_H
-#define __MM_TEE_MMU_TYPES_H
+#ifndef TEE_MMU_TYPES_H
+#define TEE_MMU_TYPES_H
 
 #include <stdint.h>
 #include <sys/queue.h>
@@ -88,12 +88,6 @@ struct tee_mmap_region {
 	vaddr_t va;
 	size_t size;
 	uint32_t attr; /* TEE_MATTR_* above */
-};
-
-struct memory_map {
-	size_t count;
-	size_t alloc_count;
-	struct tee_mmap_region *map;
 };
 
 struct vm_region {

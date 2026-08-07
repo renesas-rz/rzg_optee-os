@@ -73,12 +73,7 @@ static void stm32_gate_endisable(uint16_t gate_id, bool enable)
 			io_write32(addr, BIT(gate->bit_idx));
 		else
 			io_setbits32_stm32shregs(addr, BIT(gate->bit_idx));
-		/* Make sure the clock is enabled before returning to caller */
-		dsb();
 	} else {
-		/* Waiting pending operation before disabling clock */
-		dsb();
-
 		if (gate->set_clr)
 			io_write32(addr + RCC_MP_ENCLRR_OFFSET,
 				   BIT(gate->bit_idx));
@@ -87,34 +82,14 @@ static void stm32_gate_endisable(uint16_t gate_id, bool enable)
 	}
 }
 
-void stm32_gate_set_init_state(uint16_t gate_id, bool enable)
-{
-	struct clk_stm32_priv __maybe_unused *priv = clk_stm32_get_priv();
-
-	assert(!priv->gate_cpt[gate_id]);
-	stm32_gate_endisable(gate_id, enable);
-}
-
 void stm32_gate_disable(uint16_t gate_id)
 {
-	struct clk_stm32_priv *priv = clk_stm32_get_priv();
-	uint8_t *gate_cpt = priv->gate_cpt;
-
-	assert(gate_cpt[gate_id] > 0);
-	if (gate_cpt[gate_id] == 1)
-		stm32_gate_endisable(gate_id, false);
-	gate_cpt[gate_id]--;
+	stm32_gate_endisable(gate_id, false);
 }
 
 void stm32_gate_enable(uint16_t gate_id)
 {
-	struct clk_stm32_priv *priv = clk_stm32_get_priv();
-	uint8_t *gate_cpt = priv->gate_cpt;
-
-	assert(gate_cpt[gate_id] < 0xFF);
-	if (gate_cpt[gate_id] == 0)
-		stm32_gate_endisable(gate_id, true);
-	gate_cpt[gate_id]++;
+	stm32_gate_endisable(gate_id, true);
 }
 
 bool stm32_gate_is_enabled(uint16_t gate_id)
@@ -152,20 +127,10 @@ TEE_Result stm32_gate_wait_ready(uint16_t gate_id, bool ready_on)
 static TEE_Result stm32_gate_ready_endisable(uint16_t gate_id, bool enable,
 					     bool wait_rdy)
 {
-	TEE_Result res = TEE_ERROR_GENERIC;
-
 	stm32_gate_endisable(gate_id, enable);
 
-	if (wait_rdy) {
-		res = stm32_gate_wait_ready(gate_id + 1, enable);
-		if (res) {
-			stm32_gate_endisable(gate_id, !enable);
-			if (stm32_gate_wait_ready(gate_id + 1, !enable))
-				panic("Gate failed to sync");
-
-			return res;
-		}
-	}
+	if (wait_rdy)
+		return stm32_gate_wait_ready(gate_id + 1, enable);
 
 	return TEE_SUCCESS;
 }
@@ -522,14 +487,11 @@ int clk_stm32_parse_fdt_by_name(const void *fdt, int node, const char *name,
 	uint32_t i = 0;
 
 	cell = fdt_getprop(fdt, node, name, &len);
-	if (cell && len > 0) {
+	if (cell)
 		for (i = 0; i < ((uint32_t)len / sizeof(uint32_t)); i++)
 			tab[i] = fdt32_to_cpu(cell[i]);
 
-		*nb = (uint32_t)len / sizeof(uint32_t);
-	} else {
-		*nb = 0;
-	}
+	*nb = (uint32_t)len / sizeof(uint32_t);
 
 	return 0;
 }
@@ -539,10 +501,6 @@ TEE_Result clk_stm32_init(struct clk_stm32_priv *priv, uintptr_t base)
 	stm32_clock_data = priv;
 
 	priv->base = base;
-
-	priv->gate_cpt = calloc(priv->nb_gates, sizeof(*priv->gate_cpt));
-	if (!priv->gate_cpt)
-		return TEE_ERROR_OUT_OF_MEMORY;
 
 	return TEE_SUCCESS;
 }
@@ -586,23 +544,23 @@ struct clk *stm32mp_rcc_clock_id_to_clk(unsigned long clock_id)
 	return priv->clk_refs[clock_id];
 }
 
-static TEE_Result stm32mp_clk_dt_get_clk(struct dt_pargs *pargs,
-					 void *data __unused,
-					 struct clk **out_clk)
+static struct clk *stm32mp_clk_dt_get_clk(struct dt_driver_phandle_args *pargs,
+					  void *data __unused, TEE_Result *res)
 {
 	unsigned long clock_id = pargs->args[0];
 	struct clk *clk = NULL;
 
+	*res = TEE_ERROR_BAD_PARAMETERS;
+
 	if (pargs->args_count != 1)
-		return TEE_ERROR_BAD_PARAMETERS;
+		return NULL;
 
 	clk = stm32mp_rcc_clock_id_to_clk(clock_id);
 	if (!clk)
-		return TEE_ERROR_BAD_PARAMETERS;
+		return NULL;
 
-	*out_clk = clk;
-
-	return TEE_SUCCESS;
+	*res = TEE_SUCCESS;
+	return clk;
 }
 
 static void clk_stm32_register_clocks(struct clk_stm32_priv *priv)

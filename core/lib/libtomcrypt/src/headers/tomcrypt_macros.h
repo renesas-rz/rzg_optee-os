@@ -1,11 +1,6 @@
 /* LibTomCrypt, modular cryptographic library -- Tom St Denis */
 /* SPDX-License-Identifier: Unlicense */
 
-
-#define LTC_TMPVAR__(n, l) n ## l
-#define LTC_TMPVAR_(n, l) LTC_TMPVAR__(n, l)
-#define LTC_TMPVAR(n) LTC_TMPVAR_(LTC_ ## n ## _, __LINE__)
-
 /* ---- HELPER MACROS ---- */
 #ifdef ENDIAN_NEUTRAL
 
@@ -280,20 +275,20 @@ static inline ulong32 ROR(ulong32 word, int i)
 #ifndef LTC_NO_ROLC
 
 #define ROLc(word,i) ({ \
-   ulong32 LTC_TMPVAR(ROLc) = (word); \
+   ulong32 ROLc_tmp = (word); \
    __asm__ ("roll %2, %0" : \
-            "=r" (LTC_TMPVAR(ROLc)) : \
-            "0" (LTC_TMPVAR(ROLc)), \
+            "=r" (ROLc_tmp) : \
+            "0" (ROLc_tmp), \
             "I" (i)); \
-            LTC_TMPVAR(ROLc); \
+            ROLc_tmp; \
    })
 #define RORc(word,i) ({ \
-   ulong32 LTC_TMPVAR(RORc) = (word); \
+   ulong32 RORc_tmp = (word); \
    __asm__ ("rorl %2, %0" : \
-            "=r" (LTC_TMPVAR(RORc)) : \
-            "0" (LTC_TMPVAR(RORc)), \
+            "=r" (RORc_tmp) : \
+            "0" (RORc_tmp), \
             "I" (i)); \
-            LTC_TMPVAR(RORc); \
+            RORc_tmp; \
    })
 
 #else
@@ -398,20 +393,20 @@ static inline ulong64 ROR64(ulong64 word, int i)
 #ifndef LTC_NO_ROLC
 
 #define ROL64c(word,i) ({ \
-   ulong64 LTC_TMPVAR(ROL64c) = word; \
+   ulong64 ROL64c_tmp = word; \
    __asm__ ("rolq %2, %0" : \
-            "=r" (LTC_TMPVAR(ROL64c)) : \
-            "0" (LTC_TMPVAR(ROL64c)), \
+            "=r" (ROL64c_tmp) : \
+            "0" (ROL64c_tmp), \
             "J" (i)); \
-            LTC_TMPVAR(ROL64c); \
+            ROL64c_tmp; \
    })
 #define ROR64c(word,i) ({ \
-   ulong64 LTC_TMPVAR(ROR64c) = word; \
+   ulong64 ROR64c_tmp = word; \
    __asm__ ("rorq %2, %0" : \
-            "=r" (LTC_TMPVAR(ROR64c)) : \
-            "0" (LTC_TMPVAR(ROR64c)), \
+            "=r" (ROR64c_tmp) : \
+            "0" (ROR64c_tmp), \
             "J" (i)); \
-            LTC_TMPVAR(ROR64c); \
+            ROR64c_tmp; \
    })
 
 #else /* LTC_NO_ROLC */

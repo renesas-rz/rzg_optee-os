@@ -9,7 +9,7 @@
 #ifndef __DRIVERS_LS_GPIO_H
 #define __DRIVERS_LS_GPIO_H
 
-#include <drivers/gpio.h>
+#include <gpio.h>
 #include <stdlib.h>
 #include <tee_api_types.h>
 #include <util.h>

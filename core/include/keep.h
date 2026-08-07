@@ -2,8 +2,8 @@
 /*
  * Copyright (c) 2015, Linaro Limited
  */
-#ifndef __KEEP_H
-#define __KEEP_H
+#ifndef KEEP_H
+#define KEEP_H
 
 #ifdef __ASSEMBLER__
 
@@ -45,4 +45,4 @@
 
 #endif /* __ASSEMBLER__ */
 
-#endif /*__KEEP_H*/
+#endif /*KEEP_H*/

@@ -32,7 +32,6 @@
 #include <io.h>
 #include <keep.h>
 #include <kernel/dt.h>
-#include <kernel/dt_driver.h>
 #include <util.h>
 
 /* Register definitions */
@@ -165,7 +164,7 @@ static int imx_uart_dev_init(struct serial_chip *chip, const void *fdt,
 	if (parms && parms[0])
 		IMSG("imx_uart: device parameters ignored (%s)", parms);
 
-	if (dt_map_dev(fdt, offs, &vbase, &size, DT_MAP_AUTO) < 0)
+	if (dt_map_dev(fdt, offs, &vbase, &size) < 0)
 		return -1;
 
 	pbase = virt_to_phys((void *)vbase);

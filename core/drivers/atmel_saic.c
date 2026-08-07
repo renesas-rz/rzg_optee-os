@@ -29,7 +29,7 @@ struct saic_data {
 	uint32_t external[SAMA5D2_AIC_MAX_IRQS32];
 };
 
-static struct saic_data saic;
+static struct saic_data saic = {0};
 
 static void saic_register_pm(void);
 
@@ -43,11 +43,11 @@ static uint32_t saic_read_reg(uint32_t reg)
 	return io_read32(saic.base + reg);
 }
 
-void interrupt_main_handler(void)
+void atmel_saic_it_handle(void)
 {
 	uint32_t irqnr = saic_read_reg(AT91_AIC_IVR);
 
-	interrupt_call_handlers(&saic.chip, irqnr);
+	itr_handle(irqnr);
 	saic_write_reg(AT91_AIC_EOICR, 0);
 }
 
@@ -104,8 +104,8 @@ static TEE_Result saic_get_src_type(uint32_t dt_level, size_t it,
 	return TEE_SUCCESS;
 }
 
-static void saic_configure(struct itr_chip *chip __unused, size_t it,
-			   uint32_t type, uint32_t prio)
+static void saic_add(struct itr_chip *chip __unused, size_t it,
+		     uint32_t type, uint32_t prio)
 {
 	uint32_t src_type = AT91_AIC_SMR_HIGH_LEVEL;
 
@@ -130,12 +130,30 @@ static void saic_disable(struct itr_chip *chip __unused, size_t it)
 	saic_write_reg(AT91_AIC_IDCR, 1);
 }
 
+static void saic_raise_pi(struct itr_chip *chip __unused, size_t it __unused)
+{
+	panic();
+}
+
+static void saic_raise_sgi(struct itr_chip *chip __unused, size_t it __unused,
+			   uint8_t cpu_mask __unused)
+{
+	panic();
+}
+
+static void saic_set_affinity(struct itr_chip *chip __unused,
+			      size_t it __unused, uint8_t cpu_mask __unused)
+{
+	panic();
+}
+
 static const struct itr_ops saic_ops = {
-	.configure = saic_configure,
-	.mask = saic_disable,
-	.unmask = saic_enable,
+	.add = saic_add,
 	.enable = saic_enable,
 	.disable = saic_disable,
+	.raise_pi = saic_raise_pi,
+	.raise_sgi = saic_raise_sgi,
+	.set_affinity = saic_set_affinity,
 };
 
 static int saic_dt_get_irq(const uint32_t *properties, int len,
@@ -145,6 +163,8 @@ static int saic_dt_get_irq(const uint32_t *properties, int len,
 	uint32_t src_type = 0;
 	uint32_t priority = 0;
 	uint32_t irq_type = 0;
+
+	len /= sizeof(uint32_t);
 
 	if (len != 3)
 		return DT_INFO_INVALID_INTERRUPT;
@@ -170,11 +190,9 @@ static int saic_dt_get_irq(const uint32_t *properties, int len,
 	return it;
 }
 
-static struct saic_data saic = {
-	.chip = {
-		.ops = &saic_ops,
-		.dt_get_irq = &saic_dt_get_irq,
-	},
+struct itr_chip saic_chip = {
+	.ops = &saic_ops,
+	.dt_get_irq = &saic_dt_get_irq,
 };
 
 static void saic_clear_aicredir(void)
@@ -265,9 +283,9 @@ TEE_Result atmel_saic_setup(void)
 	if (node < 0)
 		return TEE_ERROR_GENERIC;
 
-	ret = dt_map_dev(fdt, node, &saic.base, &size, DT_MAP_AUTO);
+	ret = dt_map_dev(fdt, node, &saic.base, &size);
 	if (ret) {
-		EMSG("Failed to map SAIC");
+		EMSG("Failed to map SAIC\n");
 		return TEE_ERROR_GENERIC;
 	}
 
@@ -277,7 +295,7 @@ TEE_Result atmel_saic_setup(void)
 	saic_init_external(fdt, node);
 	saic_init_hw();
 
-	interrupt_main_init(&saic.chip);
+	itr_init(&saic_chip);
 	saic_register_pm();
 
 	return TEE_SUCCESS;

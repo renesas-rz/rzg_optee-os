@@ -5,8 +5,6 @@
 
 #include <assert.h>
 #include <compiler.h>
-#include <mbedtls/nist_kw.h>
-#include <string_ext.h>
 #include <tee_api_defines.h>
 #include <tee_internal_api.h>
 #include <tee_internal_api_extensions.h>
@@ -21,9 +19,7 @@ bool processing_is_tee_asymm(uint32_t proc_id)
 {
 	switch (proc_id) {
 	/* RSA flavors */
-	case PKCS11_CKM_RSA_AES_KEY_WRAP:
 	case PKCS11_CKM_RSA_PKCS:
-	case PKCS11_CKM_RSA_X_509:
 	case PKCS11_CKM_RSA_PKCS_OAEP:
 	case PKCS11_CKM_RSA_PKCS_PSS:
 	case PKCS11_CKM_MD5_RSA_PKCS:
@@ -64,11 +60,9 @@ pkcs2tee_algorithm(uint32_t *tee_id, uint32_t *tee_hash_id,
 		uint32_t tee_hash_id;
 	} pkcs2tee_algo[] = {
 		/* RSA flavors */
-		{ PKCS11_CKM_RSA_AES_KEY_WRAP, 1, 0 },
 		{ PKCS11_CKM_RSA_PKCS, TEE_ALG_RSAES_PKCS1_V1_5, 0 },
 		{ PKCS11_CKM_RSA_PKCS_OAEP, 1, 0 },
 		{ PKCS11_CKM_RSA_PKCS_PSS, 1, 0 },
-		{ PKCS11_CKM_RSA_X_509, TEE_ALG_RSA_NOPAD, 0 },
 		{ PKCS11_CKM_MD5_RSA_PKCS, TEE_ALG_RSASSA_PKCS1_V1_5_MD5,
 		  TEE_ALG_MD5 },
 		{ PKCS11_CKM_SHA1_RSA_PKCS, TEE_ALG_RSASSA_PKCS1_V1_5_SHA1,
@@ -126,10 +120,6 @@ pkcs2tee_algorithm(uint32_t *tee_id, uint32_t *tee_hash_id,
 		break;
 	case PKCS11_CKM_RSA_PKCS_OAEP:
 		rc = pkcs2tee_algo_rsa_oaep(tee_id, tee_hash_id, proc_params);
-		break;
-	case PKCS11_CKM_RSA_AES_KEY_WRAP:
-		rc = pkcs2tee_algo_rsa_aes_wrap(tee_id, tee_hash_id,
-						proc_params);
 		break;
 	case PKCS11_CKM_ECDSA:
 	case PKCS11_CKM_ECDSA_SHA1:
@@ -225,38 +215,17 @@ allocate_tee_operation(struct pkcs11_session *session,
 	struct active_processing *processing = session->processing;
 
 	assert(processing->tee_op_handle == TEE_HANDLE_NULL);
-	assert(processing->tee_op_handle2 == TEE_HANDLE_NULL);
+	assert(processing->tee_hash_op_handle == TEE_HANDLE_NULL);
 
 	if (pkcs2tee_algorithm(&algo, &hash_algo, function, params, obj))
 		return PKCS11_CKR_FUNCTION_FAILED;
 
-	/*
-	 * PKCS#11 allows Sign/Verify with CKM_RSA_X_509 while GP TEE API
-	 * only permits Encrypt/Decrypt with TEE_ALG_RSA_NOPAD.
-	 * For other algorithm, use simple 1-to-1 ID conversion pkcs2tee_mode().
-	 */
-	if (params->id == PKCS11_CKM_RSA_X_509) {
-		assert(!hash_algo);
-		switch (function) {
-		case PKCS11_FUNCTION_ENCRYPT:
-		case PKCS11_FUNCTION_VERIFY:
-			mode = TEE_MODE_ENCRYPT;
-			break;
-		case PKCS11_FUNCTION_DECRYPT:
-		case PKCS11_FUNCTION_SIGN:
-			mode = TEE_MODE_DECRYPT;
-			break;
-		default:
-			TEE_Panic(0);
-		}
-	} else {
-		pkcs2tee_mode(&mode, function);
-	}
+	pkcs2tee_mode(&mode, function);
 
 	if (hash_algo) {
 		pkcs2tee_mode(&hash_mode, PKCS11_FUNCTION_DIGEST);
 
-		res = TEE_AllocateOperation(&processing->tee_op_handle2,
+		res = TEE_AllocateOperation(&processing->tee_hash_op_handle,
 					    hash_algo, hash_mode, 0);
 		if (res) {
 			EMSG("TEE_AllocateOp. failed %#"PRIx32" %#"PRIx32,
@@ -279,9 +248,9 @@ allocate_tee_operation(struct pkcs11_session *session,
 		return PKCS11_CKR_MECHANISM_INVALID;
 
 	if (res != TEE_SUCCESS &&
-	    processing->tee_op_handle2 != TEE_HANDLE_NULL) {
-		TEE_FreeOperation(session->processing->tee_op_handle2);
-		processing->tee_op_handle2 = TEE_HANDLE_NULL;
+	    processing->tee_hash_op_handle != TEE_HANDLE_NULL) {
+		TEE_FreeOperation(session->processing->tee_hash_op_handle);
+		processing->tee_hash_op_handle = TEE_HANDLE_NULL;
 		processing->tee_hash_algo = 0;
 	}
 
@@ -409,9 +378,6 @@ init_tee_operation(struct pkcs11_session *session,
 	struct active_processing *proc = session->processing;
 
 	switch (proc_params->id) {
-	case PKCS11_CKM_RSA_X_509:
-		rc = pkcs2tee_rsa_nopad_context(proc);
-		break;
 	case PKCS11_CKM_RSA_PKCS_PSS:
 	case PKCS11_CKM_SHA1_RSA_PKCS_PSS:
 	case PKCS11_CKM_SHA224_RSA_PKCS_PSS:
@@ -429,9 +395,6 @@ init_tee_operation(struct pkcs11_session *session,
 		break;
 	case PKCS11_CKM_EDDSA:
 		rc = pkcs2tee_proc_params_eddsa(proc, proc_params);
-		break;
-	case PKCS11_CKM_RSA_AES_KEY_WRAP:
-		rc = pkcs2tee_proc_params_rsa_aes_wrap(proc, proc_params);
 		break;
 	default:
 		break;
@@ -457,11 +420,7 @@ enum pkcs11_rc init_asymm_operation(struct pkcs11_session *session,
 	if (rc)
 		return rc;
 
-	rc = init_tee_operation(session, proc_params, obj);
-	if (!rc)
-		session->processing->mecha_type = proc_params->id;
-
-	return rc;
+	return init_tee_operation(session, proc_params, obj);
 }
 
 /*
@@ -484,17 +443,14 @@ enum pkcs11_rc step_asymm_operation(struct pkcs11_session *session,
 	void *in2_buf = NULL;
 	void *out_buf = NULL;
 	void *hash_buf = NULL;
-	void *temp_buf = NULL;
 	uint32_t in_size = 0;
 	uint32_t in2_size = 0;
-	size_t out_size = 0;
-	size_t hash_size = 0;
-	size_t temp_size = 0;
+	uint32_t out_size = 0;
+	uint32_t hash_size = 0;
 	TEE_Attribute *tee_attrs = NULL;
 	size_t tee_attrs_count = 0;
 	bool output_data = false;
 	struct active_processing *proc = session->processing;
-	struct rsa_aes_key_wrap_processing_ctx *rsa_aes_ctx = NULL;
 	struct rsa_oaep_processing_ctx *rsa_oaep_ctx = NULL;
 	struct rsa_pss_processing_ctx *rsa_pss_ctx = NULL;
 	struct eddsa_processing_ctx *eddsa_ctx = NULL;
@@ -594,25 +550,6 @@ enum pkcs11_rc step_asymm_operation(struct pkcs11_session *session,
 				     rsa_oaep_ctx->source_data_len);
 		tee_attrs_count++;
 		break;
-	case PKCS11_CKM_RSA_AES_KEY_WRAP:
-		rsa_aes_ctx = proc->extra_ctx;
-
-		if (!rsa_aes_ctx->source_data_len)
-			break;
-
-		tee_attrs = TEE_Malloc(sizeof(TEE_Attribute),
-				       TEE_USER_MEM_HINT_NO_FILL_ZERO);
-		if (!tee_attrs) {
-			rc = PKCS11_CKR_DEVICE_MEMORY;
-			goto out;
-		}
-
-		TEE_InitRefAttribute(&tee_attrs[tee_attrs_count],
-				     TEE_ATTR_RSA_OAEP_LABEL,
-				     rsa_aes_ctx->source_data,
-				     rsa_aes_ctx->source_data_len);
-		tee_attrs_count++;
-		break;
 	default:
 		break;
 	}
@@ -639,9 +576,10 @@ enum pkcs11_rc step_asymm_operation(struct pkcs11_session *session,
 		case PKCS11_CKM_SHA256_RSA_PKCS_PSS:
 		case PKCS11_CKM_SHA384_RSA_PKCS_PSS:
 		case PKCS11_CKM_SHA512_RSA_PKCS_PSS:
-			assert(proc->tee_op_handle2 != TEE_HANDLE_NULL);
+			assert(proc->tee_hash_op_handle != TEE_HANDLE_NULL);
 
-			TEE_DigestUpdate(proc->tee_op_handle2, in_buf, in_size);
+			TEE_DigestUpdate(proc->tee_hash_op_handle, in_buf,
+					 in_size);
 			rc = PKCS11_CKR_OK;
 			break;
 		default:
@@ -677,15 +615,16 @@ enum pkcs11_rc step_asymm_operation(struct pkcs11_session *session,
 	case PKCS11_CKM_SHA256_RSA_PKCS_PSS:
 	case PKCS11_CKM_SHA384_RSA_PKCS_PSS:
 	case PKCS11_CKM_SHA512_RSA_PKCS_PSS:
-		assert(proc->tee_op_handle2 != TEE_HANDLE_NULL);
+		assert(proc->tee_hash_op_handle != TEE_HANDLE_NULL);
 
 		hash_size = TEE_ALG_GET_DIGEST_SIZE(proc->tee_hash_algo);
 		hash_buf = TEE_Malloc(hash_size, 0);
 		if (!hash_buf)
 			return PKCS11_CKR_DEVICE_MEMORY;
 
-		res = TEE_DigestDoFinal(proc->tee_op_handle2, in_buf, in_size,
-					hash_buf, &hash_size);
+		res = TEE_DigestDoFinal(proc->tee_hash_op_handle,
+					in_buf, in_size, hash_buf,
+					&hash_size);
 
 		rc = tee2pkcs_error(res);
 		if (rc != PKCS11_CKR_OK)
@@ -741,7 +680,6 @@ enum pkcs11_rc step_asymm_operation(struct pkcs11_session *session,
 		}
 		break;
 	case PKCS11_CKM_RSA_PKCS:
-	case PKCS11_CKM_RSA_X_509:
 	case PKCS11_CKM_MD5_RSA_PKCS:
 	case PKCS11_CKM_SHA1_RSA_PKCS:
 	case PKCS11_CKM_SHA224_RSA_PKCS:
@@ -825,135 +763,6 @@ enum pkcs11_rc step_asymm_operation(struct pkcs11_session *session,
 			break;
 		}
 		break;
-
-	case PKCS11_CKM_RSA_X_509:
-		switch (function) {
-		case PKCS11_FUNCTION_ENCRYPT:
-			/*
-			 * Input message size shall be at most the key size
-			 * As encrypting with raw RSA can be unsafe, it
-			 * remains the responsibility of the client to
-			 * prolerly pad the message for safe usage.
-			 */
-			if (in_size > sz) {
-				rc = PKCS11_CKR_DATA_LEN_RANGE;
-				break;
-			}
-			res = TEE_AsymmetricEncrypt(proc->tee_op_handle,
-						    tee_attrs, tee_attrs_count,
-						    in_buf, in_size,
-						    out_buf, &out_size);
-			output_data = true;
-			rc = tee2pkcs_error(res);
-			if (rc == PKCS11_CKR_ARGUMENTS_BAD)
-				rc = PKCS11_CKR_DATA_LEN_RANGE;
-			break;
-		case PKCS11_FUNCTION_DECRYPT:
-			/*
-			 * Input message size shall be at most the key size
-			 * As decrypting with raw RSA can be unsafe, it
-			 * remains the responsibility of the encryption
-			 * instance to have prolerly padded its message.
-			 */
-			if (in_size > sz) {
-				rc = PKCS11_CKR_ENCRYPTED_DATA_LEN_RANGE;
-				break;
-			}
-
-			res = TEE_AsymmetricDecrypt(proc->tee_op_handle,
-						    tee_attrs, tee_attrs_count,
-						    in_buf, in_size,
-						    out_buf, &out_size);
-			output_data = true;
-			rc = tee2pkcs_error(res);
-			if (rc == PKCS11_CKR_ARGUMENTS_BAD)
-				rc = PKCS11_CKR_ENCRYPTED_DATA_LEN_RANGE;
-			break;
-		case PKCS11_FUNCTION_SIGN:
-			/*
-			 * GP TEE API only allows Decrypt, not Verify operation,
-			 * on TEE_ALG_RSA_NOPAD. Be a bit strict on the size and
-			 * content of the message and ensure the generate
-			 * signature as the size of the modulus (@sz here).
-			 *
-			 * It remains the responsibility of the client to have
-			 * a safe padding scheme for the provided message data.
-			 */
-			if (in_size != sz) {
-				EMSG("Invalid data size %"PRIu32" != %zu",
-				     in_size, sz);
-				rc = PKCS11_CKR_DATA_LEN_RANGE;
-				break;
-			}
-
-			if (out_size < sz) {
-				rc = PKCS11_CKR_BUFFER_TOO_SMALL;
-				out_size = sz;
-				output_data = true;
-				break;
-			}
-
-			temp_size = sz;
-			temp_buf = proc->extra_ctx;
-			res = TEE_AsymmetricDecrypt(proc->tee_op_handle,
-						    tee_attrs, tee_attrs_count,
-						    in_buf, in_size,
-						    temp_buf, &temp_size);
-			if (!res && temp_size != sz) {
-				EMSG("CMK_RSA_X509: signature size %zu != %zu",
-				     temp_size, sz);
-				rc = PKCS11_CKR_DATA_INVALID;
-				break;
-			}
-			if (!res) {
-				TEE_MemMove(out_buf, temp_buf, sz);
-				TEE_MemFill(temp_buf, 0xa5, sz);
-			}
-			output_data = true;
-			rc = tee2pkcs_error(res);
-			out_size = sz;
-			break;
-		case PKCS11_FUNCTION_VERIFY:
-			/*
-			 * GP TEE API only allows Encrypt, not Verify operation,
-			 * on TEE_ALG_RSA_NOPAD. Encrypt signature in
-			 * temporary buffer preallocated to the size of the key.
-			 */
-			temp_size = sz;
-			temp_buf = proc->extra_ctx;
-			res = TEE_AsymmetricEncrypt(proc->tee_op_handle,
-						    tee_attrs, tee_attrs_count,
-						    in2_buf, in2_size,
-						    temp_buf, &temp_size);
-			rc = tee2pkcs_error(res);
-			if (rc == PKCS11_CKR_OK) {
-				/*
-				 * Skip nul bytes heading message before
-				 * comparing encrypted signature.
-				 */
-				char *ptr = in_buf;
-				size_t n = 0;
-
-				for (n = 0; n < in_size; n++)
-					if (ptr[n])
-						break;
-				in_size -= n;
-				ptr += n;
-				if (n > 1)
-					IMSG("Unsafe signature: skip %zu bytes",
-					     n);
-
-				if (temp_size != in_size ||
-				    consttime_memcmp(temp_buf, ptr, in_size))
-					rc = PKCS11_CKR_SIGNATURE_INVALID;
-			}
-			break;
-		default:
-			TEE_Panic(function);
-			break;
-		}
-		break;
-
 	case PKCS11_CKM_ECDSA_SHA1:
 	case PKCS11_CKM_ECDSA_SHA224:
 	case PKCS11_CKM_ECDSA_SHA256:
@@ -1091,179 +900,6 @@ enum pkcs11_rc do_asymm_derivation(struct pkcs11_session *session,
 out:
 	release_active_processing(session);
 	TEE_FreeTransientObject(out_handle);
-
-	return rc;
-}
-
-static enum pkcs11_rc wrap_rsa_aes_key(struct active_processing *proc,
-				       void *data, uint32_t data_sz,
-				       void *out_buf, uint32_t *out_sz)
-{
-	enum pkcs11_rc rc = PKCS11_CKR_OK;
-	TEE_Result res = TEE_ERROR_GENERIC;
-	int mbedtls_rc = 0;
-	struct rsa_aes_key_wrap_processing_ctx *ctx = proc->extra_ctx;
-	mbedtls_nist_kw_context kw_ctx = { };
-	uint8_t aes_key_value[32] = { };
-	uint32_t aes_key_size = ctx->aes_key_bits / 8;
-	size_t aes_wrapped_size = *out_sz;
-	uint32_t expected_size = 0;
-	size_t target_key_size = 0;
-	const size_t kw_semiblock_len = 8;
-
-	if (ctx->aes_key_bits != 128 &&
-	    ctx->aes_key_bits != 192 &&
-	    ctx->aes_key_bits != 256)
-		return PKCS11_CKR_ARGUMENTS_BAD;
-
-	mbedtls_nist_kw_init(&kw_ctx);
-	TEE_GenerateRandom(aes_key_value, aes_key_size);
-	res = TEE_AsymmetricEncrypt(proc->tee_op_handle,
-				    NULL, 0,
-				    aes_key_value, aes_key_size,
-				    out_buf, &aes_wrapped_size);
-	expected_size = aes_wrapped_size + data_sz + kw_semiblock_len;
-	if (res) {
-		if (res == TEE_ERROR_SHORT_BUFFER)
-			*out_sz = expected_size;
-
-		rc = tee2pkcs_error(res);
-		goto out;
-	}
-
-	if (*out_sz < expected_size) {
-		rc = PKCS11_CKR_BUFFER_TOO_SMALL;
-		*out_sz = expected_size;
-		goto out;
-	}
-
-	mbedtls_rc = mbedtls_nist_kw_setkey(&kw_ctx, MBEDTLS_CIPHER_ID_AES,
-					    aes_key_value, ctx->aes_key_bits,
-					    true);
-	if (mbedtls_rc) {
-		if (mbedtls_rc == MBEDTLS_ERR_CIPHER_BAD_INPUT_DATA)
-			rc = PKCS11_CKR_KEY_SIZE_RANGE;
-		else
-			rc = PKCS11_CKR_FUNCTION_FAILED;
-
-		goto out;
-	}
-
-	mbedtls_rc = mbedtls_nist_kw_wrap(&kw_ctx, MBEDTLS_KW_MODE_KWP,
-					  data, data_sz,
-					  (uint8_t *)out_buf + aes_wrapped_size,
-					  &target_key_size,
-					  *out_sz - aes_wrapped_size);
-	if (mbedtls_rc) {
-		rc = PKCS11_CKR_ARGUMENTS_BAD;
-		goto out;
-	}
-
-	assert(*out_sz >= target_key_size + aes_wrapped_size);
-	*out_sz = target_key_size + aes_wrapped_size;
-
-out:
-	mbedtls_nist_kw_free(&kw_ctx);
-	TEE_MemFill(aes_key_value, 0, aes_key_size);
-	return rc;
-}
-
-static enum pkcs11_rc unwrap_rsa_aes_key(struct active_processing *proc,
-					 void *data, uint32_t data_sz,
-					 void **out_buf, uint32_t *out_sz)
-{
-	enum pkcs11_rc rc = PKCS11_CKR_OK;
-	int mbedtls_rc = 0;
-	TEE_Result res = TEE_ERROR_GENERIC;
-	TEE_OperationInfo info = { };
-	struct rsa_aes_key_wrap_processing_ctx *ctx = proc->extra_ctx;
-	mbedtls_nist_kw_context kw_ctx = { };
-	uint8_t aes_key_value[32] = { };
-	size_t aes_key_size = ctx->aes_key_bits / 8;
-	uint32_t wrapped_key_size = 0;
-	uint32_t rsa_key_size = 0;
-	size_t target_key_size = 0;
-
-	if (ctx->aes_key_bits != 128 &&
-	    ctx->aes_key_bits != 192 &&
-	    ctx->aes_key_bits != 256)
-		return PKCS11_CKR_ARGUMENTS_BAD;
-
-	TEE_GetOperationInfo(proc->tee_op_handle, &info);
-	rsa_key_size = info.keySize / 8;
-	wrapped_key_size = data_sz - rsa_key_size;
-	target_key_size = wrapped_key_size - 8;
-
-	*out_buf = TEE_Malloc(target_key_size, TEE_MALLOC_FILL_ZERO);
-	if (!*out_buf)
-		return PKCS11_CKR_DEVICE_MEMORY;
-
-	mbedtls_nist_kw_init(&kw_ctx);
-	res = TEE_AsymmetricDecrypt(proc->tee_op_handle,
-				    NULL, 0,
-				    data, rsa_key_size,
-				    aes_key_value, &aes_key_size);
-	if (res) {
-		rc = tee2pkcs_error(res);
-		goto out;
-	}
-
-	mbedtls_rc = mbedtls_nist_kw_setkey(&kw_ctx, MBEDTLS_CIPHER_ID_AES,
-					    aes_key_value, ctx->aes_key_bits,
-					    false);
-	if (mbedtls_rc) {
-		rc = PKCS11_CKR_WRAPPED_KEY_INVALID;
-		goto out;
-	}
-
-	mbedtls_rc = mbedtls_nist_kw_unwrap(&kw_ctx, MBEDTLS_KW_MODE_KWP,
-					    (uint8_t *)data + rsa_key_size,
-					    wrapped_key_size, *out_buf,
-					    &target_key_size, target_key_size);
-	if (mbedtls_rc) {
-		rc = PKCS11_CKR_WRAPPED_KEY_INVALID;
-		goto out;
-	}
-
-	*out_sz = target_key_size;
-out:
-	TEE_MemFill(aes_key_value, 0, aes_key_size);
-	mbedtls_nist_kw_free(&kw_ctx);
-	return rc;
-}
-
-enum pkcs11_rc wrap_data_by_asymm_enc(struct pkcs11_session *session,
-				      void *data, uint32_t data_sz,
-				      void *out_buf, uint32_t *out_sz)
-{
-	enum pkcs11_rc rc = PKCS11_CKR_GENERAL_ERROR;
-	struct active_processing *proc = session->processing;
-
-	switch (proc->mecha_type) {
-	case PKCS11_CKM_RSA_AES_KEY_WRAP:
-		rc = wrap_rsa_aes_key(proc, data, data_sz, out_buf, out_sz);
-		break;
-	default:
-		return PKCS11_CKR_MECHANISM_INVALID;
-	}
-
-	return rc;
-}
-
-enum pkcs11_rc unwrap_key_by_asymm(struct pkcs11_session *session,
-				   void *data, uint32_t data_sz,
-				   void **out_buf, uint32_t *out_sz)
-{
-	enum pkcs11_rc rc = PKCS11_CKR_GENERAL_ERROR;
-	struct active_processing *proc = session->processing;
-
-	switch (proc->mecha_type) {
-	case PKCS11_CKM_RSA_AES_KEY_WRAP:
-		rc = unwrap_rsa_aes_key(proc, data, data_sz, out_buf, out_sz);
-		break;
-	default:
-		return PKCS11_CKR_MECHANISM_INVALID;
-	}
 
 	return rc;
 }

@@ -247,11 +247,11 @@ void *tee_pager_phys_to_virt(paddr_t pa, size_t len)
 		return (void *)core_mmu_idx2va(&ti, idx);
 
 	n = 0;
-	idx = core_mmu_va2idx(&pager_tables[n].tbl_info, TEE_RAM_START);
+	idx = core_mmu_va2idx(&pager_tables[n].tbl_info, TEE_RAM_VA_START);
 	while (true) {
 		while (idx < TBL_NUM_ENTRIES) {
 			v = core_mmu_idx2va(&pager_tables[n].tbl_info, idx);
-			if (v >= (TEE_RAM_START + TEE_RAM_VA_SIZE))
+			if (v >= (TEE_RAM_VA_START + TEE_RAM_VA_SIZE))
 				return NULL;
 
 			core_mmu_get_entry(&pager_tables[n].tbl_info,
@@ -412,7 +412,7 @@ void tee_pager_set_alias_area(tee_mm_entry_t *mm)
 	}
 
 out:
-	tlbi_va_range(smem, nbytes, SMALL_PAGE_SIZE);
+	tlbi_mva_range(smem, nbytes, SMALL_PAGE_SIZE);
 }
 
 static size_t tbl_usage_count(struct core_mmu_table_info *ti)
@@ -470,11 +470,11 @@ static void tblidx_tlbi_entry(struct tblidx tblidx)
 	if (tblidx.pgt->ctx) {
 		uint32_t asid = to_user_mode_ctx(tblidx.pgt->ctx)->vm_info.asid;
 
-		tlbi_va_asid(va, asid);
+		tlbi_mva_asid(va, asid);
 		return;
 	}
 #endif
-	tlbi_va_allasid(va);
+	tlbi_mva_allasid(va);
 }
 
 static void pmem_assign_fobj_page(struct tee_pager_pmem *pmem,
@@ -931,7 +931,7 @@ static struct pgt **alloc_merged_pgt_array(struct vm_paged_region *a,
 	    a->pgt_array[a_pgt_count - 1] != a_next->pgt_array[0])
 		return NULL;
 
-	pgt_array = calloc(pgt_count, sizeof(struct pgt *));
+	pgt_array = calloc(sizeof(struct pgt *), pgt_count);
 	if (!pgt_array)
 		return NULL;
 
@@ -1377,7 +1377,7 @@ static void pager_deploy_page(struct tee_pager_pmem *pmem,
 	if (!(attr_alias & TEE_MATTR_PW)) {
 		attr_alias |= TEE_MATTR_PW;
 		core_mmu_set_entry(ti, idx_alias, pa_alias, attr_alias);
-		tlbi_va_allasid((vaddr_t)va_alias);
+		tlbi_mva_allasid((vaddr_t)va_alias);
 	}
 
 	asan_tag_access(va_alias, va_alias + SMALL_PAGE_SIZE);
@@ -1392,7 +1392,7 @@ static void pager_deploy_page(struct tee_pager_pmem *pmem,
 		/* Forbid write to aliases for read-only (maybe exec) pages */
 		attr_alias &= ~TEE_MATTR_PW;
 		core_mmu_set_entry(ti, idx_alias, pa_alias, attr_alias);
-		tlbi_va_allasid((vaddr_t)va_alias);
+		tlbi_mva_allasid((vaddr_t)va_alias);
 		break;
 	case PAGED_REGION_TYPE_RW:
 		TAILQ_INSERT_TAIL(&tee_pager_pmem_head, pmem, link);
@@ -1988,7 +1988,7 @@ void tee_pager_release_phys(void *addr, size_t size)
 	}
 
 	if (unmaped)
-		tlbi_va_range(begin, end - begin, SMALL_PAGE_SIZE);
+		tlbi_mva_range(begin, end - begin, SMALL_PAGE_SIZE);
 
 	pager_unlock(exceptions);
 }
@@ -2004,7 +2004,7 @@ void *tee_pager_alloc(size_t size)
 	if (!size)
 		return NULL;
 
-	mm = tee_mm_alloc(&core_virt_mem_pool, ROUNDUP(size, SMALL_PAGE_SIZE));
+	mm = tee_mm_alloc(&tee_mm_vcore, ROUNDUP(size, SMALL_PAGE_SIZE));
 	if (!mm)
 		return NULL;
 
@@ -2031,8 +2031,7 @@ vaddr_t tee_pager_init_iv_region(struct fobj *fobj)
 
 	assert(!pager_iv_region);
 
-	mm = tee_mm_alloc(&core_virt_mem_pool,
-			  fobj->num_pages * SMALL_PAGE_SIZE);
+	mm = tee_mm_alloc(&tee_mm_vcore, fobj->num_pages * SMALL_PAGE_SIZE);
 	if (!mm)
 		panic();
 

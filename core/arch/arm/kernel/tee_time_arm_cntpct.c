@@ -7,13 +7,14 @@
 #include <crypto/crypto.h>
 #include <kernel/misc.h>
 #include <kernel/tee_time.h>
+#include <kernel/time_source.h>
 #include <mm/core_mmu.h>
 #include <stdint.h>
 #include <tee/tee_cryp_utl.h>
 #include <trace.h>
 #include <utee_defines.h>
 
-TEE_Result tee_time_get_sys_time(TEE_Time *time)
+static TEE_Result arm_cntpct_get_sys_time(TEE_Time *time)
 {
 	uint64_t cntpct = barrier_read_counter_timer();
 	uint32_t cntfrq = read_cntfrq();
@@ -24,10 +25,13 @@ TEE_Result tee_time_get_sys_time(TEE_Time *time)
 	return TEE_SUCCESS;
 }
 
-uint32_t tee_time_get_sys_time_protection_level(void)
-{
-	return 1000;
-}
+static const struct time_source arm_cntpct_time_source = {
+	.name = "arm cntpct",
+	.protection_level = 1000,
+	.get_sys_time = arm_cntpct_get_sys_time,
+};
+
+REGISTER_TIME_SOURCE(arm_cntpct_time_source)
 
 /*
  * We collect jitter using cntpct in 32- or 64-bit mode that is typically

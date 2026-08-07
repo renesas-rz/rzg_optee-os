@@ -13,10 +13,8 @@ void stm32mp_pmic_apply_boot_on_config(void);
 void stm32mp_pmic_apply_lp_config(const char *lp_state);
 void stm32mp_get_pmic(void);
 void stm32mp_put_pmic(void);
+int stm32mp_dt_pmic_status(void);
 const char *stm32mp_pmic_get_cpu_supply_name(void);
-
-/* Get the PMIC regulator related to @name or NULL if not found */
-struct regulator *stm32mp_pmic_get_regulator(const char *name);
 #else
 static inline void stm32mp_pmic_apply_boot_on_config(void)
 {
@@ -36,13 +34,12 @@ static inline void stm32mp_put_pmic(void)
 	panic();
 }
 
-static inline const char *stm32mp_pmic_get_cpu_supply_name(void)
+static inline int stm32mp_dt_pmic_status(void)
 {
-	return NULL;
+	return -1;
 }
 
-static inline struct regulator *
-stm32mp_pmic_get_regulator(const char *name __unused)
+static inline const char *stm32mp_pmic_get_cpu_supply_name(void)
 {
 	return NULL;
 }

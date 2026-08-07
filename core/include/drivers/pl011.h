@@ -2,8 +2,8 @@
 /*
  * Copyright (c) 2014, Linaro Limited
  */
-#ifndef __DRIVERS_PL011_H
-#define __DRIVERS_PL011_H
+#ifndef PL011_H
+#define PL011_H
 
 #include <types_ext.h>
 #include <drivers/serial.h>
@@ -18,4 +18,4 @@ struct pl011_data {
 void pl011_init(struct pl011_data *pd, paddr_t pbase, uint32_t uart_clk,
 		uint32_t baud_rate);
 
-#endif /* __DRIVERS_PL011_H */
+#endif /* PL011_H */

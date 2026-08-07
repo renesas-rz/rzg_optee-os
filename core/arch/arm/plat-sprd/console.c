@@ -32,7 +32,7 @@
 
 static struct sprd_uart_data console_data;
 
-void plat_console_init(void)
+void console_init(void)
 {
 	sprd_uart_init(&console_data, CONSOLE_UART_BASE);
 	register_serial_console(&console_data.chip);

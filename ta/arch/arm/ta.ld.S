@@ -14,6 +14,7 @@ OUTPUT_ARCH(aarch64)
 #endif
 
 SECTIONS {
+	.ta_head : {*(.ta_head)}
 	.text : {
 		__text_start = .;
 		*(.text .text.*)

@@ -3,8 +3,8 @@
  * Copyright (c) 2014, Linaro Limited
  */
 
-#ifndef __CONSOLE_H
-#define __CONSOLE_H
+#ifndef CONSOLE_H
+#define CONSOLE_H
 
 #include <compiler.h>
 #include <tee_api_types.h>
@@ -13,8 +13,6 @@
 void console_init(void);
 void console_putc(int ch);
 void console_flush(void);
-
-void plat_console_init(void);
 
 struct serial_chip;
 void register_serial_console(struct serial_chip *chip);
@@ -53,5 +51,5 @@ static inline void configure_console_from_dt(void)
 {}
 #endif /* !CFG_DT */
 
-#endif /* __CONSOLE_H */
+#endif /* CONSOLE_H */
 

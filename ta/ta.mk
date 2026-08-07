@@ -12,22 +12,13 @@ include mk/$(COMPILER_$(sm)).mk
 # Config flags from mk/config.mk
 #
 
-ifeq ($(_CFG_TA_STACK_PROTECTOR),y)
-ta-stackp-cflags-$(CFG_TA_STACK_PROTECTOR) := -fstack-protector
-ta-stackp-cflags-$(CFG_TA_STACK_PROTECTOR_STRONG) := -fstack-protector-strong
-ta-stackp-cflags-$(CFG_TA_STACK_PROTECTOR_ALL) := -fstack-protector-all
-else
-ta-stackp-cflags-y := -fno-stack-protector
-endif
-$(sm)-platform-cflags += $(ta-stackp-cflags-y)
-
 ifeq ($(CFG_TA_MBEDTLS_SELF_TEST),y)
 $(sm)-platform-cppflags += -DMBEDTLS_SELF_TEST
 endif
 
 ifeq ($(CFG_TEE_TA_MALLOC_DEBUG),y)
-# Build malloc debug code into libutils, that is, record allocation
-# location and extra sanity checks.
+# Build malloc debug code into libutils: (mdbg_malloc(), mdbg_free(),
+# mdbg_check(), etc.).
 $(sm)-platform-cppflags += -DENABLE_MDBG=1
 endif
 
@@ -49,9 +40,6 @@ ta-mk-file-export-add-$(sm) += CFG_TEE_TA_LOG_LEVEL ?= $(CFG_TEE_TA_LOG_LEVEL)_n
 ta-mk-file-export-vars-$(sm) += CFG_TA_BGET_TEST
 ta-mk-file-export-vars-$(sm) += CFG_ATTESTATION_PTA
 ta-mk-file-export-vars-$(sm) += CFG_MEMTAG
-ta-mk-file-export-vars-$(sm) += CFG_TA_LIBGCC
-ta-mk-file-export-vars-$(sm) += CFG_TA_SANITIZE_UNDEFINED
-ta-mk-file-export-vars-$(sm) += _CFG_TA_STACK_PROTECTOR
 
 # Expand platform flags here as $(sm) will change if we have several TA
 # targets. Platform flags should not change after inclusion of ta/ta.mk.
@@ -63,9 +51,6 @@ aflags$(sm)	:= $(platform-aflags) $($(sm)-platform-aflags)
 # compiled, these flags are not propagated to the TA
 cppflags$(sm)	+= -include $(conf-file)
 cppflags$(sm) += -DTRACE_LEVEL=$(CFG_TEE_TA_LOG_LEVEL)
-ifeq ($(CFG_TA_SANITIZE_UNDEFINED),y)
-cflags$(sm) += -fsanitize=undefined
-endif
 
 ifeq ($(ta-target),ta_arm32)
 arm32-user-sysreg-txt = lib/libutee/arch/arm/arm32_user_sysreg.txt
@@ -110,7 +95,7 @@ ta-mk-file-export-vars-$(sm) += CFG_TA_MBEDTLS
 
 libname = utee
 libdir = lib/libutee
-libuuid = 4b3d937e-d57e-418b-8673-1c04f2420226
+libuuid = 527f1a47-b92c-4a74-95bd-72f19f4a6f74
 libl = mbedtls utils
 include mk/lib.mk
 
@@ -135,6 +120,10 @@ incfiles-extra-host += core/include/signed_hdr.h
 ifeq ($(ta-target),ta_arm32)
 incfiles-extra-host += $(out-dir)/include/generated/arm32_user_sysreg.h
 endif
+ifeq ($(CFG_SPMC_TESTS),y)
+incfiles-extra-host += core/arch/arm/include/ffa.h
+incfiles-extra-host += core/arch/arm/include/smccc.h
+endif
 #
 # Copy lib files and exported headers from each lib
 #
@@ -158,8 +147,8 @@ $(foreach f, $(libfiles), \
 
 # Copy .mk files
 ta-mkfiles = mk/compile.mk mk/subdir.mk mk/gcc.mk mk/clang.mk mk/cleandirs.mk \
-	mk/cc-option.mk mk/macros.mk \
-	ta/link.mk ta/link_shlib.mk \
+	mk/cc-option.mk \
+	ta/arch/$(ARCH)/link.mk ta/arch/$(ARCH)/link_shlib.mk \
 	ta/mk/ta_dev_kit.mk
 
 $(foreach f, $(ta-mkfiles), \
@@ -181,7 +170,7 @@ $(foreach f, $(incfiles-extra-host), \
 	$(eval $(call copy-file, $(f), $(out-dir)/export-$(sm)/host_include)))
 
 # Copy the src files
-ta-srcfiles = ta/user_ta_header.c ta/arch/$(ARCH)/ta.ld.S
+ta-srcfiles = ta/arch/$(ARCH)/user_ta_header.c ta/arch/$(ARCH)/ta.ld.S
 ifeq ($(ta-target),ta_arm32)
 ta-srcfiles += ta/arch/$(ARCH)/ta_entry_a32.S
 endif
@@ -189,19 +178,12 @@ $(foreach f, $(ta-srcfiles), \
 	$(eval $(call copy-file, $(f), $(out-dir)/export-$(sm)/src)))
 
 # Copy keys
-ta-keys := $(TA_SIGN_KEY)
-# default_ta.pem is a symlink to default.pem, for backwards compatibility.
-# If default_ta.pem is used, copy both files.
-ifeq ($(TA_SIGN_KEY),keys/default_ta.pem)
-ta-keys += keys/default.pem
-endif
-
+ta-keys = keys/default_ta.pem
 $(foreach f, $(ta-keys), \
 	$(eval $(call copy-file, $(f), $(out-dir)/export-$(sm)/keys)))
 
 # Copy the scripts
-ta-scripts = scripts/sign_encrypt.py scripts/symbolize.py \
-       scripts/sign_rproc_fw.py scripts/ftrace_format.py
+ta-scripts = scripts/sign_encrypt.py scripts/symbolize.py
 $(foreach f, $(ta-scripts), \
 	$(eval $(call copy-file, $(f), $(out-dir)/export-$(sm)/scripts)))
 

@@ -3,8 +3,8 @@
  * Copyright (c) 2016, Linaro Limited
  * Copyright (c) 2014, STMicroelectronics International N.V.
  */
-#ifndef __MM_CORE_MMU_ARCH_H
-#define __MM_CORE_MMU_ARCH_H
+#ifndef __CORE_MMU_ARCH_H
+#define __CORE_MMU_ARCH_H
 
 #ifndef __ASSEMBLER__
 #include <arm.h>
@@ -76,7 +76,33 @@
  * that these magic numbers are correct.
  */
 #define CORE_MMU_BASE_TABLE_OFFSET \
-	(BIT(CFG_LPAE_ADDR_SPACE_BITS - CORE_MMU_BASE_TABLE_SHIFT) * U(8))
+	(CFG_TEE_CORE_NB_CORE * \
+	 BIT(CFG_LPAE_ADDR_SPACE_BITS - CORE_MMU_BASE_TABLE_SHIFT) * \
+	 U(8))
+#endif
+/*
+ * TEE_RAM_VA_START:            The start virtual address of the TEE RAM
+ * TEE_TEXT_VA_START:           The start virtual address of the OP-TEE text
+ */
+
+/*
+ * Identify mapping constraint: virtual base address is the physical start addr.
+ * If platform did not set some macros, some get default value.
+ */
+#ifndef TEE_RAM_VA_SIZE
+#define TEE_RAM_VA_SIZE			CORE_MMU_PGDIR_SIZE
+#endif
+
+#ifndef TEE_LOAD_ADDR
+#define TEE_LOAD_ADDR			TEE_RAM_START
+#endif
+
+#define TEE_RAM_VA_START		TEE_RAM_START
+#define TEE_TEXT_VA_START		(TEE_RAM_VA_START + \
+					 (TEE_LOAD_ADDR - TEE_RAM_START))
+
+#ifndef STACK_ALIGNMENT
+#define STACK_ALIGNMENT			(sizeof(long) * U(2))
 #endif
 
 #ifndef __ASSEMBLER__
@@ -90,20 +116,20 @@ struct core_mmu_config {
 	uint64_t mair_el1;
 	uint64_t ttbr0_el1_base;
 	uint64_t ttbr0_core_offset;
-	uint64_t map_offset;
+	uint64_t load_offset;
 #elif defined(CFG_WITH_LPAE)
 	uint32_t ttbcr;
 	uint32_t mair0;
 	uint32_t ttbr0_base;
 	uint32_t ttbr0_core_offset;
-	uint32_t map_offset;
+	uint32_t load_offset;
 #else
 	uint32_t prrr;
 	uint32_t nmrr;
 	uint32_t dacr;
 	uint32_t ttbcr;
 	uint32_t ttbr;
-	uint32_t map_offset;
+	uint32_t load_offset;
 #endif
 };
 
@@ -135,6 +161,15 @@ struct core_mmu_user_map {
 };
 #endif
 
+#ifdef CFG_WITH_LPAE
+bool core_mmu_user_va_range_is_defined(void);
+#else
+static inline bool __noprof core_mmu_user_va_range_is_defined(void)
+{
+	return true;
+}
+#endif
+
 /* Cache maintenance operation type */
 enum cache_op {
 	DCACHE_CLEAN,
@@ -161,14 +196,13 @@ static inline TEE_Result cache_op_outer(enum cache_op op __unused,
 }
 #endif
 
-#if defined(ARM64)
-unsigned int core_mmu_arm64_get_pa_width(void);
-#endif
+/* Do section mapping, not support on LPAE */
+void map_memarea_sections(const struct tee_mmap_region *mm, uint32_t *ttb);
 
 static inline bool core_mmu_check_max_pa(paddr_t pa __maybe_unused)
 {
 #if defined(ARM64)
-	return pa <= (BIT64(core_mmu_arm64_get_pa_width()) - 1);
+	return pa <= (BIT64(CFG_CORE_ARM64_PA_BITS) - 1);
 #elif defined(CFG_CORE_LARGE_PHYS_ADDR)
 	return pa <= (BIT64(40) - 1);
 #else
@@ -200,22 +234,6 @@ static inline unsigned int core_mmu_get_va_width(void)
 	}
 	return 32;
 }
-
-static inline bool core_mmu_va_is_valid(vaddr_t va)
-{
-	return va < BIT64(core_mmu_get_va_width());
-}
-
-static inline bool core_mmu_level_in_range(unsigned int level)
-{
-#if CORE_MMU_BASE_TABLE_LEVEL == 0
-	return level <= CORE_MMU_PGDIR_LEVEL;
-#else
-	return level >= CORE_MMU_BASE_TABLE_LEVEL &&
-	       level <= CORE_MMU_PGDIR_LEVEL;
-#endif
-}
-
 #endif /*__ASSEMBLER__*/
 
-#endif /* __MM_CORE_MMU_ARCH_H */
+#endif /* CORE_MMU_H */

@@ -3,11 +3,13 @@
  * Copyright (c) 2014, STMicroelectronics International N.V.
  */
 #include <kernel/cache_helpers.h>
+#include <kernel/chip_services.h>
 #include <kernel/tee_common_otp.h>
 #include <kernel/tee_common.h>
 #include <kernel/tee_misc.h>
 #include <malloc.h>
 #include <mm/core_memprot.h>
+#include <stdio.h>
 #include <trace.h>
 
 static uint8_t tee_b2hs_add_base(uint8_t in)
@@ -93,7 +95,7 @@ bool core_is_buffer_inside(paddr_t b, paddr_size_t bl,
 	return false;
 }
 
-/* Returns true when buffer 'b' is fully outside area 'a' */
+/* Returns true when buffer 'b' is fully contained in area 'a' */
 bool core_is_buffer_outside(paddr_t b, paddr_size_t bl,
 			    paddr_t a, paddr_size_t al)
 {
@@ -126,7 +128,7 @@ void *alloc_cache_aligned(size_t size)
 	uint32_t cacheline_size = 0;
 
 	cacheline_size = cache_get_max_line_size();
-	if (ROUNDUP2_OVERFLOW(size, cacheline_size, &alloc_size))
+	if (ROUNDUP_OVERFLOW(size, cacheline_size, &alloc_size))
 		return NULL;
 
 	ptr = memalign(cacheline_size, alloc_size);

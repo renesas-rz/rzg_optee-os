@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: BSD-2-Clause
 /*
- * Copyright (c) 2016-2023, Linaro Limited
+ * Copyright (c) 2016-2020, Linaro Limited
  * Copyright (c) 2014, STMicroelectronics International N.V.
  */
 
 #include <arm.h>
-#include <config.h>
 #include <console.h>
 #include <drivers/gic.h>
-#include <drivers/hfic.h>
 #include <drivers/pl011.h>
+#include <drivers/tpm2_mmio.h>
+#include <drivers/tpm2_ptp_fifo.h>
 #include <drivers/tzc400.h>
 #include <initcall.h>
 #include <keep.h>
@@ -19,21 +19,22 @@
 #include <kernel/notif.h>
 #include <kernel/panic.h>
 #include <kernel/spinlock.h>
-#include <kernel/thread_spmc.h>
-#include <kernel/timer.h>
-#include <kernel/virtualization.h>
+#include <kernel/tee_time.h>
 #include <mm/core_memprot.h>
 #include <mm/core_mmu.h>
 #include <platform_config.h>
 #include <sm/psci.h>
 #include <stdint.h>
+#include <string.h>
 #include <trace.h>
 
+static struct gic_data gic_data __nex_bss;
 static struct pl011_data console_data __nex_bss;
-static uint16_t console_notif_vm_id __nex_bss;
-static uint16_t console_notif_backup_vm_id __nex_bss;
 
 register_phys_mem_pgdir(MEM_AREA_IO_SEC, CONSOLE_UART_BASE, PL011_REG_SIZE);
+#if defined(CFG_DRIVERS_TPM2_MMIO)
+register_phys_mem_pgdir(MEM_AREA_IO_SEC, TPM2_BASE, TPM2_REG_SIZE);
+#endif
 #if defined(PLATFORM_FLAVOR_fvp)
 register_phys_mem(MEM_AREA_RAM_SEC, TZCDRAM_BASE, TZCDRAM_SIZE);
 #endif
@@ -47,56 +48,46 @@ register_ddr(DRAM0_BASE, DRAM0_SIZE);
 register_ddr(DRAM1_BASE, DRAM1_SIZE);
 #endif
 
-#ifdef CFG_GIC
-register_phys_mem_pgdir(MEM_AREA_IO_SEC, GICC_BASE, GIC_CPU_REG_SIZE);
+#ifdef GIC_BASE
+
 register_phys_mem_pgdir(MEM_AREA_IO_SEC, GICD_BASE, GIC_DIST_REG_SIZE);
-#ifdef GIC_REDIST_BASE
-register_phys_mem_pgdir(MEM_AREA_IO_SEC, GIC_REDIST_BASE, GIC_REDIST_SIZE);
-#endif
+register_phys_mem_pgdir(MEM_AREA_IO_SEC, GICC_BASE, GIC_DIST_REG_SIZE);
 
-void boot_primary_init_intc(void)
+void main_init_gic(void)
 {
-#ifdef GIC_REDIST_BASE
-	gic_init_v3(GIC_BASE + GICC_OFFSET, GIC_BASE + GICD_OFFSET,
-		    GIC_REDIST_BASE);
+#if defined(CFG_WITH_ARM_TRUSTED_FW)
+	/* On ARMv8, GIC configuration is initialized in ARM-TF */
+	gic_init_base_addr(&gic_data, GIC_BASE + GICC_OFFSET,
+			   GIC_BASE + GICD_OFFSET);
 #else
-	gic_init(GIC_BASE + GICC_OFFSET, GIC_BASE + GICD_OFFSET);
+	gic_init(&gic_data, GIC_BASE + GICC_OFFSET, GIC_BASE + GICD_OFFSET);
 #endif
-	if (IS_ENABLED(CFG_CORE_SEL1_SPMC) &&
-	    IS_ENABLED(CFG_CORE_ASYNC_NOTIF)) {
-		size_t it = CFG_CORE_ASYNC_NOTIF_GIC_INTID;
-
-		if (it >= GIC_SGI_SEC_BASE && it <= GIC_SGI_SEC_MAX)
-			gic_init_donate_sgi_to_ns(it);
-		thread_spmc_set_async_notif_intid(it);
-	}
+	itr_init(&gic_data.chip);
 }
 
-void boot_secondary_init_intc(void)
+#if !defined(CFG_WITH_ARM_TRUSTED_FW)
+void main_secondary_init_gic(void)
 {
-	gic_init_per_cpu();
-}
-#endif /*CFG_GIC*/
-
-#ifdef CFG_CORE_HAFNIUM_INTC
-void boot_primary_init_intc(void)
-{
-	hfic_init();
+	gic_cpu_init(&gic_data);
 }
 #endif
 
-void plat_console_init(void)
+#endif
+
+void itr_core_handler(void)
+{
+	gic_it_handle(&gic_data);
+}
+
+void console_init(void)
 {
 	pl011_init(&console_data, CONSOLE_UART_BASE, CONSOLE_UART_CLK_IN_HZ,
 		   CONSOLE_BAUDRATE);
 	register_serial_console(&console_data.chip);
 }
 
-#if (defined(CFG_GIC) || defined(CFG_CORE_HAFNIUM_INTC)) && \
-	defined(IT_CONSOLE_UART) && \
-	!(defined(CFG_WITH_ARM_TRUSTED_FW) && defined(CFG_ARM_GICV2)) && \
-	!defined(CFG_SEMIHOSTING_CONSOLE) && \
-	!defined(CFG_FFA_CONSOLE)
+#if defined(IT_CONSOLE_UART) && !defined(CFG_VIRTUALIZATION) && \
+	!(defined(CFG_WITH_ARM_TRUSTED_FW) && defined(CFG_ARM_GICV2))
 /*
  * This cannot be enabled with TF-A and GICv3 because TF-A then need to
  * assign the interrupt number of the UART to OP-TEE (S-EL1). Currently
@@ -110,9 +101,6 @@ static void read_console(void)
 {
 	struct serial_chip *cons = &console_data.chip;
 
-	if (!cons->ops->getchar || !cons->ops->have_rx_data)
-		return;
-
 	while (cons->ops->have_rx_data(cons)) {
 		int ch __maybe_unused = cons->ops->getchar(cons);
 
@@ -120,30 +108,22 @@ static void read_console(void)
 	}
 }
 
-static uint16_t get_console_notif_vm_id(void)
+static enum itr_return console_itr_cb(struct itr_handler *h __maybe_unused)
 {
-	if (IS_ENABLED(CFG_NS_VIRTUALIZATION))
-		return console_notif_vm_id;
-	return 0;
-}
-
-static enum itr_return console_itr_cb(struct itr_handler *hdl __unused)
-{
-	if (notif_async_is_started(get_console_notif_vm_id())) {
+	if (notif_async_is_started()) {
 		/*
 		 * Asynchronous notifications are enabled, lets read from
 		 * uart in the bottom half instead.
 		 */
-		console_data.chip.ops->rx_intr_disable(&console_data.chip);
-		notif_send_async(NOTIF_VALUE_DO_BOTTOM_HALF,
-				 get_console_notif_vm_id());
+		itr_disable(IT_CONSOLE_UART);
+		notif_send_async(NOTIF_VALUE_DO_BOTTOM_HALF);
 	} else {
 		read_console();
 	}
 	return ITRR_HANDLED;
 }
 
-static struct itr_handler console_itr __nex_data = {
+static struct itr_handler console_itr = {
 	.it = IT_CONSOLE_UART,
 	.flags = ITRF_TRIGGER_LEVEL,
 	.handler = console_itr_cb,
@@ -151,24 +131,9 @@ static struct itr_handler console_itr __nex_data = {
 DECLARE_KEEP_PAGER(console_itr);
 
 static void atomic_console_notif(struct notif_driver *ndrv __unused,
-				 enum notif_event ev, uint16_t vm_id)
+				 enum notif_event ev __maybe_unused)
 {
-	switch (ev) {
-	case NOTIF_EVENT_STARTED:
-		DMSG("Asynchronous notifications started, event %d (vm %#"PRIx16")",
-		     (int)ev, vm_id);
-		break;
-	case NOTIF_EVENT_SHUTDOWN:
-		DMSG("Shutting down partition, event %d (vm %#"PRIx16")",
-		     (int)ev, vm_id);
-		if (vm_id == console_notif_backup_vm_id)
-			console_notif_backup_vm_id = 0;
-		if (vm_id == console_notif_vm_id)
-			console_notif_vm_id = console_notif_backup_vm_id;
-		break;
-	default:
-		EMSG("Unknown event %d", (int)ev);
-	}
+	DMSG("Asynchronous notifications started, event %d", (int)ev);
 }
 DECLARE_KEEP_PAGER(atomic_console_notif);
 
@@ -177,62 +142,51 @@ static void yielding_console_notif(struct notif_driver *ndrv __unused,
 {
 	switch (ev) {
 	case NOTIF_EVENT_DO_BOTTOM_HALF:
-		if (IS_ENABLED(CFG_NS_VIRTUALIZATION) &&
-		    console_notif_vm_id != virt_get_current_guest_id())
-			break;
 		read_console();
-		console_data.chip.ops->rx_intr_enable(&console_data.chip);
+		itr_enable(IT_CONSOLE_UART);
 		break;
 	case NOTIF_EVENT_STOPPED:
 		DMSG("Asynchronous notifications stopped");
-		console_data.chip.ops->rx_intr_enable(&console_data.chip);
+		itr_enable(IT_CONSOLE_UART);
 		break;
 	default:
 		EMSG("Unknown event %d", (int)ev);
 	}
 }
 
-static unsigned int console_notif_lock __nex_bss __maybe_unused;
-static struct notif_driver console_notif __nex_data = {
+struct notif_driver console_notif = {
 	.atomic_cb = atomic_console_notif,
 	.yielding_cb = yielding_console_notif,
 };
 
 static TEE_Result init_console_itr(void)
 {
-	TEE_Result res = TEE_ERROR_GENERIC;
-	bool have_itr_ctrl = console_data.chip.ops->rx_intr_enable &&
-			     console_data.chip.ops->rx_intr_disable;
-
-	res = interrupt_add_handler_with_chip(interrupt_get_main_chip(),
-					      &console_itr);
-	if (res)
-		return res;
-
-	interrupt_enable(console_itr.chip, console_itr.it);
-
-	if (IS_ENABLED(CFG_CORE_ASYNC_NOTIF) && have_itr_ctrl)
+	itr_add(&console_itr);
+	itr_enable(IT_CONSOLE_UART);
+	if (IS_ENABLED(CFG_CORE_ASYNC_NOTIF))
 		notif_register_driver(&console_notif);
 	return TEE_SUCCESS;
 }
-nex_driver_init(init_console_itr);
+driver_init(init_console_itr);
+#endif
 
-#ifdef CFG_NS_VIRTUALIZATION
-static TEE_Result claim_console(void)
+#if defined(CFG_DRIVERS_TPM2_MMIO)
+static TEE_Result init_tpm2(void)
 {
-	uint32_t state = cpu_spin_lock_xsave(&console_notif_lock);
+	enum tpm2_result res = TPM2_OK;
 
-	console_notif_vm_id = virt_get_current_guest_id();
-	if (!console_notif_backup_vm_id)
-		console_notif_backup_vm_id = console_notif_vm_id;
+	res = tpm2_mmio_init(TPM2_BASE);
+	if (res) {
+		EMSG("Failed to initialize TPM2 MMIO");
+		return TEE_ERROR_GENERIC;
+	}
 
-	cpu_spin_unlock_xrestore(&console_notif_lock, state);
+	DMSG("TPM2 Chip initialized");
 
 	return TEE_SUCCESS;
 }
-driver_init(claim_console);
-#endif
-#endif
+driver_init(init_tpm2);
+#endif /* defined(CFG_DRIVERS_TPM2_MMIO) */
 
 #ifdef CFG_TZC400
 register_phys_mem_pgdir(MEM_AREA_IO_SEC, TZC400_BASE, TZC400_REG_SIZE);
@@ -304,14 +258,3 @@ int psci_cpu_on(uint32_t core_id, uint32_t entry, uint32_t context_id)
 	return PSCI_RET_SUCCESS;
 }
 #endif /*PLATFORM_FLAVOR_qemu_virt*/
-
-#if defined(CFG_CALLOUT) && defined(IT_SEC_PHY_TIMER)
-static TEE_Result init_callout_service(void)
-{
-	timer_init_callout_service(interrupt_get_main_chip(), IT_SEC_PHY_TIMER);
-
-	return TEE_SUCCESS;
-}
-
-nex_early_init(init_callout_service);
-#endif

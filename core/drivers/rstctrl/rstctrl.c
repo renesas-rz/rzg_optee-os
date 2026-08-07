@@ -6,6 +6,8 @@
 #include <assert.h>
 #include <drivers/rstctrl.h>
 #include <io.h>
+#include <kernel/dt.h>
+#include <kernel/dt_driver.h>
 #include <kernel/spinlock.h>
 #include <libfdt.h>
 #include <stdint.h>
@@ -44,7 +46,7 @@ TEE_Result rstctrl_dt_get_by_name(const void *fdt, int nodeoffset,
 
 	index = fdt_stringlist_search(fdt, nodeoffset, "reset-names", name);
 	if (index < 0)
-		return TEE_ERROR_ITEM_NOT_FOUND;
+		return TEE_ERROR_GENERIC;
 
 	return rstctrl_dt_get_by_index(fdt, nodeoffset, index, rstctrl);
 }

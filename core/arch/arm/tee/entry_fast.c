@@ -5,8 +5,8 @@
  */
 
 #include <config.h>
-#include <drivers/wdt.h>
 #include <kernel/boot.h>
+#include <kernel/misc.h>
 #include <kernel/notif.h>
 #include <kernel/tee_l2cc_mutex.h>
 #include <kernel/virtualization.h>
@@ -28,8 +28,8 @@ static void tee_entry_get_shm_config(struct thread_smc_args *args)
 
 static void tee_entry_fastcall_l2cc_mutex(struct thread_smc_args *args)
 {
+	TEE_Result ret;
 #ifdef ARM32
-	TEE_Result ret = TEE_ERROR_NOT_SUPPORTED;
 	paddr_t pa = 0;
 
 	switch (args->a1) {
@@ -51,21 +51,19 @@ static void tee_entry_fastcall_l2cc_mutex(struct thread_smc_args *args)
 		args->a0 = OPTEE_SMC_RETURN_EBADCMD;
 		return;
 	}
-
+#else
+	ret = TEE_ERROR_NOT_SUPPORTED;
+#endif
 	if (ret == TEE_ERROR_NOT_SUPPORTED)
 		args->a0 = OPTEE_SMC_RETURN_UNKNOWN_FUNCTION;
 	else if (ret)
 		args->a0 = OPTEE_SMC_RETURN_EBADADDR;
 	else
 		args->a0 = OPTEE_SMC_RETURN_OK;
-#else
-	args->a0 = OPTEE_SMC_RETURN_UNKNOWN_FUNCTION;
-#endif
 }
 
 static void tee_entry_exchange_capabilities(struct thread_smc_args *args)
 {
-	bool res_shm_en = IS_ENABLED(CFG_CORE_RESERVED_SHM);
 	bool dyn_shm_en __maybe_unused = false;
 
 	/*
@@ -89,37 +87,29 @@ static void tee_entry_exchange_capabilities(struct thread_smc_args *args)
 
 	args->a0 = OPTEE_SMC_RETURN_OK;
 	args->a1 = 0;
-
-	if (res_shm_en)
-		args->a1 |= OPTEE_SMC_SEC_CAP_HAVE_RESERVED_SHM;
-	IMSG("Reserved shared memory is %sabled", res_shm_en ? "en" : "dis");
+#ifdef CFG_CORE_RESERVED_SHM
+	args->a1 |= OPTEE_SMC_SEC_CAP_HAVE_RESERVED_SHM;
+#endif
+	if (IS_ENABLED(CFG_VIRTUALIZATION))
+		args->a1 |= OPTEE_SMC_SEC_CAP_VIRTUALIZATION;
+	args->a1 |= OPTEE_SMC_SEC_CAP_MEMREF_NULL;
+	if (IS_ENABLED(CFG_CORE_ASYNC_NOTIF)) {
+		args->a1 |= OPTEE_SMC_SEC_CAP_ASYNC_NOTIF;
+		args->a2 = NOTIF_VALUE_MAX;
+	}
+	DMSG("Asynchronous notifications are %sabled",
+	     IS_ENABLED(CFG_CORE_ASYNC_NOTIF) ? "en" : "dis");
 
 #if defined(CFG_CORE_DYN_SHM)
 	dyn_shm_en = core_mmu_nsec_ddr_is_defined();
 	if (dyn_shm_en)
 		args->a1 |= OPTEE_SMC_SEC_CAP_DYNAMIC_SHM;
 #endif
-	IMSG("Dynamic shared memory is %sabled", dyn_shm_en ? "en" : "dis");
 
-	if (IS_ENABLED(CFG_NS_VIRTUALIZATION))
-		args->a1 |= OPTEE_SMC_SEC_CAP_VIRTUALIZATION;
-	IMSG("Normal World virtualization support is %sabled",
-	     IS_ENABLED(CFG_NS_VIRTUALIZATION) ? "en" : "dis");
-
-	args->a1 |= OPTEE_SMC_SEC_CAP_MEMREF_NULL;
-
-	if (IS_ENABLED(CFG_CORE_ASYNC_NOTIF)) {
-		args->a1 |= OPTEE_SMC_SEC_CAP_ASYNC_NOTIF;
-		args->a2 = NOTIF_VALUE_MAX;
-	}
-	IMSG("Asynchronous notifications are %sabled",
-	     IS_ENABLED(CFG_CORE_ASYNC_NOTIF) ? "en" : "dis");
+	DMSG("Dynamic shared memory is %sabled", dyn_shm_en ? "en" : "dis");
 
 	args->a1 |= OPTEE_SMC_SEC_CAP_RPC_ARG;
 	args->a3 = THREAD_RPC_MAX_NUM_PARAMS;
-
-	if (IS_ENABLED(CFG_RPMB_ANNOUNCE_PROBE_CAP))
-		args->a1 |= OPTEE_SMC_SEC_CAP_RPMB_PROBE;
 }
 
 static void tee_entry_disable_shm_cache(struct thread_smc_args *args)
@@ -167,7 +157,7 @@ static void tee_entry_get_thread_count(struct thread_smc_args *args)
 	args->a1 = CFG_NUM_THREADS;
 }
 
-#if defined(CFG_NS_VIRTUALIZATION)
+#if defined(CFG_VIRTUALIZATION)
 static void tee_entry_vm_created(struct thread_smc_args *args)
 {
 	uint16_t guest_id = args->a1;
@@ -221,15 +211,6 @@ static void get_async_notif_value(struct thread_smc_args *args)
 		args->a2 |= OPTEE_SMC_ASYNC_NOTIF_PENDING;
 }
 
-static void tee_entry_watchdog(struct thread_smc_args *args)
-{
-#if defined(CFG_WDT_SM_HANDLER)
-	__wdt_sm_handler(args);
-#else
-	args->a0 = OPTEE_SMC_RETURN_UNKNOWN_FUNCTION;
-#endif
-}
-
 /*
  * If tee_entry_fast() is overridden, it's still supposed to call this
  * function.
@@ -280,7 +261,7 @@ void __tee_entry_fast(struct thread_smc_args *args)
 		tee_entry_get_thread_count(args);
 		break;
 
-#if defined(CFG_NS_VIRTUALIZATION)
+#if defined(CFG_VIRTUALIZATION)
 	case OPTEE_SMC_VM_CREATED:
 		tee_entry_vm_created(args);
 		break;
@@ -291,13 +272,7 @@ void __tee_entry_fast(struct thread_smc_args *args)
 
 	case OPTEE_SMC_ENABLE_ASYNC_NOTIF:
 		if (IS_ENABLED(CFG_CORE_ASYNC_NOTIF)) {
-			uint16_t g_id = 0;
-
-			if (IS_ENABLED(CFG_NS_VIRTUALIZATION))
-				g_id = args->a7;
-
-			notif_deliver_atomic_event(NOTIF_EVENT_STARTED, g_id);
-
+			notif_deliver_atomic_event(NOTIF_EVENT_STARTED);
 			args->a0 = OPTEE_SMC_RETURN_OK;
 		} else {
 			args->a0 = OPTEE_SMC_RETURN_UNKNOWN_FUNCTION;
@@ -308,11 +283,6 @@ void __tee_entry_fast(struct thread_smc_args *args)
 			get_async_notif_value(args);
 		else
 			args->a0 = OPTEE_SMC_RETURN_UNKNOWN_FUNCTION;
-		break;
-
-	/* Watchdog entry if handler ID is defined in TOS range */
-	case CFG_WDT_SM_HANDLER_ID:
-		tee_entry_watchdog(args);
 		break;
 
 	default:
@@ -330,7 +300,7 @@ size_t tee_entry_generic_get_api_call_count(void)
 	 */
 	size_t ret = 12;
 
-	if (IS_ENABLED(CFG_NS_VIRTUALIZATION))
+	if (IS_ENABLED(CFG_VIRTUALIZATION))
 		ret += 2;
 
 	return ret;

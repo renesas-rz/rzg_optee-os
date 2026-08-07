@@ -5,8 +5,8 @@
  * Copyright (c) 2020-2021, Arm Limited
  */
 
-#ifndef __KERNEL_THREAD_H
-#define __KERNEL_THREAD_H
+#ifndef KERNEL_THREAD_H
+#define KERNEL_THREAD_H
 
 #ifndef __ASSEMBLER__
 #include <types_ext.h>
@@ -19,7 +19,6 @@
 #define THREAD_FLAGS_COPY_ARGS_ON_RETURN	BIT(0)
 #define THREAD_FLAGS_FOREIGN_INTR_ENABLE	BIT(1)
 #define THREAD_FLAGS_EXIT_ON_FOREIGN_INTR	BIT(2)
-#define THREAD_FLAGS_FFA_ONLY			BIT(3)
 
 #define THREAD_ID_0		0
 #define THREAD_ID_INVALID	-1
@@ -43,48 +42,36 @@ struct thread_specific_data {
 	bool stackcheck_recursion;
 #endif
 	unsigned int syscall_recursion;
-#ifdef CFG_FAULT_MITIGATION
-	struct ftmn_func_arg *ftmn_arg;
-#endif
 };
 
 void thread_init_canaries(void);
 void thread_init_primary(void);
 void thread_init_per_cpu(void);
 
-#if defined(CFG_WITH_STACK_CANARIES)
-void thread_update_canaries(void);
-#else
-static inline void thread_update_canaries(void) { }
-#endif
-
 struct thread_core_local *thread_get_core_local(void);
 
 /*
- * thread_init_threads() - Initialize threads
- * @thread_count: Number of threads to configure
+ * Sets the stacks to be used by the different threads. Use THREAD_ID_0 for
+ * first stack, THREAD_ID_0 + 1 for the next and so on.
  *
- * Initializes thread contexts. Called in thread_init_boot_thread() if
- * virtualization is disabled. Virtualization subsystem calls it for every
- * new guest otherwise. @thread_count must be <= CFG_NUM_THREADS, and will
- * initialize the number of threads to @thread_count if configured with
- * CFG_DYN_CONFIG=y, else @thread_count must equal CFG_NUM_THREADS.
+ * Returns true on success and false on errors.
  */
-void thread_init_threads(size_t thread_count);
-
-vaddr_t thread_get_abt_stack(void);
+bool thread_init_stack(uint32_t stack_id, vaddr_t sp);
 
 /*
- * thread_init_thread_core_local() - Initialize thread_core_local
- * @core_count:	Number of cores in the system
- *
- * Called by the init CPU. Sets temporary stack mode for all CPUs
- * (curr_thread = -1 and THREAD_CLF_TMP) and sets the temporary stack limit
- * for the init CPU. @core_count must be <= CFG_TEE_CORE_NB_CORE, and will
- * set the number of supported cores to @core_count if configured with
- * CFG_DYN_CONFIG=y, else @core_count must equal CFG_TEE_CORE_NB_CORE.
+ * Initializes thread contexts. Called in thread_init_boot_thread() if
+ * virtualization is disabled. Virtualization subsystem calls it for
+ * every new guest otherwise.
  */
-void thread_init_thread_core_local(size_t core_count);
+void thread_init_threads(void);
+
+/*
+ * Called by the init CPU. Sets temporary stack mode for all CPUs
+ * (curr_thread = -1 and THREAD_CLF_TMP) and sets the temporary stack limit for
+ * the init CPU.
+ */
+void thread_init_thread_core_local(void);
+void thread_init_core_local_stacks(void);
 
 #if defined(CFG_CORE_PAUTH)
 void thread_init_thread_pauth_keys(void);
@@ -255,9 +242,7 @@ bool thread_is_in_normal_mode(void);
 bool thread_is_from_abort_mode(void);
 
 /**
- * Allocates data for payload buffers shared with a non-secure user space
- * application. Ensure consistency with the enumeration
- * THREAD_SHM_TYPE_APPLICATION.
+ * Allocates data for payload buffers.
  *
  * @size:	size in bytes of payload buffer
  *
@@ -273,8 +258,7 @@ struct mobj *thread_rpc_alloc_payload(size_t size);
 void thread_rpc_free_payload(struct mobj *mobj);
 
 /**
- * Allocate data for payload buffers shared with the non-secure kernel.
- * Ensure consistency with the enumeration THREAD_SHM_TYPE_KERNEL_PRIVATE.
+ * Allocate data for payload buffers only shared with the non-secure kernel
  *
  * @size:	size in bytes of payload buffer
  *
@@ -347,9 +331,8 @@ uint32_t thread_rpc_cmd(uint32_t cmd, size_t num_params,
 		struct thread_param *params);
 
 /**
- * Allocate data for payload buffers shared with both user space applications
- * and the non-secure kernel. Ensure consistency with the enumeration
- * THREAD_SHM_TYPE_GLOBAL.
+ * Allocate data for payload buffers.
+ * Buffer is exported to user mode applications.
  *
  * @size:	size in bytes of payload buffer
  *
@@ -382,7 +365,6 @@ enum thread_shm_type {
  * @THREAD_SHM_CACHE_USER_SOCKET - socket communication
  * @THREAD_SHM_CACHE_USER_FS - filesystem access
  * @THREAD_SHM_CACHE_USER_I2C - I2C communication
- * @THREAD_SHM_CACHE_USER_RPMB - RPMB communication
  *
  * To ensure that each user of the shared memory cache doesn't interfere
  * with each other a unique ID per user is used.
@@ -391,7 +373,6 @@ enum thread_shm_cache_user {
 	THREAD_SHM_CACHE_USER_SOCKET,
 	THREAD_SHM_CACHE_USER_FS,
 	THREAD_SHM_CACHE_USER_I2C,
-	THREAD_SHM_CACHE_USER_RPMB,
 };
 
 /*
@@ -405,4 +386,4 @@ void *thread_rpc_shm_cache_alloc(enum thread_shm_cache_user user,
 
 #endif /*__ASSEMBLER__*/
 
-#endif /*__KERNEL_THREAD_H*/
+#endif /*KERNEL_THREAD_H*/

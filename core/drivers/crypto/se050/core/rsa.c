@@ -5,8 +5,6 @@
  */
 
 #include <assert.h>
-#include <config.h>
-#include <crypto/crypto_impl.h>
 #include <drvcrypt.h>
 #include <drvcrypt_acipher.h>
 #include <drvcrypt_math.h>
@@ -17,49 +15,6 @@
 #include <tee/cache.h>
 #include <tee/tee_cryp_utl.h>
 #include <tee_api_defines_extensions.h>
-
-static sss_cipher_type_t oefid_cipher_type(void)
-{
-	switch (se050_get_oefid()) {
-	case SE050F_ID:
-		return kSSS_CipherType_RSA_CRT;
-	default:
-		return kSSS_CipherType_RSA;
-	}
-}
-
-static bool oefid_keylen_supported(size_t bits)
-{
-	switch (se050_get_oefid()) {
-	case SE050F_ID:
-		return bits >= 2048;
-	default:
-		return true;
-	}
-}
-
-static bool rsa_keypair_has_crt(struct rsa_keypair *key)
-{
-	if (key->p && crypto_bignum_num_bytes(key->p) &&
-	    key->q && crypto_bignum_num_bytes(key->q) &&
-	    key->qp && crypto_bignum_num_bytes(key->qp) &&
-	    key->dp && crypto_bignum_num_bytes(key->dp) &&
-	    key->dq && crypto_bignum_num_bytes(key->dq))
-		return true;
-
-	return false;
-}
-
-static bool keypair_supported(struct rsa_keypair *key, sss_cipher_type_t ctype)
-{
-	if (se050_rsa_keypair_from_nvm(key))
-		return true;
-
-	if (ctype == kSSS_CipherType_RSA_CRT)
-		return rsa_keypair_has_crt(key);
-
-	return true;
-}
 
 static uint32_t tee2se050(uint32_t algo)
 {
@@ -150,7 +105,7 @@ static TEE_Result se050_inject_public_key(sss_se05x_object_t *k_object,
 	 */
 	st = sss_se05x_key_object_allocate_handle(k_object, oid,
 						  kSSS_KeyPart_Public,
-						  oefid_cipher_type(), 0,
+						  kSSS_CipherType_RSA, 0,
 						  kKeyObject_Mode_Persistent);
 	if (st != kStatus_SSS_Success)
 		return TEE_ERROR_BAD_PARAMETERS;
@@ -197,7 +152,7 @@ static TEE_Result se050_inject_keypair(sss_se05x_object_t *k_object,
 	/* Keys 2048 and above need to be placed on persistent storage */
 	st = sss_se05x_key_object_allocate_handle(k_object, oid,
 						  kSSS_KeyPart_Pair,
-						  oefid_cipher_type(), 0,
+						  kSSS_CipherType_RSA, 0,
 						  kKeyObject_Mode_Persistent);
 	if (st != kStatus_SSS_Success)
 		return TEE_ERROR_BAD_PARAMETERS;
@@ -537,14 +492,14 @@ static TEE_Result do_alloc_keypair(struct rsa_keypair *s,
 
 	return TEE_SUCCESS;
 err:
-	crypto_bignum_free(&s->e);
-	crypto_bignum_free(&s->d);
-	crypto_bignum_free(&s->n);
-	crypto_bignum_free(&s->p);
-	crypto_bignum_free(&s->q);
-	crypto_bignum_free(&s->qp);
-	crypto_bignum_free(&s->dp);
-	crypto_bignum_free(&s->dq);
+	crypto_bignum_free(s->e);
+	crypto_bignum_free(s->d);
+	crypto_bignum_free(s->n);
+	crypto_bignum_free(s->p);
+	crypto_bignum_free(s->q);
+	crypto_bignum_free(s->qp);
+	crypto_bignum_free(s->dp);
+	crypto_bignum_free(s->dq);
 
 	return TEE_ERROR_OUT_OF_MEMORY;
 }
@@ -556,7 +511,7 @@ static TEE_Result do_alloc_publickey(struct rsa_public_key *s,
 	if (!bn_alloc_max(&s->e))
 		return TEE_ERROR_OUT_OF_MEMORY;
 	if (!bn_alloc_max(&s->n)) {
-		crypto_bignum_free(&s->e);
+		crypto_bignum_free(s->e);
 		return TEE_ERROR_OUT_OF_MEMORY;
 	}
 
@@ -566,8 +521,8 @@ static TEE_Result do_alloc_publickey(struct rsa_public_key *s,
 static void do_free_publickey(struct rsa_public_key *s)
 {
 	if (s) {
-		crypto_bignum_free(&s->n);
-		crypto_bignum_free(&s->e);
+		crypto_bignum_free(s->n);
+		crypto_bignum_free(s->e);
 	}
 }
 
@@ -587,14 +542,14 @@ static void do_free_keypair(struct rsa_keypair *s)
 			sss_se05x_key_store_erase_key(se050_kstore, &k_object);
 	}
 
-	crypto_bignum_free(&s->e);
-	crypto_bignum_free(&s->d);
-	crypto_bignum_free(&s->n);
-	crypto_bignum_free(&s->p);
-	crypto_bignum_free(&s->q);
-	crypto_bignum_free(&s->qp);
-	crypto_bignum_free(&s->dp);
-	crypto_bignum_free(&s->dq);
+	crypto_bignum_free(s->e);
+	crypto_bignum_free(s->d);
+	crypto_bignum_free(s->n);
+	crypto_bignum_free(s->p);
+	crypto_bignum_free(s->q);
+	crypto_bignum_free(s->qp);
+	crypto_bignum_free(s->dp);
+	crypto_bignum_free(s->dq);
 }
 
 static TEE_Result do_gen_keypair(struct rsa_keypair *key, size_t kb)
@@ -610,14 +565,6 @@ static TEE_Result do_gen_keypair(struct rsa_keypair *key, size_t kb)
 	size_t e_len = 0;
 	size_t k_len = sizeof(k);
 
-	if (!oefid_keylen_supported(kb)) {
-		if (!IS_ENABLED(CFG_NXP_SE05X_RSA_DRV_FALLBACK))
-			return TEE_ERROR_NOT_IMPLEMENTED;
-
-		DMSG("se050: debug: RSA software fallback: KEYGEN");
-		return sw_crypto_acipher_gen_rsa_key(key, kb);
-	}
-
 	st = sss_se05x_key_object_init(&k_object, se050_kstore);
 	if (st != kStatus_SSS_Success)
 		return TEE_ERROR_BAD_PARAMETERS;
@@ -628,7 +575,7 @@ static TEE_Result do_gen_keypair(struct rsa_keypair *key, size_t kb)
 
 	st = sss_se05x_key_object_allocate_handle(&k_object, oid,
 						  kSSS_KeyPart_Pair,
-						  oefid_cipher_type(), 0,
+						  kSSS_CipherType_RSA, 0,
 						  kKeyObject_Mode_Persistent);
 	if (st != kStatus_SSS_Success)
 		return TEE_ERROR_BAD_PARAMETERS;
@@ -665,43 +612,8 @@ error:
 	return TEE_ERROR_BAD_PARAMETERS;
 }
 
-static TEE_Result encrypt_fallback(struct drvcrypt_rsa_ed *p)
-{
-	if (!IS_ENABLED(CFG_NXP_SE05X_RSA_DRV_FALLBACK))
-		return TEE_ERROR_NOT_IMPLEMENTED;
-
-	switch (p->rsa_id) {
-	case DRVCRYPT_RSA_NOPAD:
-		DMSG("se050: debug: RSA software fallback: ENCRYPT_NOPAD");
-		return sw_crypto_acipher_rsanopad_encrypt(p->key.key,
-							  p->message.data,
-							  p->message.length,
-							  p->cipher.data,
-							  &p->cipher.length);
-
-	case DRVCRYPT_RSA_OAEP:
-	case DRVCRYPT_RSA_PKCS_V1_5:
-	case DRVCRYPT_RSASSA_PKCS_V1_5:
-	case DRVCRYPT_RSASSA_PSS:
-	default:
-		DMSG("se050: debug: RSA software fallback: ENCRYPT_ES");
-		return sw_crypto_acipher_rsaes_encrypt(p->algo,
-						       p->key.key,
-						       p->label.data,
-						       p->label.length,
-						       p->mgf_algo,
-						       p->message.data,
-						       p->message.length,
-						       p->cipher.data,
-						       &p->cipher.length);
-	}
-}
-
 static TEE_Result do_encrypt(struct drvcrypt_rsa_ed *rsa_data)
 {
-	if (!oefid_keylen_supported(rsa_data->key.n_size * 8))
-		return encrypt_fallback(rsa_data);
-
 	switch (rsa_data->rsa_id) {
 	case DRVCRYPT_RSA_NOPAD:
 	case DRVCRYPT_RSASSA_PSS:
@@ -721,9 +633,8 @@ static TEE_Result do_encrypt(struct drvcrypt_rsa_ed *rsa_data)
 				  &rsa_data->cipher.length);
 
 	case DRVCRYPT_RSA_OAEP:
-		if (rsa_data->hash_algo != TEE_ALG_SHA1 ||
-		    rsa_data->hash_algo != rsa_data->mgf_algo)
-			return encrypt_fallback(rsa_data);
+		if (rsa_data->hash_algo != TEE_ALG_SHA1)
+			return TEE_ERROR_NOT_IMPLEMENTED;
 
 		return encrypt_es(TEE_ALG_RSAES_PKCS1_OAEP_MGF1_SHA1,
 				  rsa_data->key.key,
@@ -736,52 +647,11 @@ static TEE_Result do_encrypt(struct drvcrypt_rsa_ed *rsa_data)
 		break;
 	}
 
-	return encrypt_fallback(rsa_data);
-}
-
-static TEE_Result decrypt_fallback(struct drvcrypt_rsa_ed *p)
-{
-	if (!IS_ENABLED(CFG_NXP_SE05X_RSA_DRV_FALLBACK))
-		return TEE_ERROR_NOT_IMPLEMENTED;
-
-	if (se050_rsa_keypair_from_nvm(p->key.key))
-		return TEE_ERROR_NOT_IMPLEMENTED;
-
-	switch (p->rsa_id) {
-	case DRVCRYPT_RSA_NOPAD:
-		DMSG("se050: debug: RSA software fallback: DECRYPT_NOPAD");
-		return sw_crypto_acipher_rsanopad_decrypt(p->key.key,
-							  p->cipher.data,
-							  p->cipher.length,
-							  p->message.data,
-							  &p->message.length);
-
-	case DRVCRYPT_RSA_OAEP:
-	case DRVCRYPT_RSA_PKCS_V1_5:
-	case DRVCRYPT_RSASSA_PKCS_V1_5:
-	case DRVCRYPT_RSASSA_PSS:
-	default:
-		DMSG("se050: debug: RSA software fallback: DECRYPT_ES");
-		return sw_crypto_acipher_rsaes_decrypt(p->algo,
-						       p->key.key,
-						       p->label.data,
-						       p->label.length,
-						       p->mgf_algo,
-						       p->cipher.data,
-						       p->cipher.length,
-						       p->message.data,
-						       &p->message.length);
-	}
+	return TEE_ERROR_NOT_IMPLEMENTED;
 }
 
 static TEE_Result do_decrypt(struct drvcrypt_rsa_ed *rsa_data)
 {
-	if (!oefid_keylen_supported(rsa_data->key.n_size * 8))
-		return decrypt_fallback(rsa_data);
-
-	if (!keypair_supported(rsa_data->key.key, oefid_cipher_type()))
-		return decrypt_fallback(rsa_data);
-
 	switch (rsa_data->rsa_id) {
 	case DRVCRYPT_RSA_NOPAD:
 	case DRVCRYPT_RSASSA_PSS:
@@ -801,9 +671,8 @@ static TEE_Result do_decrypt(struct drvcrypt_rsa_ed *rsa_data)
 				  &rsa_data->message.length);
 
 	case DRVCRYPT_RSA_OAEP:
-		if (rsa_data->hash_algo != TEE_ALG_SHA1 ||
-		    rsa_data->hash_algo != rsa_data->mgf_algo)
-			return decrypt_fallback(rsa_data);
+		if (rsa_data->hash_algo != TEE_ALG_SHA1)
+			return TEE_ERROR_NOT_IMPLEMENTED;
 
 		return decrypt_es(TEE_ALG_RSAES_PKCS1_OAEP_MGF1_SHA1,
 				  rsa_data->key.key,
@@ -819,32 +688,8 @@ static TEE_Result do_decrypt(struct drvcrypt_rsa_ed *rsa_data)
 	return TEE_ERROR_NOT_IMPLEMENTED;
 }
 
-static TEE_Result sign_ssa_fallback(struct drvcrypt_rsa_ssa *p)
-{
-	if (!IS_ENABLED(CFG_NXP_SE05X_RSA_DRV_FALLBACK))
-		return TEE_ERROR_NOT_IMPLEMENTED;
-
-	if (se050_rsa_keypair_from_nvm(p->key.key))
-		return TEE_ERROR_NOT_IMPLEMENTED;
-
-	DMSG("se050: debug: RSA software fallback: SIGN");
-	return sw_crypto_acipher_rsassa_sign(p->algo,
-					     p->key.key,
-					     p->salt_len,
-					     p->message.data,
-					     p->message.length,
-					     p->signature.data,
-					     &p->signature.length);
-}
-
 static TEE_Result do_ssa_sign(struct drvcrypt_rsa_ssa *ssa_data)
 {
-	if (!oefid_keylen_supported(ssa_data->key.n_size * 8))
-		return sign_ssa_fallback(ssa_data);
-
-	if (!keypair_supported(ssa_data->key.key, oefid_cipher_type()))
-		return sign_ssa_fallback(ssa_data);
-
 	/* PKCS1_PSS_MGF1 padding limitations */
 	switch (ssa_data->algo) {
 	case TEE_ALG_RSASSA_PKCS1_PSS_MGF1_SHA1:
@@ -853,11 +698,11 @@ static TEE_Result do_ssa_sign(struct drvcrypt_rsa_ssa *ssa_data)
 	case TEE_ALG_RSASSA_PKCS1_PSS_MGF1_SHA256:
 	case TEE_ALG_RSASSA_PKCS1_PSS_MGF1_SHA384:
 		if (ssa_data->key.n_size * 8 <= 512)
-			return sign_ssa_fallback(ssa_data);
+			return TEE_ERROR_NOT_IMPLEMENTED;
 		break;
 	case TEE_ALG_RSASSA_PKCS1_PSS_MGF1_SHA512:
 		if (ssa_data->key.n_size * 8 <= 1024)
-			return sign_ssa_fallback(ssa_data);
+			return TEE_ERROR_NOT_IMPLEMENTED;
 		break;
 	default:
 		break;
@@ -871,26 +716,8 @@ static TEE_Result do_ssa_sign(struct drvcrypt_rsa_ssa *ssa_data)
 			&ssa_data->signature.length);
 }
 
-static TEE_Result verify_ssa_fallback(struct drvcrypt_rsa_ssa *p)
-{
-	if (!IS_ENABLED(CFG_NXP_SE05X_RSA_DRV_FALLBACK))
-		return TEE_ERROR_NOT_IMPLEMENTED;
-
-	DMSG("se050: debug: RSA software fallback: VERIFY");
-	return sw_crypto_acipher_rsassa_verify(p->algo,
-					       p->key.key,
-					       p->salt_len,
-					       p->message.data,
-					       p->message.length,
-					       p->signature.data,
-					       p->signature.length);
-}
-
 static TEE_Result do_ssa_verify(struct drvcrypt_rsa_ssa *ssa_data)
 {
-	if (!oefid_keylen_supported(ssa_data->key.n_size * 8))
-		return verify_ssa_fallback(ssa_data);
-
 	/* PKCS1_PSS_MGF1 padding limitations */
 	switch (ssa_data->algo) {
 	case TEE_ALG_RSASSA_PKCS1_PSS_MGF1_SHA1:
@@ -899,11 +726,11 @@ static TEE_Result do_ssa_verify(struct drvcrypt_rsa_ssa *ssa_data)
 	case TEE_ALG_RSASSA_PKCS1_PSS_MGF1_SHA256:
 	case TEE_ALG_RSASSA_PKCS1_PSS_MGF1_SHA384:
 		if (ssa_data->key.n_size * 8 <= 512)
-			return verify_ssa_fallback(ssa_data);
+			return TEE_ERROR_NOT_IMPLEMENTED;
 		break;
 	case TEE_ALG_RSASSA_PKCS1_PSS_MGF1_SHA512:
 		if (ssa_data->key.n_size * 8 <= 1024)
-			return verify_ssa_fallback(ssa_data);
+			return TEE_ERROR_NOT_IMPLEMENTED;
 		break;
 	default:
 		break;

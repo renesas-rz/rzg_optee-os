@@ -11,9 +11,10 @@
 #include <kernel/tee_ta_manager.h>
 #include <kernel/thread_private.h>
 #include <kernel/user_mode_ctx.h>
-#include <memtag.h>
 #include <mm/core_mmu.h>
+#include <mm/mobj.h>
 #include <mm/tee_pager.h>
+#include <tee/tee_svc.h>
 #include <trace.h>
 #include <unw/unwind.h>
 
@@ -22,7 +23,6 @@ enum fault_type {
 	FAULT_TYPE_USER_MODE_VFP,
 	FAULT_TYPE_PAGEABLE,
 	FAULT_TYPE_IGNORE,
-	FAULT_TYPE_EXTERNAL_ABORT,
 };
 
 #ifdef CFG_UNWIND
@@ -115,10 +115,6 @@ static __maybe_unused const char *fault_to_str(uint32_t abort_type,
 		return " (write permission fault)";
 	case CORE_MMU_FAULT_TAG_CHECK:
 		return " (tag check fault)";
-	case CORE_MMU_FAULT_SYNC_EXTERNAL:
-		return " (Synchronous external abort)";
-	case CORE_MMU_FAULT_ASYNC_EXTERNAL:
-		return " (Asynchronous external abort)";
 	default:
 		return "";
 	}
@@ -152,16 +148,9 @@ __print_abort_info(struct abort_info *ai __maybe_unused,
 #endif /*ARM64*/
 
 	EMSG_RAW("");
-	if (IS_ENABLED(CFG_MEMTAG))
-		EMSG_RAW("%s %s-abort at address 0x%" PRIxVA
-			 " [tagged 0x%" PRIxVA "]%s", ctx,
-			 abort_type_to_str(ai->abort_type),
-			 memtag_strip_tag_vaddr((void *)ai->va), ai->va,
-			 fault_to_str(ai->abort_type, ai->fault_descr));
-	else
-		EMSG_RAW("%s %s-abort at address 0x%" PRIxVA "%s", ctx,
-			 abort_type_to_str(ai->abort_type), ai->va,
-			 fault_to_str(ai->abort_type, ai->fault_descr));
+	EMSG_RAW("%s %s-abort at address 0x%" PRIxVA "%s",
+		ctx, abort_type_to_str(ai->abort_type), ai->va,
+		fault_to_str(ai->abort_type, ai->fault_descr));
 #ifdef ARM32
 	EMSG_RAW(" fsr 0x%08x  ttbr0 0x%08x  ttbr1 0x%08x  cidr 0x%X",
 		 ai->fault_descr, read_ttbr0(), read_ttbr1(),
@@ -362,7 +351,6 @@ static void handle_user_mode_panic(struct abort_info *ai)
 {
 	struct thread_ctx *tc __maybe_unused = NULL;
 	uint32_t daif = 0;
-	uint32_t pan_bit = 0;
 
 	/*
 	 * It was a user exception, stop user execution and return
@@ -384,12 +372,9 @@ static void handle_user_mode_panic(struct abort_info *ai)
 	ai->regs->apiakey_lo = tc->keys.apia_lo;
 #endif
 
-	if (IS_ENABLED(CFG_PAN) && feat_pan_implemented() && read_pan())
-		pan_bit = SPSR_64_PAN;
 	daif = (ai->regs->spsr >> SPSR_32_AIF_SHIFT) & SPSR_32_AIF_MASK;
 	/* XXX what about DAIF_D? */
-	ai->regs->spsr = SPSR_64(SPSR_64_MODE_EL1, SPSR_64_MODE_SP_EL0, daif) |
-			 pan_bit;
+	ai->regs->spsr = SPSR_64(SPSR_64_MODE_EL1, SPSR_64_MODE_SP_EL0, daif);
 }
 #endif /*ARM64*/
 
@@ -530,12 +515,10 @@ static enum fault_type get_fault_type(struct abort_info *ai)
 		return FAULT_TYPE_PAGEABLE;
 
 	case CORE_MMU_FAULT_ASYNC_EXTERNAL:
-	case CORE_MMU_FAULT_SYNC_EXTERNAL:
 		if (!abort_is_user_exception(ai))
 			abort_print(ai);
-		DMSG("[abort]%s", fault_to_str(ai->abort_type,
-					       ai->fault_descr));
-		return FAULT_TYPE_EXTERNAL_ABORT;
+		DMSG("[abort] Ignoring async external abort!");
+		return FAULT_TYPE_IGNORE;
 
 	case CORE_MMU_FAULT_TAG_CHECK:
 		if (abort_is_user_exception(ai))
@@ -568,12 +551,6 @@ void abort_handler(uint32_t abort_type, struct thread_abort_regs *regs)
 		save_abort_info_in_tsd(&ai);
 		vfp_disable();
 		handle_user_mode_panic(&ai);
-		break;
-	case FAULT_TYPE_EXTERNAL_ABORT:
-#ifdef CFG_EXTERNAL_ABORT_PLAT_HANDLER
-		/* Allow platform-specific handling */
-		plat_external_abort_handler(&ai);
-#endif
 		break;
 #ifdef CFG_WITH_VFP
 	case FAULT_TYPE_USER_MODE_VFP:

@@ -71,24 +71,6 @@ FUNC thread_get_usr_sp , :
 	bx	lr
 END_FUNC thread_get_usr_sp
 
-FUNC thread_get_usr_lr , :
-	mrs	r1, cpsr
-	cpsid	aif
-	cps	#CPSR_MODE_SYS
-	mov	r0, lr
-	msr	cpsr, r1
-	bx	lr
-END_FUNC thread_get_usr_lr
-
-FUNC thread_set_usr_lr , :
-	mrs	r1, cpsr
-	cpsid	aif
-	cps	#CPSR_MODE_SYS
-	mov	lr, r0
-	msr	cpsr, r1
-	bx	lr
-END_FUNC thread_set_usr_lr
-
 /* void thread_resume(struct thread_ctx_regs *regs) */
 FUNC thread_resume , :
 UNWIND(	.cantunwind)
@@ -218,20 +200,6 @@ UNWIND(	.cantunwind)
 	bx	lr
 END_FUNC thread_save_state
 
-#ifdef CFG_CORE_SEL2_SPMC
-/*
- * unsigned long thread_hvc(unsigned long func_id, unsigned long a1,
- *			    unsigned long a2, unsigned long a3)
- */
-FUNC thread_hvc , :
-	push	{r4-r7}
-UNWIND(	.save	{r4-r7})
-	hvc	#0
-	pop	{r4-r7}
-	bx	lr
-END_FUNC thread_hvc
-#endif /*CFG_CORE_SEL2_SPMC*/
-
 /*
  * unsigned long thread_smc(unsigned long func_id, unsigned long a1,
  *			    unsigned long a2, unsigned long a3)
@@ -281,16 +249,16 @@ DECLARE_KEEP_PAGER thread_init_vbar
  * user TA calls _utee_return, user TA calls _utee_panic or through an abort.
  *
  * Calls to _utee_return or _utee_panic are handled as:
- * __thread_svc_handler() -> thread_scall_handler() -> scall_do_call() which
+ * __thread_svc_handler() -> thread_svc_handler() ->tee_svc_do_call() which
  * calls syscall_return() or syscall_panic().
  *
- * These function calls returns normally except thread_scall_handler() which
+ * These function calls returns normally except thread_svc_handler() which
  * which is an exception handling routine so it reads return address and
  * SPSR to restore from the stack. syscall_return() and syscall_panic()
- * changes return address and SPSR used by thread_scall_handler() to instead of
+ * changes return address and SPSR used by thread_svc_handler() to instead of
  * returning into user mode as with other syscalls it returns into
  * thread_unwind_user_mode() in kernel mode instead.  When
- * thread_scall_handler() returns the stack pointer at the point where
+ * thread_svc_handler() returns the stack pointer at the point where
  * thread_enter_user_mode() left it so this is where
  * thread_unwind_user_mode() can operate.
  *
@@ -467,42 +435,8 @@ END_FUNC thread_unwind_user_mode
 	push	{r0-r3, r12, lr}
 	.endif
 
-	/*
-	 * Use SP_abt to update core local flags.
-	 * flags = (flags << THREAD_CLF_SAVED_SHIFT) | THREAD_CLF_TMP |
-	 *         THREAD_CLF_{FIQ|IRQ};
-	 */
-	cps     #CPSR_MODE_ABT
-	ldr     r1, [sp, #THREAD_CORE_LOCAL_FLAGS]
-	lsl     r1, r1, #THREAD_CLF_SAVED_SHIFT
-	.ifc    \mode\(),fiq
-	orr     r1, r1, #(THREAD_CLF_TMP | THREAD_CLF_FIQ)
-	.else
-	orr     r1, r1, #(THREAD_CLF_TMP | THREAD_CLF_IRQ)
-	.endif
-	str     r1, [sp, #THREAD_CORE_LOCAL_FLAGS]
-	.ifc    \mode\(),fiq
-	cps     #CPSR_MODE_FIQ
-	.else
-	cps     #CPSR_MODE_IRQ
-	.endif
-
 	bl	thread_check_canaries
-	bl	interrupt_main_handler
-
-	/*
-	 * Use SP_abt to update core local flags.
-	 * flags >>= THREAD_CLF_SAVED_SHIFT;
-	 */
-	cps     #CPSR_MODE_ABT
-	ldr     r1, [sp, #THREAD_CORE_LOCAL_FLAGS]
-	lsr     r1, r1, #THREAD_CLF_SAVED_SHIFT
-	str     r1, [sp, #THREAD_CORE_LOCAL_FLAGS]
-	.ifc    \mode\(),fiq
-	cps     #CPSR_MODE_FIQ
-	.else
-	cps     #CPSR_MODE_IRQ
-	.endif
+	bl	itr_core_handler
 
 	mrs	r0, spsr
 	cmp_spsr_user_mode r0
@@ -824,7 +758,7 @@ __thread_svc_handler:
 	mrs	r0, spsr
 	push	{r0}
 	mov	r0, sp
-	bl	thread_scall_handler
+	bl	thread_svc_handler
 	cpsid	aif	/* In case something was unmasked */
 	pop	{r0}
 	msr	spsr_fsxc, r0
@@ -835,7 +769,7 @@ __thread_svc_handler:
 	/* end thread_svc_handler */
 
 __thread_fiq_handler:
-#if defined(CFG_CORE_IRQ_IS_NATIVE_INTR)
+#if defined(CFG_ARM_GICV3)
 	foreign_intr_handler	fiq
 #else
 	native_intr_handler	fiq
@@ -843,7 +777,7 @@ __thread_fiq_handler:
 	/* end thread_fiq_handler */
 
 __thread_irq_handler:
-#if defined(CFG_CORE_IRQ_IS_NATIVE_INTR)
+#if defined(CFG_ARM_GICV3)
 	native_intr_handler	irq
 #else
 	foreign_intr_handler	irq

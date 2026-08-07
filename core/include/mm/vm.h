@@ -2,8 +2,8 @@
 /*
  * Copyright (c) 2014, STMicroelectronics International N.V.
  */
-#ifndef __MM_VM_H
-#define __MM_VM_H
+#ifndef TEE_MMU_H
+#define TEE_MMU_H
 
 #include <tee_api_types.h>
 #include <kernel/tee_ta_manager.h>
@@ -63,6 +63,14 @@ TEE_Result vm_map_param(struct user_mode_ctx *uctx, struct tee_ta_param *param,
 void vm_clean_param(struct user_mode_ctx *uctx);
 
 /*
+ * These two functions are deprecated and should only be called from
+ * mobj_seccpy_shm_alloc() and mobj_seccpy_shm_free().
+ */
+TEE_Result vm_add_rwmem(struct user_mode_ctx *uctx, struct mobj *mobj,
+			vaddr_t *va);
+void vm_rem_rwmem(struct user_mode_ctx *uctx, struct mobj *mobj, vaddr_t va);
+
+/*
  * User mode private memory is defined as user mode image static segment
  * (code, ro/rw static data, heap, stack). The sole other virtual memory
  * mapped to user mode are memref parameters. These later are considered
@@ -97,4 +105,4 @@ void vm_set_ctx(struct ts_ctx *ctx);
 
 struct mobj *vm_get_mobj(struct user_mode_ctx *uctx, vaddr_t va, size_t *len,
 			 uint16_t *prot, size_t *offs);
-#endif /*__MM_VM_H*/
+#endif /*TEE_MMU_H*/

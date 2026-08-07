@@ -33,14 +33,23 @@ register_ddr(DRAM0_BASE, DRAM0_SIZE);
 register_ddr(DRAM1_BASE, DRAM1_SIZE);
 #endif
 
+static struct gic_data gic_data;
+
 static struct serial8250_uart_data console_data;
 
-void boot_primary_init_intc(void)
+void main_init_gic(void)
 {
-	gic_init(GIC_BASE + GICC_OFFSET, GIC_BASE + GICD_OFFSET);
+	gic_init_base_addr(&gic_data, GIC_BASE + GICC_OFFSET,
+			   GIC_BASE + GICD_OFFSET);
+	itr_init(&gic_data.chip);
 }
 
-void plat_console_init(void)
+void itr_core_handler(void)
+{
+	gic_it_handle(&gic_data);
+}
+
+void console_init(void)
 {
 	/* Init UART */
 	serial8250_uart_init(&console_data, CONSOLE_UART_BASE,

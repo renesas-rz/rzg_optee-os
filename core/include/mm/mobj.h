@@ -39,6 +39,7 @@ struct mobj_ops {
 };
 
 extern struct mobj mobj_virt;
+extern struct mobj *mobj_sec_ddr;
 extern struct mobj *mobj_tee_ram_rx;
 extern struct mobj *mobj_tee_ram_rw;
 
@@ -225,6 +226,9 @@ static inline bool mobj_check_offset_and_len(struct mobj *mobj, size_t offset,
 	       end_offs < mobj->size;
 }
 
+struct mobj *mobj_mm_alloc(struct mobj *mobj_parent, size_t size,
+			   tee_mm_pool_t *pool);
+
 struct mobj *mobj_phys_alloc(paddr_t pa, size_t size, uint32_t cattr,
 			     enum buf_is_attr battr);
 
@@ -236,8 +240,7 @@ TEE_Result mobj_ffa_unregister_by_cookie(uint64_t cookie);
 
 /* Functions for SPMC */
 #ifdef CFG_CORE_SEL1_SPMC
-struct mobj_ffa *mobj_ffa_sel1_spmc_new(uint64_t cookie,
-					unsigned int num_pages);
+struct mobj_ffa *mobj_ffa_sel1_spmc_new(unsigned int num_pages);
 void mobj_ffa_sel1_spmc_delete(struct mobj_ffa *mobj);
 TEE_Result mobj_ffa_sel1_spmc_reclaim(uint64_t cookie);
 #else
@@ -313,6 +316,8 @@ static inline bool mobj_is_paged(struct mobj *mobj __unused)
 	return false;
 }
 #endif
+
+struct mobj *mobj_seccpy_shm_alloc(size_t size);
 
 struct mobj *mobj_with_fobj_alloc(struct fobj *fobj, struct file *file,
 				  uint32_t mem_type);

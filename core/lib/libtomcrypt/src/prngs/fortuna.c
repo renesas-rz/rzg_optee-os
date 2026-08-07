@@ -39,18 +39,6 @@ we reseed automatically when len(pool0) >= 64 or every LTC_FORTUNA_WD calls to t
    #error LTC_FORTUNA_POOLS must be in [4..32]
 #endif
 
-#ifdef LTC_FORTUNA_USE_ENCRYPT_ONLY
-#define AES_SETUP aes_enc_setup
-#define AES_ENC   aes_enc_ecb_encrypt
-#define AES_DONE  aes_enc_done
-#define AES_TEST  aes_enc_test
-#else
-#define AES_SETUP aes_setup
-#define AES_ENC   aes_ecb_encrypt
-#define AES_DONE  aes_done
-#define AES_TEST  aes_test
-#endif
-
 const struct ltc_prng_descriptor fortuna_desc = {
     "fortuna",
     64,
@@ -158,7 +146,7 @@ static int s_fortuna_reseed(prng_state *prng)
    if ((err = sha256_done(&md, prng->u.fortuna.K)) != CRYPT_OK) {
       return err;
    }
-   if ((err = AES_SETUP(prng->u.fortuna.K, 32, 0, &prng->u.fortuna.skey)) != CRYPT_OK) {
+   if ((err = rijndael_setup(prng->u.fortuna.K, 32, 0, &prng->u.fortuna.skey)) != CRYPT_OK) {
       return err;
    }
    s_fortuna_update_iv(prng);
@@ -248,7 +236,7 @@ int fortuna_start(prng_state *prng)
 
    /* reset bufs */
    zeromem(prng->u.fortuna.K, 32);
-   if ((err = AES_SETUP(prng->u.fortuna.K, 32, 0, &prng->u.fortuna.skey)) != CRYPT_OK) {
+   if ((err = rijndael_setup(prng->u.fortuna.K, 32, 0, &prng->u.fortuna.skey)) != CRYPT_OK) {
       for (x = 0; x < LTC_FORTUNA_POOLS; x++) {
           sha256_done(&prng->u.fortuna.pool[x], tmp);
       }
@@ -407,7 +395,7 @@ unsigned long fortuna_read(unsigned char *out, unsigned long outlen, prng_state 
    /* handle whole blocks without the extra XMEMCPY */
    while (outlen >= 16) {
       /* encrypt the IV and store it */
-      AES_ENC(prng->u.fortuna.IV, out, &prng->u.fortuna.skey);
+      rijndael_ecb_encrypt(prng->u.fortuna.IV, out, &prng->u.fortuna.skey);
       out += 16;
       outlen -= 16;
       s_fortuna_update_iv(prng);
@@ -415,19 +403,19 @@ unsigned long fortuna_read(unsigned char *out, unsigned long outlen, prng_state 
 
    /* left over bytes? */
    if (outlen > 0) {
-      AES_ENC(prng->u.fortuna.IV, tmp, &prng->u.fortuna.skey);
+      rijndael_ecb_encrypt(prng->u.fortuna.IV, tmp, &prng->u.fortuna.skey);
       XMEMCPY(out, tmp, outlen);
       s_fortuna_update_iv(prng);
    }
 
    /* generate new key */
-   AES_ENC(prng->u.fortuna.IV, prng->u.fortuna.K   , &prng->u.fortuna.skey);
+   rijndael_ecb_encrypt(prng->u.fortuna.IV, prng->u.fortuna.K   , &prng->u.fortuna.skey);
    s_fortuna_update_iv(prng);
 
-   AES_ENC(prng->u.fortuna.IV, prng->u.fortuna.K+16, &prng->u.fortuna.skey);
+   rijndael_ecb_encrypt(prng->u.fortuna.IV, prng->u.fortuna.K+16, &prng->u.fortuna.skey);
    s_fortuna_update_iv(prng);
 
-   if (AES_SETUP(prng->u.fortuna.K, 32, 0, &prng->u.fortuna.skey) != CRYPT_OK) {
+   if (rijndael_setup(prng->u.fortuna.K, 32, 0, &prng->u.fortuna.skey) != CRYPT_OK) {
       tlen = 0;
    }
 
@@ -524,7 +512,7 @@ int fortuna_test(void)
    if ((err = sha256_test()) != CRYPT_OK) {
       return err;
    }
-   return AES_TEST();
+   return rijndael_test();
 #endif
 }
 

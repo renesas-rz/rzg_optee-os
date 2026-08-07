@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: BSD-2-Clause
 /*
  * Copyright (c) 2019, Linaro Limited
- * Copyright (c) 2020-2023, Arm Limited
+ * Copyright (c) 2020, Arm Limited
  */
 
 #include <assert.h>
 #include <config.h>
 #include <confine_array_index.h>
+#include <ctype.h>
 #include <elf32.h>
 #include <elf64.h>
 #include <elf_common.h>
@@ -97,28 +98,19 @@ struct ta_elf *ta_elf_find_elf(const TEE_UUID *uuid)
 	return NULL;
 }
 
-#if defined(ARM32) || defined(ARM64)
 static TEE_Result e32_parse_ehdr(struct ta_elf *elf, Elf32_Ehdr *ehdr)
 {
 	if (ehdr->e_ident[EI_VERSION] != EV_CURRENT ||
 	    ehdr->e_ident[EI_CLASS] != ELFCLASS32 ||
 	    ehdr->e_ident[EI_DATA] != ELFDATA2LSB ||
-	    (ehdr->e_ident[EI_OSABI] != ELFOSABI_NONE &&
-	     ehdr->e_ident[EI_OSABI] != ELFOSABI_ARM) ||
+	    ehdr->e_ident[EI_OSABI] != ELFOSABI_NONE ||
 	    ehdr->e_type != ET_DYN || ehdr->e_machine != EM_ARM ||
+	    (ehdr->e_flags & EF_ARM_ABIMASK) != EF_ARM_ABI_VERSION ||
 #ifndef CFG_WITH_VFP
 	    (ehdr->e_flags & EF_ARM_ABI_FLOAT_HARD) ||
 #endif
 	    ehdr->e_phentsize != sizeof(Elf32_Phdr) ||
 	    ehdr->e_shentsize != sizeof(Elf32_Shdr))
-		return TEE_ERROR_BAD_FORMAT;
-
-	if (ehdr->e_ident[EI_OSABI] == ELFOSABI_NONE &&
-	    (ehdr->e_flags & EF_ARM_ABIMASK) != EF_ARM_ABI_V5)
-		return TEE_ERROR_BAD_FORMAT;
-
-	if (ehdr->e_ident[EI_OSABI] == ELFOSABI_ARM &&
-	    (ehdr->e_flags & EF_ARM_ABIMASK) != EF_ARM_ABI_UNKNOWN)
 		return TEE_ERROR_BAD_FORMAT;
 
 	elf->is_32bit = true;
@@ -164,38 +156,6 @@ static TEE_Result e64_parse_ehdr(struct ta_elf *elf __unused,
 	return TEE_ERROR_NOT_SUPPORTED;
 }
 #endif /*ARM64*/
-#endif /* ARM32 || ARM64 */
-
-#if defined(RV64)
-static TEE_Result e32_parse_ehdr(struct ta_elf *elf __unused,
-				 Elf32_Ehdr *ehdr __unused)
-{
-		return TEE_ERROR_BAD_FORMAT;
-}
-
-static TEE_Result e64_parse_ehdr(struct ta_elf *elf, Elf64_Ehdr *ehdr)
-{
-	if (ehdr->e_ident[EI_VERSION] != EV_CURRENT ||
-	    ehdr->e_ident[EI_CLASS] != ELFCLASS64 ||
-	    ehdr->e_ident[EI_DATA] != ELFDATA2LSB ||
-	    ehdr->e_ident[EI_OSABI] != ELFOSABI_NONE ||
-	    ehdr->e_type != ET_DYN || ehdr->e_machine != EM_RISCV ||
-	    ehdr->e_phentsize != sizeof(Elf64_Phdr) ||
-	    ehdr->e_shentsize != sizeof(Elf64_Shdr))
-		return TEE_ERROR_BAD_FORMAT;
-
-	elf->is_32bit = false;
-	elf->e_entry = ehdr->e_entry;
-	elf->e_phoff = ehdr->e_phoff;
-	elf->e_shoff = ehdr->e_shoff;
-	elf->e_phnum = ehdr->e_phnum;
-	elf->e_shnum = ehdr->e_shnum;
-	elf->e_phentsize = ehdr->e_phentsize;
-	elf->e_shentsize = ehdr->e_shentsize;
-
-	return TEE_SUCCESS;
-}
-#endif /* RV64 */
 
 static void check_phdr_in_range(struct ta_elf *elf, unsigned int type,
 				vaddr_t addr, size_t memsz)
@@ -962,10 +922,10 @@ static void parse_property_segment(struct ta_elf *elf)
 	    !IS_POWER_OF_TWO(align))
 		return;
 
-	desc_offset = ROUNDUP2(sizeof(*note) + sizeof(ELF_NOTE_GNU), align);
+	desc_offset = ROUNDUP(sizeof(*note) + sizeof(ELF_NOTE_GNU), align);
 
 	if (desc_offset > elf->prop_memsz ||
-	    ROUNDUP2(desc_offset + note->n_descsz, align) > elf->prop_memsz)
+	    ROUNDUP(desc_offset + note->n_descsz, align) > elf->prop_memsz)
 		return;
 
 	desc = (char *)(va + desc_offset);
@@ -992,7 +952,7 @@ static void parse_property_segment(struct ta_elf *elf)
 			}
 		}
 
-		prop_offset += ROUNDUP2(sizeof(*prop) + prop->pr_datasz, align);
+		prop_offset += ROUNDUP(sizeof(*prop) + prop->pr_datasz, align);
 	} while (prop_offset < note->n_descsz);
 }
 
@@ -1068,17 +1028,13 @@ static void add_deps_from_segment(struct ta_elf *elf, unsigned int type,
 	check_range(elf, ".dynstr/STRTAB", str_tab, str_tab_sz);
 
 	for (n = 0; n < num_dyns; n++) {
-		TEE_Result res = TEE_SUCCESS;
-
 		read_dyn(elf, addr, n, &tag, &val);
 		if (tag != DT_NEEDED)
 			continue;
 		if (val >= str_tab_sz)
 			err(TEE_ERROR_BAD_FORMAT,
 			    "Offset into .dynstr/STRTAB out of range");
-		res = tee_uuid_from_str(&uuid, str_tab + val);
-		if (res)
-			err(res, "Fail to get UUID from string");
+		tee_uuid_from_str(&uuid, str_tab + val);
 		queue_elf(&uuid);
 	}
 }
@@ -1206,8 +1162,6 @@ static void set_tls_offset(struct ta_elf *elf __unused) {}
 
 static void load_main(struct ta_elf *elf)
 {
-	vaddr_t va = 0;
-
 	init_elf(elf);
 	map_segments(elf);
 	populate_segments(elf);
@@ -1220,10 +1174,7 @@ static void load_main(struct ta_elf *elf)
 	if (elf->bti_enabled)
 		ta_elf_add_bti(elf);
 
-	if (!ta_elf_resolve_sym("ta_head", &va, NULL, elf))
-		elf->head = (struct ta_head *)va;
-	else
-		elf->head = (struct ta_head *)elf->load_addr;
+	elf->head = (struct ta_head *)elf->load_addr;
 	if (elf->head->depr_entry != UINT64_MAX) {
 		/*
 		 * Legacy TAs sets their entry point in ta_head. For
@@ -1290,7 +1241,7 @@ void ta_elf_load_main(const TEE_UUID *uuid, uint32_t *is_32bit, uint64_t *sp,
 	ta_stack_size = elf->head->stack_size;
 }
 
-void ta_elf_finalize_load_main(uint64_t *entry, uint64_t *load_addr)
+void ta_elf_finalize_load_main(uint64_t *entry)
 {
 	struct ta_elf *elf = TAILQ_FIRST(&main_elf_queue);
 	TEE_Result res = TEE_SUCCESS;
@@ -1308,8 +1259,6 @@ void ta_elf_finalize_load_main(uint64_t *entry, uint64_t *load_addr)
 		*entry = elf->head->depr_entry;
 	else
 		*entry = elf->e_entry + elf->load_addr;
-
-	*load_addr = elf->load_addr;
 }
 
 
@@ -1476,9 +1425,9 @@ void ta_elf_print_mappings(void *pctx, print_func_t print_func,
 	get_next_in_order(elf_queue, &elf, &seg, &elf_idx);
 	while (true) {
 		vaddr_t va = -1;
-		paddr_t pa = -1;
 		size_t sz = 0;
 		uint32_t flags = DUMP_MAP_SECURE;
+		size_t offs = 0;
 
 		if (seg) {
 			va = rounddown(seg->vaddr + elf->load_addr);
@@ -1491,7 +1440,6 @@ void ta_elf_print_mappings(void *pctx, print_func_t print_func,
 
 			/* If there's a match, it should be the same map */
 			if (maps[map_idx].va == va) {
-				pa = maps[map_idx].pa;
 				/*
 				 * In shared libraries the first page is
 				 * mapped separately with the rest of that
@@ -1530,6 +1478,7 @@ void ta_elf_print_mappings(void *pctx, print_func_t print_func,
 		if (!seg)
 			break;
 
+		offs = rounddown(seg->offset);
 		if (seg->flags & PF_R)
 			flags |= DUMP_MAP_READ;
 		if (seg->flags & PF_W)
@@ -1537,7 +1486,7 @@ void ta_elf_print_mappings(void *pctx, print_func_t print_func,
 		if (seg->flags & PF_X)
 			flags |= DUMP_MAP_EXEC;
 
-		print_seg(pctx, print_func, idx, elf_idx, va, pa, sz, flags);
+		print_seg(pctx, print_func, idx, elf_idx, va, offs, sz, flags);
 		idx++;
 
 		if (!get_next_in_order(elf_queue, &elf, &seg, &elf_idx))
@@ -1554,8 +1503,6 @@ void ta_elf_print_mappings(void *pctx, print_func_t print_func,
 }
 
 #ifdef CFG_UNWIND
-
-#if defined(ARM32) || defined(ARM64)
 /* Called by libunw */
 bool find_exidx(vaddr_t addr, vaddr_t *idx_start, vaddr_t *idx_end)
 {
@@ -1596,16 +1543,7 @@ void ta_elf_stack_trace_a64(uint64_t fp, uint64_t sp, uint64_t pc)
 
 	print_stack_arm64(&state, ta_stack, ta_stack_size);
 }
-#elif defined(RV32) || defined(RV64)
-void ta_elf_stack_trace_riscv(uint64_t fp, uint64_t pc)
-{
-	struct unwind_state_riscv state = { .fp = fp, .pc = pc };
-
-	print_stack_riscv(&state, ta_stack, ta_stack_size);
-}
 #endif
-
-#endif /* CFG_UNWIND */
 
 TEE_Result ta_elf_add_library(const TEE_UUID *uuid)
 {

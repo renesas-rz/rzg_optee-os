@@ -42,12 +42,12 @@ static TEE_Result mu_wait_for(vaddr_t addr, uint32_t mask)
 	return TEE_SUCCESS;
 }
 
-unsigned int imx_mu_plat_get_rx_channel(vaddr_t base __unused)
+unsigned int imx_mu_plat_get_rx_channel(void)
 {
 	return MU_MAX_CHANNEL;
 }
 
-unsigned int imx_mu_plat_get_tx_channel(vaddr_t base __unused)
+unsigned int imx_mu_plat_get_tx_channel(void)
 {
 	return MU_MAX_CHANNEL;
 }

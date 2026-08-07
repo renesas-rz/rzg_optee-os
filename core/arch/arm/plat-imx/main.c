@@ -3,7 +3,7 @@
  * Copyright (C) 2015 Freescale Semiconductor, Inc.
  * Copyright (c) 2016, Wind River Systems.
  * All rights reserved.
- * Copyright 2019, 2023 NXP
+ * Copyright 2019 NXP
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -33,11 +33,18 @@
 #include <drivers/gic.h>
 #include <drivers/imx_uart.h>
 #include <imx.h>
+#include <io.h>
 #include <kernel/boot.h>
+#include <kernel/interrupt.h>
+#include <kernel/misc.h>
+#include <kernel/panic.h>
 #include <mm/core_memprot.h>
 #include <mm/core_mmu.h>
 #include <platform_config.h>
+#include <sm/optee_smc.h>
 #include <stdint.h>
+
+static struct gic_data gic_data __nex_bss;
 
 static struct imx_uart_data console_data __nex_bss;
 
@@ -90,14 +97,17 @@ register_phys_mem_pgdir(MEM_AREA_IO_SEC,
 			CORE_MMU_PGDIR_SIZE);
 #endif
 
-#ifdef CFG_DRAM_BASE
-register_ddr(CFG_DRAM_BASE, CFG_DDR_SIZE);
-#endif
-#ifdef CFG_NSEC_DDR_1_BASE
-register_ddr(CFG_NSEC_DDR_1_BASE, CFG_NSEC_DDR_1_SIZE);
+register_dynamic_shm(CFG_NSEC_DDR_0_BASE, CFG_NSEC_DDR_0_SIZE);
+#if defined(CFG_NSEC_DDR_1_BASE) && defined(CFG_NSEC_DDR_1_SIZE)
+register_dynamic_shm(CFG_NSEC_DDR_1_BASE, CFG_NSEC_DDR_1_SIZE);
 #endif
 
-void plat_console_init(void)
+void itr_core_handler(void)
+{
+	gic_it_handle(&gic_data);
+}
+
+void console_init(void)
 {
 #ifdef CONSOLE_UART_BASE
 	imx_uart_init(&console_data, CONSOLE_UART_BASE);
@@ -105,18 +115,19 @@ void plat_console_init(void)
 #endif
 }
 
-void boot_primary_init_intc(void)
+void main_init_gic(void)
 {
 #ifdef GICD_BASE
-	gic_init(0, GICD_BASE);
+	gic_init(&gic_data, 0, GICD_BASE);
 #else
-	gic_init(GIC_BASE + GICC_OFFSET, GIC_BASE + GICD_OFFSET);
+	gic_init(&gic_data, GIC_BASE + GICC_OFFSET, GIC_BASE + GICD_OFFSET);
 #endif
+	itr_init(&gic_data.chip);
 }
 
 #if CFG_TEE_CORE_NB_CORE > 1
-void boot_secondary_init_intc(void)
+void main_secondary_init_gic(void)
 {
-	gic_init_per_cpu();
+	gic_cpu_init(&gic_data);
 }
 #endif

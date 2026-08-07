@@ -9,6 +9,7 @@
 #include <drivers/stih_asc.h>
 #include <io.h>
 #include <kernel/boot.h>
+#include <kernel/interrupt.h>
 #include <kernel/misc.h>
 #include <kernel/panic.h>
 #include <kernel/tz_ssvce_pl310.h>
@@ -32,6 +33,7 @@ register_ddr(DRAM0_BASE, DRAM0_SIZE);
 register_ddr(DRAM1_BASE, DRAM1_SIZE);
 #endif
 
+static struct gic_data gic_data;
 static struct stih_asc_pd console_data;
 
 #if defined(PLATFORM_FLAVOR_b2260)
@@ -56,7 +58,7 @@ TEE_Result tee_entry_std(struct optee_msg_arg *arg, uint32_t num_params)
 }
 #endif
 
-void plat_console_init(void)
+void console_init(void)
 {
 	stih_asc_init(&console_data, UART_CONSOLE_BASE);
 }
@@ -78,8 +80,7 @@ void console_flush(void)
 	if (ns_resources_ready()) {
 		struct serial_chip *cons = &console_data.chip;
 
-		if (cons->ops->flush)
-			cons->ops->flush(cons);
+		cons->ops->flush(cons);
 	}
 }
 
@@ -132,12 +133,18 @@ void plat_primary_init_early(void)
 		io_write32(GIC_DIST_BASE + GIC_DIST_ISR1 + i, 0xFFFFFFFF);
 }
 
-void boot_primary_init_intc(void)
+void main_init_gic(void)
 {
-	gic_init(GIC_CPU_BASE, GIC_DIST_BASE);
+	gic_init(&gic_data, GIC_CPU_BASE, GIC_DIST_BASE);
+	itr_init(&gic_data.chip);
 }
 
-void boot_secondary_init_intc(void)
+void main_secondary_init_gic(void)
 {
-	gic_init_per_cpu();
+	gic_cpu_init(&gic_data);
+}
+
+void itr_core_handler(void)
+{
+	gic_it_handle(&gic_data);
 }

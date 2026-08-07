@@ -60,12 +60,13 @@ register_ddr(NSEC_DDR_3_BASE, NSEC_DDR_3_SIZE);
 #endif
 
 static struct scif_uart_data console_data __nex_bss;
+static struct gic_data gic_data __nex_bss;
 
 #ifdef PRR_BASE
 uint32_t rcar_prr_value __nex_bss;
 #endif
 
-void plat_console_init(void)
+void console_init(void)
 {
 	scif_uart_init(&console_data, CONSOLE_UART_BASE);
 	register_serial_console(&console_data.chip);
@@ -87,12 +88,19 @@ unsigned long plat_get_aslr_seed(void)
 }
 #endif
 
-void boot_primary_init_intc(void)
+void main_init_gic(void)
 {
-	gic_init(GICC_BASE, GICD_BASE);
+	gic_init(&gic_data, GICC_BASE, GICD_BASE);
+	itr_init(&gic_data.chip);
 }
 
-void boot_secondary_init_intc(void)
+void main_secondary_init_gic(void)
 {
-	gic_init_per_cpu();
+	gic_cpu_init(&gic_data);
 }
+
+void itr_core_handler(void)
+{
+	gic_it_handle(&gic_data);
+}
+

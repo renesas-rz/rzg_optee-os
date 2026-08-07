@@ -1,19 +1,14 @@
 // SPDX-License-Identifier: BSD-2-Clause
 /*
  * Copyright (c) 2014, STMicroelectronics International N.V.
- * Copyright (c) 2025, Linaro Limited.
  */
 #include <assert.h>
 #include <config.h>
-#include <kernel/asan.h>
 #include <kernel/dt_driver.h>
-#include <kernel/linker.h>
-#include <kernel/panic.h>
 #include <malloc.h>
-#include <mm/core_memprot.h>
-#include <setjmp.h>
 #include <stdbool.h>
 #include <trace.h>
+#include <kernel/panic.h>
 #include <util.h>
 
 #include "misc.h"
@@ -430,7 +425,7 @@ static int self_test_malloc(void)
 	return ret;
 }
 
-#ifdef CFG_NS_VIRTUALIZATION
+#ifdef CFG_VIRTUALIZATION
 /* test nex_malloc support. resulting trace shall be manually checked */
 static int self_test_nex_malloc(void)
 {
@@ -549,321 +544,8 @@ static int self_test_nex_malloc(void)
 
 	return ret;
 }
-#else  /* CFG_NS_VIRTUALIZATION */
+#else  /* CFG_VIRTUALIZATION */
 static int self_test_nex_malloc(void)
-{
-	return 0;
-}
-#endif
-
-static int check_virt_to_phys(vaddr_t va, paddr_t exp_pa,
-			      enum teecore_memtypes m)
-{
-	paddr_t pa = 0;
-	void *v = NULL;
-
-	pa = virt_to_phys((void *)va);
-	LOG("virt_to_phys(%#"PRIxVA") => %#"PRIxPA" (expect %#"PRIxPA")",
-	    va, pa, exp_pa);
-	if (pa != exp_pa)
-		goto fail;
-
-	if (!exp_pa)
-		return 0;
-
-	v = phys_to_virt(pa, m, 1);
-	LOG("phys_to_virt(%#"PRIxPA") => %p (expect %#"PRIxVA")",
-	    pa, v, va);
-	if ((vaddr_t)v != va)
-		goto fail;
-	return 0;
-
-fail:
-	LOG("Fail");
-	return -1;
-}
-
-static int check_phys_to_virt(paddr_t pa, void *exp_va,
-			      enum teecore_memtypes m)
-{
-	paddr_t new_pa = 0;
-	void *v = NULL;
-
-	v = phys_to_virt(pa, m, 1);
-	LOG("phys_to_virt(%#"PRIxPA") => %p (expect %p)",
-	    pa, v, exp_va);
-	if (v != exp_va)
-		goto fail;
-
-	if (!exp_va)
-		return 0;
-
-	new_pa = virt_to_phys(v);
-	LOG("virt_to_phys(%p) => %#"PRIxPA" (expect %#"PRIxPA")",
-	    v, new_pa, pa);
-	if (new_pa != pa)
-		goto fail;
-	return 0;
-
-fail:
-	LOG("Fail");
-	return -1;
-}
-
-static int self_test_va2pa(void)
-{
-	void *ptr = self_test_va2pa;
-	int ret = 0;
-
-	if (IS_ENABLED(CFG_DYN_CONFIG) && VCORE_FREE_SZ) {
-		vaddr_t va_base = VCORE_FREE_PA;
-		paddr_t pa_base = 0;
-
-		pa_base = virt_to_phys((void *)va_base);
-		if (!pa_base) {
-			LOG("virt_to_phys(%#"PRIxVA") => 0 Fail!", va_base);
-			return -1;
-		}
-
-		/*
-		 * boot_mem_release_unused() and
-		 * boot_mem_release_tmp_alloc() has been called during
-		 * boot.
-		 *
-		 * First pages of VCORE_FREE are expected to be allocated
-		 * with boot_mem_alloc() while the end of VCORE_FREE should
-		 * have been freed by the two mentioned release functions.
-		 */
-		if (check_virt_to_phys(va_base, pa_base, MEM_AREA_TEE_RAM))
-			ret = -1;
-		if (check_virt_to_phys(va_base + 16, pa_base + 16,
-				       MEM_AREA_TEE_RAM))
-			ret = -1;
-		if (check_virt_to_phys(va_base + VCORE_FREE_SZ -
-				       SMALL_PAGE_SIZE, 0, MEM_AREA_TEE_RAM))
-			ret = -1;
-		if (check_virt_to_phys(va_base + VCORE_FREE_SZ - 16, 0,
-				       MEM_AREA_TEE_RAM))
-			ret = -1;
-	}
-
-	if (!IS_ENABLED(CFG_WITH_PAGER) &&
-	    check_phys_to_virt(virt_to_phys(ptr), ptr, MEM_AREA_TEE_RAM))
-		ret = -1;
-	if (check_phys_to_virt(virt_to_phys(ptr), NULL, MEM_AREA_IO_SEC))
-		ret = -1;
-	if (check_virt_to_phys(0, 0, MEM_AREA_TEE_RAM))
-		ret = -1;
-	if (check_phys_to_virt(0, NULL, MEM_AREA_TEE_RAM))
-		ret = -1;
-
-	return ret;
-}
-
-#ifdef CFG_CORE_SANITIZE_KADDRESS
-
-#define ASAN_TEST_SUCCESS 1
-#define ASAN_TEST_BUF_SIZE 15
-
-static char asan_test_sgbuf[ASAN_TEST_BUF_SIZE];
-char asan_test_gbuf[ASAN_TEST_BUF_SIZE];
-static const char asan_test_sgbuf_ro[ASAN_TEST_BUF_SIZE + 1];
-
-static jmp_buf asan_test_jmp;
-
-struct asan_test_ctx {
-	char *pmalloc1;
-	char *pmalloc2[3];
-	char write_value;
-	void (*write_func)(char *buf, size_t pos, char value);
-	char (*read_func)(char *buf, size_t pos);
-	void *(*memcpy_func)(void *__restrict dst,
-			     const void *__restrict src, size_t size);
-	void *(*memset_func)(void *buf, int val, size_t size);
-};
-
-static void asan_out_of_bounds_write(char *buf, size_t pos,
-				     char value)
-{
-	buf[pos] = value;
-}
-
-static char asan_out_of_bounds_read(char *buf, size_t pos)
-{
-	return buf[pos];
-}
-
-static void *asan_out_of_bounds_memcpy(void *__restrict dst,
-				       const void *__restrict src,
-				       size_t size)
-{
-	return memcpy(dst, src, size);
-}
-
-static void *asan_out_of_bounds_memset(void *buf, int val, size_t size)
-{
-	return memset(buf, val, size);
-}
-
-static void asan_panic_test(void)
-{
-	longjmp(asan_test_jmp, ASAN_TEST_SUCCESS);
-}
-
-static void asan_test_cleanup(struct asan_test_ctx *ctx)
-{
-	unsigned int i = 0;
-
-	free(ctx->pmalloc1);
-
-	for (; i < ARRAY_SIZE(ctx->pmalloc2); i++)
-		free(ctx->pmalloc2[i]);
-}
-
-static int asan_call_test(struct asan_test_ctx *ctx,
-			  void (*test)(struct asan_test_ctx *ctx),
-			  const char __maybe_unused *desc)
-{
-	int ret = 0;
-
-	ret = setjmp(asan_test_jmp);
-	if (ret == 0) {
-		test(ctx);
-		ret = -1;
-	} else if (ret == ASAN_TEST_SUCCESS) {
-		ret = 0;
-	} else {
-		panic("Unexpected setjmp return");
-	}
-	LOG("  => [asan] test %s: %s", desc, !ret ? "ok" : "FAILED");
-	return ret;
-}
-
-#ifndef CFG_DYN_CONFIG
-static void asan_stack(struct asan_test_ctx *ctx)
-{
-	char buf[ASAN_TEST_BUF_SIZE] = {0};
-
-	ctx->write_func(buf, ASAN_TEST_BUF_SIZE, ctx->write_value);
-}
-#endif
-
-static void asan_global_stat(struct asan_test_ctx *ctx)
-{
-	ctx->write_func(asan_test_sgbuf, ASAN_TEST_BUF_SIZE,
-			ctx->write_value);
-}
-
-static void asan_global_ro(struct asan_test_ctx *ctx)
-{
-	ctx->read_func((char *)asan_test_sgbuf_ro,
-		       ASAN_TEST_BUF_SIZE + 1);
-}
-
-static void asan_global(struct asan_test_ctx *ctx)
-{
-	ctx->write_func(asan_test_gbuf, ASAN_TEST_BUF_SIZE,
-			ctx->write_value);
-}
-
-static void asan_malloc(struct asan_test_ctx *ctx)
-{
-	ctx->pmalloc1 = malloc(ASAN_TEST_BUF_SIZE);
-
-	if (ctx->pmalloc1)
-		ctx->write_func(ctx->pmalloc1, ASAN_TEST_BUF_SIZE,
-				ctx->write_value);
-}
-
-static void asan_malloc2(struct asan_test_ctx *ctx)
-{
-	unsigned int i = 0;
-	char *p = NULL;
-	size_t aligned_size = ROUNDUP(ASAN_TEST_BUF_SIZE, 8);
-
-	for (; i < ARRAY_SIZE(ctx->pmalloc2); i++) {
-		ctx->pmalloc2[i] = malloc(aligned_size);
-		if (!ctx->pmalloc2[i])
-			return;
-	}
-	p = ctx->pmalloc2[1];
-	ctx->write_func(p, aligned_size, ctx->write_value);
-}
-
-static void asan_use_after_free(struct asan_test_ctx *ctx)
-{
-	char *a = malloc(ASAN_TEST_BUF_SIZE);
-
-	if (a) {
-		free(a);
-		ctx->write_func(a, 0, ctx->write_value);
-	}
-}
-
-static void asan_memcpy_dst(struct asan_test_ctx *ctx)
-{
-	static char b[ASAN_TEST_BUF_SIZE + 1];
-	static char a[ASAN_TEST_BUF_SIZE];
-
-	ctx->memcpy_func(a, b, sizeof(b));
-}
-
-static void asan_memcpy_src(struct asan_test_ctx *ctx)
-{
-	static char b[ASAN_TEST_BUF_SIZE];
-	static char a[ASAN_TEST_BUF_SIZE + 1];
-
-	ctx->memcpy_func(a, b, sizeof(a));
-}
-
-static void asan_memset(struct asan_test_ctx *ctx)
-{
-	static char b[ASAN_TEST_BUF_SIZE];
-
-	ctx->memset_func(b, ctx->write_value, ASAN_TEST_BUF_SIZE + 1);
-}
-
-static int self_test_asan(void)
-{
-	uint32_t vfp_state = UINT32_C(0);
-	int ret = 0;
-	struct asan_test_ctx ctx = {0};
-
-	ctx.write_value = 0xab;
-	ctx.write_func = asan_out_of_bounds_write;
-	ctx.read_func = asan_out_of_bounds_read;
-	ctx.memcpy_func = asan_out_of_bounds_memcpy;
-	ctx.memset_func = asan_out_of_bounds_memset;
-
-	asan_set_panic_cb(asan_panic_test);
-	/*
-	 * We need enable access to floating-point registers, in other
-	 * way sync exception during setjmp/longjmp will occur.
-	 */
-	vfp_state = thread_kernel_enable_vfp();
-
-	if (asan_call_test(&ctx, asan_global_stat, "(s) glob overflow") ||
-	    asan_call_test(&ctx, asan_global, "glob overflow") ||
-	    asan_call_test(&ctx, asan_global_ro, "glob ro overflow") ||
-#ifndef CFG_DYN_CONFIG
-	    asan_call_test(&ctx, asan_stack, "stack overflow") ||
-#endif
-	    asan_call_test(&ctx, asan_malloc, "malloc") ||
-	    asan_call_test(&ctx, asan_malloc2, "malloc2") ||
-	    asan_call_test(&ctx, asan_use_after_free, "use_after_free") ||
-	    asan_call_test(&ctx, asan_memcpy_dst, "memcpy_dst") ||
-	    asan_call_test(&ctx, asan_memcpy_src, "memcpy_src") ||
-	    asan_call_test(&ctx, asan_memset, "memset")) {
-		ret = -1;
-	}
-
-	thread_kernel_disable_vfp(vfp_state);
-	asan_test_cleanup(&ctx);
-	asan_set_panic_cb(asan_panic);
-	return ret;
-}
-#else
-static int self_test_asan(void)
 {
 	return 0;
 }
@@ -876,8 +558,7 @@ TEE_Result core_self_tests(uint32_t nParamTypes __unused,
 	if (self_test_mul_signed_overflow() || self_test_add_overflow() ||
 	    self_test_sub_overflow() || self_test_mul_unsigned_overflow() ||
 	    self_test_division() || self_test_malloc() ||
-	    self_test_nex_malloc() || self_test_va2pa() ||
-	    self_test_asan()) {
+	    self_test_nex_malloc()) {
 		EMSG("some self_test_xxx failed! you should enable local LOG");
 		return TEE_ERROR_GENERIC;
 	}

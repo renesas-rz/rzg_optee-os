@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause)
 /*
- * Copyright (C) STMicroelectronics 2017-2024 - All Rights Reserved
+ * Copyright (C) STMicroelectronics 2017 - All Rights Reserved
  * Author: Ludovic Barre <ludovic.barre@st.com> for STMicroelectronics.
  */
 /dts-v1/;
@@ -54,12 +54,6 @@
 			no-map;
 		};
 
-		ipc_shmem: ipc-shmem@1004f000 {
-			compatible = "shared-dma-pool";
-			reg = <0x10048000 0x8000>;
-			no-map;
-		};
-
 		mcuram: mcuram@30000000 {
 			compatible = "shared-dma-pool";
 			reg = <0x30000000 0x40000>;
@@ -94,7 +88,6 @@
 		gpios-states = <0>;
 		states = <1800000 0x1>,
 			 <2900000 0x0>;
-		status = "disabled";
 	};
 
 	vin: vin {
@@ -122,18 +115,8 @@
 	};
 };
 
-&bsec {
-	board_id: board_id@ec {
-		reg = <0xec 0x4>;
-		st,non-secure-otp;
-	};
-	huk_otp: huk-otp@f0 {
-		reg = <0xf0 0x10>;
-	};
-};
-
 &crc1 {
-	status = "disabled";
+	status = "okay";
 };
 
 &dac {
@@ -150,23 +133,7 @@
 };
 
 &dts {
-	status = "disabled";
-};
-
-&etzpc {
-	st,decprot =
-		<DECPROT(STM32MP1_ETZPC_USART1_ID, DECPROT_NS_RW, DECPROT_UNLOCK)>,
-		<DECPROT(STM32MP1_ETZPC_SPI6_ID, DECPROT_NS_RW, DECPROT_UNLOCK)>,
-		<DECPROT(STM32MP1_ETZPC_I2C4_ID, DECPROT_NS_RW, DECPROT_UNLOCK)>,
-		<DECPROT(STM32MP1_ETZPC_I2C6_ID, DECPROT_NS_RW, DECPROT_UNLOCK)>,
-		<DECPROT(STM32MP1_ETZPC_RNG1_ID, DECPROT_NS_RW, DECPROT_UNLOCK)>,
-		<DECPROT(STM32MP1_ETZPC_HASH1_ID, DECPROT_NS_RW, DECPROT_UNLOCK)>,
-		<DECPROT(STM32MP1_ETZPC_CRYP1_ID, DECPROT_NS_RW, DECPROT_UNLOCK)>,
-		<DECPROT(STM32MP1_ETZPC_DDRCTRL_ID, DECPROT_NS_R_S_W, DECPROT_LOCK)>,
-		<DECPROT(STM32MP1_ETZPC_DDRPHYC_ID, DECPROT_NS_R_S_W, DECPROT_LOCK)>,
-		<DECPROT(STM32MP1_ETZPC_STGENC_ID, DECPROT_S_RW, DECPROT_LOCK)>,
-		<DECPROT(STM32MP1_ETZPC_BKPSRAM_ID, DECPROT_S_RW, DECPROT_LOCK)>,
-		<DECPROT(STM32MP1_ETZPC_IWDG1_ID, DECPROT_S_RW, DECPROT_LOCK)>;
+	status = "okay";
 };
 
 &gpu {
@@ -174,11 +141,10 @@
 };
 
 &hash1 {
-	status = "disabled";
+	status = "okay";
 };
 
 &i2c4 {
-	compatible = "st,stm32mp15-i2c-non-secure";
 	pinctrl-names = "default", "sleep";
 	pinctrl-0 = <&i2c4_pins_a>;
 	pinctrl-1 = <&i2c4_sleep_pins_a>;
@@ -277,7 +243,6 @@
 			vdd_usb: ldo4 {
 				regulator-name = "vdd_usb";
 				interrupts = <IT_CURLIM_LDO4 0>;
-				regulator-always-on;
 			};
 
 			vdd_sd: ldo5 {
@@ -322,7 +287,7 @@
 			interrupts = <IT_PONKEY_F 0>, <IT_PONKEY_R 0>;
 			interrupt-names = "onkey-falling", "onkey-rising";
 			power-off-time-sec = <10>;
-			status = "disabled";
+			status = "okay";
 		};
 
 		watchdog {
@@ -333,27 +298,27 @@
 };
 
 &ipcc {
-	status = "disabled";
+	status = "okay";
 };
 
 &iwdg1 {
 	timeout-sec = <32>;
-	status = "okay";
 };
 
 &iwdg2 {
 	timeout-sec = <32>;
-	status = "disabled";
+	status = "okay";
+	secure-status = "disabled";
 };
 
 &m4_rproc {
 	memory-region = <&retram>, <&mcuram>, <&mcuram2>, <&vdev0vring0>,
-			<&vdev0vring1>, <&vdev0buffer>, <&ipc_shmem>;
+			<&vdev0vring1>, <&vdev0buffer>;
 	mboxes = <&ipcc 0>, <&ipcc 1>, <&ipcc 2>, <&ipcc 3>;
 	mbox-names = "vq0", "vq1", "shutdown", "detach";
 	interrupt-parent = <&exti>;
 	interrupts = <68 1>;
-	status = "disabled";
+	status = "okay";
 };
 
 &pwr_regulators {
@@ -361,12 +326,11 @@
 	vdd_3v3_usbfs-supply = <&vdd_usb>;
 };
 
-&rcc {
-	compatible = "st,stm32mp1-rcc";
+&rng1 {
 	status = "okay";
 };
 
-&rng1 {
+&rtc {
 	status = "okay";
 };
 
@@ -387,7 +351,7 @@
 	sd-uhs-sdr25;
 	sd-uhs-sdr50;
 	sd-uhs-ddr50;
-	status = "disabled";
+	status = "okay";
 };
 
 &sdmmc2 {
@@ -403,11 +367,11 @@
 	vmmc-supply = <&v3v3>;
 	vqmmc-supply = <&vdd>;
 	mmc-ddr-3_3v;
-	status = "disabled";
+	status = "okay";
 };
 
 &timers6 {
-	status = "disabled";
+	status = "okay";
 	/* spare dmas for other usage */
 	/delete-property/dmas;
 	/delete-property/dma-names;
@@ -436,4 +400,15 @@
 
 &usbphyc_port1 {
 	phy-supply = <&vdd_usb>;
+};
+
+&rcc {
+	status = "okay";
+};
+
+&bsec {
+	board_id: board_id@ec {
+		reg = <0xec 0x4>;
+		st,non-secure-otp;
+	};
 };

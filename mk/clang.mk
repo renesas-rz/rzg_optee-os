@@ -7,16 +7,13 @@ clang-target	:= $(patsubst %-,%,$(notdir $(lastword $(CROSS_COMPILE_$(sm)))))
 ifeq ($(clang-target),aarch64-linux)
 clang-target	:= aarch64-linux-gnu
 endif
-ifneq ($(clang-target),)
-clang-target-opt := --target=$(clang-target)
-endif
 ccache-cmd	:= $(if $(findstring ccache,$(CROSS_COMPILE_$(sm))),$(firstword $(CROSS_COMPILE_$(sm))) ,)
 
-CC$(sm)		:= $(ccache-cmd)$(OPTEE_CLANG_COMPILER_PATH)clang $(clang-target-opt)
+CC$(sm)		:= $(ccache-cmd)$(OPTEE_CLANG_COMPILER_PATH)clang --target=$(clang-target)
 CXX$(sm)	:= false # Untested yet
 # Due to the absence of clang-cpp in AOSP's prebuilt version of clang,
 # use the equivalent command of 'clang -E'
-CPP$(sm)	:= $(ccache-cmd)$(OPTEE_CLANG_COMPILER_PATH)clang $(clang-target-opt) -E
+CPP$(sm)	:= $(ccache-cmd)$(OPTEE_CLANG_COMPILER_PATH)clang --target=$(clang-target) -E
 LD$(sm)		:= $(ccache-cmd)$(OPTEE_CLANG_COMPILER_PATH)ld.lld
 
 AR$(sm)		:= $(ccache-cmd)$(OPTEE_CLANG_COMPILER_PATH)llvm-ar
@@ -29,8 +26,12 @@ nostdinc$(sm)	:= -nostdinc -isystem $(shell $(CC$(sm)) \
 			-print-file-name=include 2> /dev/null)
 
 comp-cflags-warns-clang := -Wno-language-extension-token \
-			 -Wno-gnu-zero-variadic-macro-arguments \
-			 -Wno-gnu-alignof-expression
+			 -Wno-gnu-zero-variadic-macro-arguments
+
+# Note, use the compiler runtime library (libclang_rt.builtins.*.a) instead of
+# libgcc for clang
+libgcc$(sm)	:= $(shell $(CC$(sm)) $(CFLAGS$(arch-bits-$(sm))) \
+			-rtlib=compiler-rt -print-libgcc-file-name 2> /dev/null)
 
 # Core ASLR relies on the executable being ready to run from its preferred load
 # address, because some symbols are used before the MMU is enabled and the

@@ -40,10 +40,8 @@ endif
 cleanfiles	:= $(lib-libfile) $(lib-shlibfile) $(lib-shlibstrippedfile) $(lib-shlibtafile) $(lib-libuuidln) $(cleanfiles)
 libfiles	:= $(lib-libfile) $(lib-shlibfile) $(lib-shlibstrippedfile) $(lib-shlibtafile) $(lib-libuuidln) $(libfiles)
 libdirs 	:= $(out-dir)/$(base-prefix)$(libdir) $(libdirs)
-ifneq (,$(objs))
 libnames	:= $(libname) $(libnames)
 libdeps		:= $(lib-libfile) $(libdeps)
-endif
 
 SIGN = scripts/sign_encrypt.py
 TA_SIGN_KEY ?= keys/default_ta.pem
@@ -62,14 +60,14 @@ $(lib-libfile): $(objs)
 endif
 ifeq ($(CFG_ULIBS_SHARED),y)
 ifeq ($(sm)-$(CFG_TA_BTI),ta_arm64-y)
-lib-ldflags$(lib-shlibfile) += $$(call ld-option,-z force-bti) --fatal-warnings
+lib-ldflags$(libuuid) += $$(call ld-option,-z force-bti) --fatal-warnings
 endif
 $(lib-shlibfile): $(objs) $(lib-needed-so-files)
 	@$(cmd-echo-silent) '  LD      $$@'
 	@mkdir -p $$(dir $$@)
 	$$(q)$$(LD$(sm)) $(lib-ldflags) -shared -z max-page-size=4096 \
 		$(call ld-option,-z separate-loadable-segments) \
-		$$(lib-ldflags$(lib-shlibfile)) \
+		$$(lib-ldflags$(libuuid)) \
 		--soname=$(libuuid) -o $$@ $$(filter-out %.so,$$^) $(lib-Ll-args)
 
 $(lib-shlibstrippedfile): $(lib-shlibfile)

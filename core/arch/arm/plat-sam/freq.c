@@ -4,12 +4,9 @@
  */
 
 #include <assert.h>
-#include <at91_clk.h>
-#include <config.h>
 #include <drivers/clk.h>
 #include <drivers/clk_dt.h>
 #include <kernel/boot.h>
-#include <kernel/dt.h>
 #include <kernel/panic.h>
 #include <libfdt.h>
 
@@ -24,11 +21,7 @@ static TEE_Result get_freq_from_dt(void)
 	if (!fdt)
 		panic();
 
-	if (IS_ENABLED(CFG_SAMA7G5))
-		node = fdt_node_offset_by_compatible(fdt, -1, "arm,cortex-a7");
-	else
-		node = fdt_node_offset_by_compatible(fdt, -1, "arm,cortex-a5");
-
+	node = fdt_node_offset_by_compatible(fdt, -1, "arm,cortex-a5");
 	if (!node)
 		panic();
 
@@ -37,7 +30,7 @@ static TEE_Result get_freq_from_dt(void)
 
 	freq = clk_get_rate(clk);
 
-	return at91_clk_register_cpu_opp(fdt, node, clk);
+	return TEE_SUCCESS;
 }
 early_init_late(get_freq_from_dt);
 

@@ -8,7 +8,6 @@
 #include <config.h>
 #include <crypto/crypto.h>
 #include <kernel/asan.h>
-#include <kernel/boot.h>
 #include <kernel/lockdep.h>
 #include <kernel/misc.h>
 #include <kernel/panic.h>
@@ -16,26 +15,10 @@
 #include <kernel/thread.h>
 #include <kernel/thread_private.h>
 #include <mm/mobj.h>
-#include <mm/page_alloc.h>
-#include <stdalign.h>
 
-#if defined(CFG_DYN_CONFIG)
-struct thread_core_local *thread_core_local __nex_bss;
-size_t thread_core_count __nex_bss;
-struct thread_ctx *threads;
-size_t thread_count;
-#else
-static struct thread_core_local
-	__thread_core_local[CFG_TEE_CORE_NB_CORE] __nex_bss;
-struct thread_core_local *thread_core_local __nex_data = __thread_core_local;
-size_t thread_core_count __nex_data = CFG_TEE_CORE_NB_CORE;
-static struct thread_ctx __threads[CFG_NUM_THREADS];
-struct thread_ctx *threads = __threads;
-size_t thread_count = CFG_NUM_THREADS;
-#endif
-unsigned long thread_core_local_pa __nex_bss;
-struct thread_core_local *__thread_core_local_new __nex_bss;
-size_t __thread_core_count_new __nex_bss;
+struct thread_ctx threads[CFG_NUM_THREADS];
+
+struct thread_core_local thread_core_local[CFG_TEE_CORE_NB_CORE] __nex_bss;
 
 /*
  * Stacks
@@ -47,8 +30,13 @@ size_t __thread_core_count_new __nex_bss;
  * stack_xxx[n]          "hard" top          "soft" top       bottom
  */
 
-static uint32_t start_canary_value = 0xdedede00;
-static uint32_t end_canary_value = 0xababab00;
+#ifdef CFG_WITH_STACK_CANARIES
+#define START_CANARY_VALUE	0xdededede
+#define END_CANARY_VALUE	0xabababab
+#define GET_START_CANARY(name, stack_num) name[stack_num][0]
+#define GET_END_CANARY(name, stack_num) \
+	name[stack_num][sizeof(name[stack_num]) / sizeof(uint32_t) - 1]
+#endif
 
 #define DECLARE_STACK(name, num_stacks, stack_size, linkage) \
 linkage uint32_t name[num_stacks] \
@@ -57,28 +45,22 @@ linkage uint32_t name[num_stacks] \
 		__attribute__((section(".nozi_stack." # name), \
 			       aligned(STACK_ALIGNMENT)))
 
-#ifndef CFG_DYN_CONFIG
+#define GET_STACK(stack) ((vaddr_t)(stack) + STACK_SIZE(stack))
+
 DECLARE_STACK(stack_tmp, CFG_TEE_CORE_NB_CORE, STACK_TMP_SIZE,
 	      /* global linkage */);
 DECLARE_STACK(stack_abt, CFG_TEE_CORE_NB_CORE, STACK_ABT_SIZE, static);
+#ifndef CFG_WITH_PAGER
+DECLARE_STACK(stack_thread, CFG_NUM_THREADS, STACK_THREAD_SIZE, static);
+#endif
+
+#define GET_STACK_TOP_HARD(stack, n) \
+	((vaddr_t)&(stack)[n] + STACK_CANARY_SIZE / 2)
+#define GET_STACK_TOP_SOFT(stack, n) \
+	(GET_STACK_TOP_HARD(stack, n) + STACK_CHECK_EXTRA)
 #define GET_STACK_BOTTOM(stack, n) ((vaddr_t)&(stack)[n] + sizeof(stack[n]) - \
 				    STACK_CANARY_SIZE / 2)
-#else
-/* Not used */
-#define GET_STACK_BOTTOM(stack, n) 0
-#endif
 
-#if defined(CFG_DYN_CONFIG) || defined(CFG_WITH_PAGER)
-/* Not used */
-#define GET_STACK_THREAD_BOTTOM(n) 0
-#else
-DECLARE_STACK(stack_thread, CFG_NUM_THREADS, STACK_THREAD_SIZE, static);
-#define GET_STACK_THREAD_BOTTOM(n) \
-	((vaddr_t)&stack_thread[n] +  sizeof(stack_thread[n]) - \
-	 STACK_CANARY_SIZE / 2)
-#endif
-
-#ifndef CFG_DYN_CONFIG
 const uint32_t stack_tmp_stride __section(".identity_map.stack_tmp_stride") =
 	sizeof(stack_tmp[0]);
 
@@ -87,159 +69,71 @@ const uint32_t stack_tmp_stride __section(".identity_map.stack_tmp_stride") =
  * each locally enable the pager (the mmu). Hence kept in pager sections.
  */
 DECLARE_KEEP_PAGER(stack_tmp_stride);
-#endif
 
 static unsigned int thread_global_lock __nex_bss = SPINLOCK_UNLOCK;
 
-static size_t stack_size_to_alloc_size(size_t stack_size)
-{
-	return ROUNDUP(stack_size + STACK_CANARY_SIZE + STACK_CHECK_EXTRA,
-		       STACK_ALIGNMENT);
-}
-
-static vaddr_t stack_end_va_to_top_hard(size_t stack_size, vaddr_t end_va)
-{
-	size_t l = stack_size_to_alloc_size(stack_size);
-
-	return end_va - l + STACK_CANARY_SIZE;
-}
-
-static vaddr_t stack_end_va_to_top_soft(size_t stack_size, vaddr_t end_va)
-{
-	return stack_end_va_to_top_hard(stack_size, end_va) + STACK_CHECK_EXTRA;
-}
-
-static vaddr_t stack_end_va_to_bottom(size_t stack_size __unused,
-				      vaddr_t end_va)
-{
-	return end_va;
-}
-
-static uint32_t *stack_end_va_to_start_canary(size_t stack_size, vaddr_t end_va)
-{
-	return (uint32_t *)(stack_end_va_to_top_hard(stack_size, end_va) -
-			    STACK_CANARY_SIZE / 2);
-}
-
-static uint32_t *stack_end_va_to_end_canary(size_t stack_size __unused,
-					    vaddr_t end_va)
-{
-	return (uint32_t *)(end_va + STACK_CANARY_SIZE / 2 - sizeof(uint32_t));
-}
-
-static void init_canaries(size_t stack_size, vaddr_t va_end)
-{
-	uint32_t *canary = NULL;
-
-	assert(va_end);
-	canary = stack_end_va_to_start_canary(stack_size, va_end);
-	*canary = start_canary_value;
-	canary = stack_end_va_to_end_canary(stack_size, va_end);
-	*canary = end_canary_value;
-}
-
 void thread_init_canaries(void)
 {
-	vaddr_t va = 0;
-	size_t n = 0;
-
-	if (IS_ENABLED(CFG_WITH_STACK_CANARIES)) {
-		for (n = 0; n < thread_core_count; n++) {
-			if (thread_core_local[n].tmp_stack_va_end) {
-				va = thread_core_local[n].tmp_stack_va_end +
-				     STACK_TMP_OFFS;
-				init_canaries(STACK_TMP_SIZE, va);
-			}
-			va = thread_core_local[n].abt_stack_va_end;
-			if (va)
-				init_canaries(STACK_ABT_SIZE, va);
-		}
-
+#ifdef CFG_WITH_STACK_CANARIES
+	size_t n;
+#define INIT_CANARY(name)						\
+	for (n = 0; n < ARRAY_SIZE(name); n++) {			\
+		uint32_t *start_canary = &GET_START_CANARY(name, n);	\
+		uint32_t *end_canary = &GET_END_CANARY(name, n);	\
+									\
+		*start_canary = START_CANARY_VALUE;			\
+		*end_canary = END_CANARY_VALUE;				\
 	}
 
-	if (IS_ENABLED(CFG_WITH_STACK_CANARIES) &&
-	    !IS_ENABLED(CFG_WITH_PAGER) &&
-	    !IS_ENABLED(CFG_NS_VIRTUALIZATION) && threads) {
-		for (n = 0; n < thread_count; n++) {
-			va = threads[n].stack_va_end;
-			if (va)
-				init_canaries(STACK_THREAD_SIZE, va);
-		}
-	}
-}
-
-#if defined(CFG_WITH_STACK_CANARIES)
-void thread_update_canaries(void)
-{
-	uint32_t canary[2] = { };
-	uint32_t exceptions = 0;
-
-	plat_get_random_stack_canaries(canary, ARRAY_SIZE(canary),
-				       sizeof(canary[0]));
-
-	exceptions = thread_mask_exceptions(THREAD_EXCP_ALL);
-
-	thread_check_canaries();
-
-	start_canary_value = canary[0];
-	end_canary_value = canary[1];
-	thread_init_canaries();
-
-	thread_unmask_exceptions(exceptions);
-}
+	INIT_CANARY(stack_tmp);
+	INIT_CANARY(stack_abt);
+#if !defined(CFG_WITH_PAGER) && !defined(CFG_VIRTUALIZATION)
+	INIT_CANARY(stack_thread);
 #endif
-
-static void check_stack_canary(const char *stack_name __maybe_unused,
-			       size_t n __maybe_unused,
-			       size_t stack_size, vaddr_t end_va)
-{
-	uint32_t *canary = NULL;
-
-	canary = stack_end_va_to_start_canary(stack_size, end_va);
-	if (*canary != start_canary_value) {
-		EMSG_RAW("Dead canary at start of '%s[%zu]' (%p)",
-			 stack_name, n, (void *)canary);
-		panic();
-	}
-
-	canary = stack_end_va_to_end_canary(stack_size, end_va);
-	if (*canary != end_canary_value) {
-		EMSG_RAW("Dead canary at end of '%s[%zu]' (%p)",
-			 stack_name, n, (void *)canary);
-		panic();
-	}
+#endif/*CFG_WITH_STACK_CANARIES*/
 }
+
+#define CANARY_DIED(stack, loc, n, addr) \
+	do { \
+		EMSG_RAW("Dead canary at %s of '%s[%zu]' (%p)", #loc, #stack, \
+			 n, (void *)addr); \
+		panic(); \
+	} while (0)
 
 void thread_check_canaries(void)
 {
-	vaddr_t va = 0;
+#ifdef CFG_WITH_STACK_CANARIES
+	uint32_t *canary = NULL;
 	size_t n = 0;
 
-	if (IS_ENABLED(CFG_WITH_STACK_CANARIES)) {
-		for (n = 0; n < thread_core_count; n++) {
-			if (thread_core_local[n].tmp_stack_va_end) {
-				va = thread_core_local[n].tmp_stack_va_end +
-				     STACK_TMP_OFFS;
-				check_stack_canary("tmp_stack", n,
-						   STACK_TMP_SIZE, va);
-			}
-
-			va = thread_core_local[n].abt_stack_va_end;
-			if (va)
-				check_stack_canary("abt_stack", n,
-						   STACK_ABT_SIZE, va);
-		}
+	for (n = 0; n < ARRAY_SIZE(stack_tmp); n++) {
+		canary = &GET_START_CANARY(stack_tmp, n);
+		if (*canary != START_CANARY_VALUE)
+			CANARY_DIED(stack_tmp, start, n, canary);
+		canary = &GET_END_CANARY(stack_tmp, n);
+		if (*canary != END_CANARY_VALUE)
+			CANARY_DIED(stack_tmp, end, n, canary);
 	}
 
-	if (IS_ENABLED(CFG_WITH_STACK_CANARIES) &&
-	    !IS_ENABLED(CFG_WITH_PAGER) && !IS_ENABLED(CFG_NS_VIRTUALIZATION)) {
-		for (n = 0; n < thread_count; n++) {
-			va = threads[n].stack_va_end;
-			if (va)
-				check_stack_canary("thread_stack", n,
-						   STACK_THREAD_SIZE, va);
-		}
+	for (n = 0; n < ARRAY_SIZE(stack_abt); n++) {
+		canary = &GET_START_CANARY(stack_abt, n);
+		if (*canary != START_CANARY_VALUE)
+			CANARY_DIED(stack_abt, start, n, canary);
+		canary = &GET_END_CANARY(stack_abt, n);
+		if (*canary != END_CANARY_VALUE)
+			CANARY_DIED(stack_abt, end, n, canary);
 	}
+#if !defined(CFG_WITH_PAGER) && !defined(CFG_VIRTUALIZATION)
+	for (n = 0; n < ARRAY_SIZE(stack_thread); n++) {
+		canary = &GET_START_CANARY(stack_thread, n);
+		if (*canary != START_CANARY_VALUE)
+			CANARY_DIED(stack_thread, start, n, canary);
+		canary = &GET_END_CANARY(stack_thread, n);
+		if (*canary != END_CANARY_VALUE)
+			CANARY_DIED(stack_thread, end, n, canary);
+	}
+#endif
+#endif/*CFG_WITH_STACK_CANARIES*/
 }
 
 void thread_lock_global(void)
@@ -262,15 +156,7 @@ get_core_local(unsigned int pos)
 	 */
 	assert(thread_get_exceptions() & THREAD_EXCP_FOREIGN_INTR);
 
-	/*
-	 * We boot on a single core and have allocated only one struct
-	 * thread_core_local so we return that regardless of pos.
-	 */
-	if (IS_ENABLED(CFG_DYN_CONFIG) &&
-	    thread_core_local != __thread_core_local_new)
-		return thread_core_local;
-
-	assert(pos < thread_core_count);
+	assert(pos < CFG_TEE_CORE_NB_CORE);
 	return &thread_core_local[pos];
 }
 
@@ -287,24 +173,20 @@ static void print_stack_limits(void)
 	size_t n = 0;
 	vaddr_t __maybe_unused start = 0;
 	vaddr_t __maybe_unused end = 0;
-	vaddr_t va = 0;
 
-	for (n = 0; n < thread_core_count; n++) {
-		va = thread_core_local[n].tmp_stack_va_end + STACK_TMP_OFFS;
-		start = stack_end_va_to_top_soft(STACK_TMP_SIZE, va);
-		end = stack_end_va_to_bottom(STACK_TMP_SIZE, va);
+	for (n = 0; n < CFG_TEE_CORE_NB_CORE; n++) {
+		start = GET_STACK_TOP_SOFT(stack_tmp, n);
+		end = GET_STACK_BOTTOM(stack_tmp, n);
 		DMSG("tmp [%zu] 0x%" PRIxVA "..0x%" PRIxVA, n, start, end);
-
-		va = thread_core_local[n].abt_stack_va_end;
-		start = stack_end_va_to_top_soft(STACK_ABT_SIZE, va);
-		end = stack_end_va_to_bottom(STACK_ABT_SIZE, va);
+	}
+	for (n = 0; n < CFG_TEE_CORE_NB_CORE; n++) {
+		start = GET_STACK_TOP_SOFT(stack_abt, n);
+		end = GET_STACK_BOTTOM(stack_abt, n);
 		DMSG("abt [%zu] 0x%" PRIxVA "..0x%" PRIxVA, n, start, end);
 	}
-
-	for (n = 0; n < thread_count; n++) {
-		va = threads[n].stack_va_end;
-		start = stack_end_va_to_top_soft(STACK_THREAD_SIZE, va);
-		end = stack_end_va_to_bottom(STACK_THREAD_SIZE, va);
+	for (n = 0; n < CFG_NUM_THREADS; n++) {
+		end = threads[n].stack_va_end;
+		start = end - STACK_THREAD_SIZE + STACK_CHECK_EXTRA;
 		DMSG("thr [%zu] 0x%" PRIxVA "..0x%" PRIxVA, n, start, end);
 	}
 }
@@ -373,6 +255,8 @@ void thread_init_boot_thread(void)
 {
 	struct thread_core_local *l = thread_get_core_local();
 
+	thread_init_threads();
+
 	l->curr_thread = 0;
 	threads[0].state = THREAD_STATE_ACTIVE;
 }
@@ -385,7 +269,6 @@ void __nostackcheck thread_clr_boot_thread(void)
 	assert(threads[l->curr_thread].state == THREAD_STATE_ACTIVE);
 	threads[l->curr_thread].state = THREAD_STATE_FREE;
 	l->curr_thread = THREAD_ID_INVALID;
-	print_stack_limits();
 }
 
 void __nostackcheck *thread_get_tmp_sp(void)
@@ -410,7 +293,7 @@ vaddr_t thread_stack_start(void)
 		return 0;
 
 	thr = threads + ct;
-	return stack_end_va_to_top_soft(STACK_THREAD_SIZE, thr->stack_va_end);
+	return thr->stack_va_end - STACK_THREAD_SIZE;
 }
 
 size_t thread_stack_size(void)
@@ -424,29 +307,32 @@ bool get_stack_limits(vaddr_t *start, vaddr_t *end, bool hard)
 	unsigned int pos = get_core_pos();
 	struct thread_core_local *l = get_core_local(pos);
 	int ct = l->curr_thread;
-	size_t stack_size = 0;
-	bool ret = true;
-	vaddr_t va = 0;
+	bool ret = false;
 
 	if (l->flags & THREAD_CLF_TMP) {
-		va = l->tmp_stack_va_end + STACK_TMP_OFFS;
-		stack_size = STACK_TMP_SIZE;
+		if (hard)
+			*start = GET_STACK_TOP_HARD(stack_tmp, pos);
+		else
+			*start = GET_STACK_TOP_SOFT(stack_tmp, pos);
+		*end = GET_STACK_BOTTOM(stack_tmp, pos);
+		ret = true;
 	} else if (l->flags & THREAD_CLF_ABORT) {
-		va = l->abt_stack_va_end;
-		stack_size = STACK_ABT_SIZE;
-	} else if (!l->flags && ct >= 0 && (size_t)ct < thread_count) {
-		va = threads[ct].stack_va_end;
-		stack_size = STACK_THREAD_SIZE;
-	} else {
-		ret = false;
-		goto out;
-	}
+		if (hard)
+			*start = GET_STACK_TOP_HARD(stack_abt, pos);
+		else
+			*start = GET_STACK_TOP_SOFT(stack_abt, pos);
+		*end = GET_STACK_BOTTOM(stack_abt, pos);
+		ret = true;
+	} else if (!l->flags) {
+		if (ct < 0 || ct >= CFG_NUM_THREADS)
+			goto out;
 
-	*end = stack_end_va_to_bottom(stack_size, va);
-	if (hard)
-		*start = stack_end_va_to_top_hard(stack_size, va);
-	else
-		*start = stack_end_va_to_top_soft(stack_size, va);
+		*end = threads[ct].stack_va_end;
+		*start = *end - STACK_THREAD_SIZE;
+		if (!hard)
+			*start += STACK_CHECK_EXTRA;
+		ret = true;
+	}
 out:
 	thread_unmask_exceptions(exceptions);
 	return ret;
@@ -463,7 +349,7 @@ bool thread_is_from_abort_mode(void)
  * This function should always be accurate, but it might be possible to
  * implement a more efficient depending on cpu architecture.
  */
-bool __weak __noprof thread_is_in_normal_mode(void)
+bool __weak thread_is_in_normal_mode(void)
 {
 	uint32_t exceptions = thread_mask_exceptions(THREAD_EXCP_FOREIGN_INTR);
 	struct thread_core_local *l = thread_get_core_local();
@@ -480,7 +366,7 @@ bool __weak __noprof thread_is_in_normal_mode(void)
 	return ret;
 }
 
-short int __noprof thread_get_id_may_fail(void)
+short int thread_get_id_may_fail(void)
 {
 	/*
 	 * thread_get_core_local() requires foreign interrupts to be disabled
@@ -493,7 +379,7 @@ short int __noprof thread_get_id_may_fail(void)
 	return ct;
 }
 
-short int __noprof thread_get_id(void)
+short int thread_get_id(void)
 {
 	short int ct = thread_get_id_may_fail();
 
@@ -501,27 +387,6 @@ short int __noprof thread_get_id(void)
 	COMPILE_TIME_ASSERT(CFG_NUM_THREADS <= SHRT_MAX);
 	assert(ct >= 0 && ct < CFG_NUM_THREADS);
 	return ct;
-}
-
-static vaddr_t alloc_stack(size_t stack_size, bool nex)
-{
-	size_t l = stack_size_to_alloc_size(stack_size);
-	size_t rl = ROUNDUP(l, SMALL_PAGE_SIZE);
-	uint32_t flags = MAF_GUARD_HEAD;
-	vaddr_t end_va = 0;
-	vaddr_t va = 0;
-
-	if (nex)
-		flags |= MAF_NEX;
-	va = virt_page_alloc(rl / SMALL_PAGE_SIZE, flags);
-	if (!va)
-		panic();
-
-	end_va = va + l - STACK_CANARY_SIZE / 2;
-	if (IS_ENABLED(CFG_WITH_STACK_CANARIES))
-		init_canaries(stack_size, end_va);
-
-	return end_va;
 }
 
 #ifdef CFG_WITH_PAGER
@@ -532,14 +397,14 @@ static void init_thread_stacks(void)
 	/*
 	 * Allocate virtual memory for thread stacks.
 	 */
-	for (n = 0; n < thread_count; n++) {
+	for (n = 0; n < CFG_NUM_THREADS; n++) {
 		tee_mm_entry_t *mm = NULL;
 		vaddr_t sp = 0;
 		size_t num_pages = 0;
 		struct fobj *fobj = NULL;
 
 		/* Find vmem for thread stack and its protection gap */
-		mm = tee_mm_alloc(&core_virt_mem_pool,
+		mm = tee_mm_alloc(&tee_mm_vcore,
 				  SMALL_PAGE_SIZE + STACK_THREAD_SIZE);
 		assert(mm);
 
@@ -558,41 +423,26 @@ static void init_thread_stacks(void)
 		/* init effective stack */
 		sp = tee_mm_get_smem(mm) + tee_mm_get_bytes(mm);
 		asan_tag_access((void *)tee_mm_get_smem(mm), (void *)sp);
-		threads[n].stack_va_end = sp;
+		if (!thread_init_stack(n, sp))
+			panic("init stack failed");
 	}
 }
 #else
 static void init_thread_stacks(void)
 {
-	vaddr_t va = 0;
-	size_t n = 0;
+	size_t n;
 
 	/* Assign the thread stacks */
-	for (n = 0; n < thread_count; n++) {
-		if (IS_ENABLED(CFG_DYN_CONFIG))
-			va = alloc_stack(STACK_THREAD_SIZE, false);
-		else
-			va = GET_STACK_THREAD_BOTTOM(n);
-		threads[n].stack_va_end = va;
-		if (IS_ENABLED(CFG_WITH_STACK_CANARIES))
-			init_canaries(STACK_THREAD_SIZE, va);
+	for (n = 0; n < CFG_NUM_THREADS; n++) {
+		if (!thread_init_stack(n, GET_STACK_BOTTOM(stack_thread, n)))
+			panic("thread_init_stack failed");
 	}
 }
 #endif /*CFG_WITH_PAGER*/
 
-void thread_init_threads(size_t count)
+void thread_init_threads(void)
 {
 	size_t n = 0;
-
-	if (IS_ENABLED(CFG_DYN_CONFIG)) {
-		assert(count <= CFG_NUM_THREADS);
-		threads = calloc(count, sizeof(*threads));
-		if (!threads)
-			panic();
-		thread_count = count;
-	} else {
-		assert(count == CFG_NUM_THREADS);
-	}
 
 	init_thread_stacks();
 	print_stack_limits();
@@ -600,69 +450,31 @@ void thread_init_threads(size_t count)
 
 	mutex_lockdep_init();
 
-	for (n = 0; n < thread_count; n++)
+	for (n = 0; n < CFG_NUM_THREADS; n++)
 		TAILQ_INIT(&threads[n].tsd.sess_stack);
 }
 
-#ifndef CFG_DYN_CONFIG
-vaddr_t __nostackcheck thread_get_abt_stack(void)
+void __nostackcheck thread_init_thread_core_local(void)
 {
-	return GET_STACK_BOTTOM(stack_abt, get_core_pos());
-}
-#endif
-
-void thread_init_thread_core_local(size_t core_count)
-{
-	struct thread_core_local *tcl = NULL;
-	const size_t core_pos = get_core_pos();
-	vaddr_t va = 0;
 	size_t n = 0;
+	struct thread_core_local *tcl = thread_core_local;
 
-	if (IS_ENABLED(CFG_DYN_CONFIG)) {
-		assert(core_count <= CFG_TEE_CORE_NB_CORE);
-		tcl = nex_calloc(core_count, sizeof(*tcl));
-		if (!tcl)
-			panic();
-		__thread_core_local_new = tcl;
-		__thread_core_count_new = core_count;
-	} else {
-		tcl = thread_core_local;
-		assert(core_count == CFG_TEE_CORE_NB_CORE);
-
-		for (n = 0; n < thread_core_count; n++) {
-			init_canaries(STACK_TMP_SIZE,
-				      GET_STACK_BOTTOM(stack_tmp, n));
-			init_canaries(STACK_ABT_SIZE,
-				      GET_STACK_BOTTOM(stack_abt, n));
-		}
+	for (n = 0; n < CFG_TEE_CORE_NB_CORE; n++) {
+		tcl[n].curr_thread = THREAD_ID_INVALID;
+		tcl[n].flags = THREAD_CLF_TMP;
 	}
+	tcl[0].tmp_stack_va_end = GET_STACK_BOTTOM(stack_tmp, 0);
+}
 
-	for (n = 0; n < core_count; n++) {
-		if (n == core_pos) {
-			if (IS_ENABLED(CFG_DYN_CONFIG))
-				tcl[n] = thread_core_local[0];
-			else
-				continue;
-		} else {
-			tcl[n].curr_thread = THREAD_ID_INVALID;
-			tcl[n].flags = THREAD_CLF_TMP;
-		}
+void thread_init_core_local_stacks(void)
+{
+	size_t n = 0;
+	struct thread_core_local *tcl = thread_core_local;
 
-		if (IS_ENABLED(CFG_DYN_CONFIG))
-			va = alloc_stack(STACK_TMP_SIZE, true);
-		else
-			va = GET_STACK_BOTTOM(stack_tmp, n);
-		tcl[n].tmp_stack_va_end = va - STACK_TMP_OFFS;
-#ifdef ARM32
-		tcl[n].tmp_stack_pa_end =
-			vaddr_to_phys(tcl[n].tmp_stack_va_end);
-#endif
-
-		if (IS_ENABLED(CFG_DYN_CONFIG))
-			va = alloc_stack(STACK_ABT_SIZE, true);
-		else
-			va = GET_STACK_BOTTOM(stack_abt, n);
-		tcl[n].abt_stack_va_end = va;
+	for (n = 0; n < CFG_TEE_CORE_NB_CORE; n++) {
+		tcl[n].tmp_stack_va_end = GET_STACK_BOTTOM(stack_tmp, n) -
+					  STACK_TMP_OFFS;
+		tcl[n].abt_stack_va_end = GET_STACK_BOTTOM(stack_abt, n);
 	}
 }
 
@@ -671,7 +483,7 @@ void thread_init_thread_pauth_keys(void)
 {
 	size_t n = 0;
 
-	for (n = 0; n < thread_count; n++)
+	for (n = 0; n < CFG_NUM_THREADS; n++)
 		if (crypto_rng_read(&threads[n].keys, sizeof(threads[n].keys)))
 			panic("Failed to init thread pauth keys");
 }
@@ -681,13 +493,13 @@ void thread_init_core_local_pauth_keys(void)
 	struct thread_core_local *tcl = thread_core_local;
 	size_t n = 0;
 
-	for (n = 0; n < thread_core_count; n++)
+	for (n = 0; n < CFG_TEE_CORE_NB_CORE; n++)
 		if (crypto_rng_read(&tcl[n].keys, sizeof(tcl[n].keys)))
 			panic("Failed to init core local pauth keys");
 }
 #endif
 
-struct thread_specific_data * __noprof thread_get_tsd(void)
+struct thread_specific_data *thread_get_tsd(void)
 {
 	return &threads[thread_get_id()].tsd;
 }

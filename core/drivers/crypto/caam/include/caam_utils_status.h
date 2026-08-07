@@ -7,7 +7,6 @@
 #ifndef __CAAM_UTILS_STATUS_H__
 #define __CAAM_UTILS_STATUS_H__
 
-#include <caam_status.h>
 #include <stdint.h>
 #include <tee_api_types.h>
 
