@@ -1,12 +1,12 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Copyright (c) 2021, Renesas Electronics Corporation
+ * Copyright (c) 2021-2026, Renesas Electronics Corporation
  */
 
 #ifndef PTA_FLASH_H_
 #define PTA_FLASH_H_
 
-#define FLASH_UUID                                                      \
+#define PTA_FLASH_UUID                                                  \
 	{                                                               \
 		0x2c0fca92, 0x5ab1, 0x11eb,                             \
 		{                                                       \
@@ -15,12 +15,11 @@
 	}
 
 /*
- * FLASH_CMD_WRITE_SPI - Write data to SPI Flash
- * param[0] (value) spi save address
- * param[1] (memref) write data buffer
- * param[2] unused
- * param[3] unused
+ * Write data to SPI flash.
+ * param[0].value.a (in): Offset from the SPI flash base address.
+ * param[0].value.b (in): SPI flash channel number.
+ * param[1].memref  (in): Data buffer to write.
  */
-#define FLASH_CMD_WRITE_SPI 1
+#define PTA_CMD_FLASH_WRITE_SPI (0x00000001)
 
 #endif /* PTA_FLASH_H_ */

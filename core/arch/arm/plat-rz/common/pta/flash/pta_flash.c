@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /*
- * Copyright (c) 2021-2023, Renesas Electronics Corporation
+ * Copyright (c) 2021-2026, Renesas Electronics Corporation
  */
 
 #include <stdio.h>
@@ -16,8 +16,34 @@
 
 #define TA_NAME "flash.ta"
 
-static TEE_Result spi_write(uint32_t param_types, TEE_Param p[TEE_NUM_PARAMS])
+static uintptr_t spi_offset_to_addr(uint32_t ch, uintptr_t offset)
 {
+	switch (ch) {
+#ifdef SFLASH_BASE
+	case 0:
+		return SFLASH_BASE + offset;
+#else
+#ifdef SFLASH_0_BASE
+	case 0:
+		return SFLASH_0_BASE + offset;
+#endif
+#ifdef SFLASH_1_BASE
+	case 1:
+		return SFLASH_1_BASE + offset;
+#endif
+#endif
+	default:
+		return 0;
+	}
+}
+
+static TEE_Result spi_flash_write(uint32_t param_types,
+				  TEE_Param p[TEE_NUM_PARAMS])
+{
+	TEE_Result res = TEE_SUCCESS;
+
+	uintptr_t addr = 0;
+
 	uint32_t exp_type = TEE_PARAM_TYPES(TEE_PARAM_TYPE_VALUE_INPUT,
 					    TEE_PARAM_TYPE_MEMREF_INPUT,
 					    TEE_PARAM_TYPE_NONE,
@@ -31,19 +57,25 @@ static TEE_Result spi_write(uint32_t param_types, TEE_Param p[TEE_NUM_PARAMS])
 	if (!IS_ALIGNED_WITH_TYPE(p[0].value.a, uint32_t))
 		return TEE_ERROR_BAD_PARAMETERS;
 
+	addr = spi_offset_to_addr(p[0].value.b, p[0].value.a);
+	if (!addr)
+		return TEE_ERROR_BAD_PARAMETERS;
+
 	if (!IS_ALIGNED_WITH_TYPE(p[1].memref.buffer, uint32_t))
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	if (0 < p[1].memref.size) {
-		sflash_open();
+		res = sflash_open();
+		if (res)
+			return res;
 
-		sflash_write_buffer(p[0].value.a, (uintptr_t)p[1].memref.buffer,
-				    p[1].memref.size);
+		res = sflash_write_buffer(addr, (uintptr_t)p[1].memref.buffer,
+					  p[1].memref.size);
 
 		sflash_close();
 	}
 
-	return TEE_SUCCESS;
+	return res;
 }
 
 /*
@@ -78,15 +110,15 @@ static TEE_Result invoke_command(void *psess __unused, uint32_t cmd,
 				 TEE_Param params[TEE_NUM_PARAMS])
 {
 	switch (cmd) {
-	case FLASH_CMD_WRITE_SPI:
-		return spi_write(ptypes, params);
+	case PTA_CMD_FLASH_WRITE_SPI:
+		return spi_flash_write(ptypes, params);
 	default:
 		break;
 	}
 	return TEE_ERROR_BAD_PARAMETERS;
 }
 
-pseudo_ta_register(.uuid = FLASH_UUID, .name = TA_NAME,
+pseudo_ta_register(.uuid = PTA_FLASH_UUID, .name = TA_NAME,
 		   .flags = PTA_DEFAULT_FLAGS, .create_entry_point = create_ta,
 		   .destroy_entry_point = destroy_ta,
 		   .open_session_entry_point = open_session,

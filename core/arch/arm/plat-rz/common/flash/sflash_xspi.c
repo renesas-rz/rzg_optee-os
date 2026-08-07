@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /*
- * Copyright (c) 2023-2025, Renesas Electronics Corporation
+ * Copyright (c) 2023-2026, Renesas Electronics Corporation
  */
 
 #include <stdint.h>
@@ -55,8 +55,10 @@ static struct sflash_dev *get_flash_device(uintptr_t addr, size_t len)
 	return NULL;
 }
 
-void sflash_write_buffer(uintptr_t addr, uintptr_t buff, size_t len)
+TEE_Result sflash_write_buffer(uintptr_t addr, uintptr_t buff, size_t len)
 {
+	struct sflash_dev *dev = NULL;
+
 	uintptr_t sflash_work_base = (uintptr_t)&sflash_work[0];
 	uintptr_t base_sector_addr = ROUNDDOWN(addr, XSPI_SECTOR_SIZE);
 	uintptr_t last_sector_addr =
@@ -65,8 +67,9 @@ void sflash_write_buffer(uintptr_t addr, uintptr_t buff, size_t len)
 	uint32_t write_length;
 	int32_t sector_count;
 
-	struct sflash_dev *dev = get_flash_device(addr, len);
-	assert(dev);
+	dev = get_flash_device(addr, len);
+	if (!dev)
+		return TEE_ERROR_BAD_PARAMETERS;
 
 	/* Calculate affected sector range */
 	sector_count =
@@ -81,8 +84,9 @@ void sflash_write_buffer(uintptr_t addr, uintptr_t buff, size_t len)
 		memcpy((void *)(sflash_work_base + write_offset), (void *)buff,
 		       write_length);
 
-		xspi_write(dev->ch, base_sector_addr, sflash_work_base,
-			   XSPI_SECTOR_SIZE);
+		if (xspi_write(dev->ch, base_sector_addr, sflash_work_base,
+			       XSPI_SECTOR_SIZE) != XSPI_OK)
+			return TEE_ERROR_GENERIC;
 
 		base_sector_addr += XSPI_SECTOR_SIZE;
 		sector_count--;
@@ -97,8 +101,9 @@ void sflash_write_buffer(uintptr_t addr, uintptr_t buff, size_t len)
 		memcpy((void *)sflash_work_base,
 		       (void *)((buff + len) - write_length), write_length);
 
-		xspi_write(dev->ch, last_sector_addr, sflash_work_base,
-			   XSPI_SECTOR_SIZE);
+		if (xspi_write(dev->ch, last_sector_addr, sflash_work_base,
+			       XSPI_SECTOR_SIZE) != XSPI_OK)
+			return TEE_ERROR_GENERIC;
 
 		sector_count--;
 	}
@@ -107,24 +112,32 @@ void sflash_write_buffer(uintptr_t addr, uintptr_t buff, size_t len)
 
 	/* Write remaining full sectors directly */
 	if (sector_count > 0)
-		xspi_write(dev->ch, base_sector_addr,
-			   buff + (base_sector_addr - addr), write_length);
+		if (xspi_write(dev->ch, base_sector_addr,
+			       buff + (base_sector_addr - addr),
+			       write_length) != XSPI_OK)
+			return TEE_ERROR_GENERIC;
+
+	return TEE_SUCCESS;
 }
 
-void sflash_read(uintptr_t addr, uintptr_t buff, size_t len)
+TEE_Result sflash_read(uintptr_t addr, uintptr_t buff, size_t len)
 {
 	size_t offset;
+	struct sflash_dev *dev = NULL;
 
-	struct sflash_dev *dev = get_flash_device(addr, len);
-	assert(dev);
+	dev = get_flash_device(addr, len);
+	if (!dev)
+		return TEE_ERROR_BAD_PARAMETERS;
 
 	/* Convert flash address to mapped virtual address */
 	offset = addr - dev->base;
 
 	memcpy((uint8_t *)buff, (uint8_t *)dev->virt + offset, len);
+
+	return TEE_SUCCESS;
 }
 
-void sflash_open(void)
+TEE_Result sflash_open(void)
 {
 	/* Enable XSPI controller and initialize flash devices */
 	cpg_xspi_start();
@@ -132,9 +145,12 @@ void sflash_open(void)
 	for (size_t i = 0; i < ARRAY_SIZE(sflash_devices); i++) {
 		struct sflash_dev *dev = &sflash_devices[i];
 
-		if (XSPI_OK != xspi_setup(dev->ch))
-			panic();
+		if (xspi_setup(dev->ch) != XSPI_OK) {
+			cpg_xspi_stop();
+			return TEE_ERROR_GENERIC;
+		}
 	}
+	return TEE_SUCCESS;
 }
 
 void sflash_close(void)

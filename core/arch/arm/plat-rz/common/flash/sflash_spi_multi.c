@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /*
- * Copyright (c) 2023-2025, Renesas Electronics Corporation
+ * Copyright (c) 2023-2026, Renesas Electronics Corporation
  */
 
 #include <stdint.h>
@@ -40,7 +40,7 @@ static void sflash_sector_erase(uint32_t addr, size_t len)
 	spi_multi_setup();
 }
 
-void sflash_write_buffer(uintptr_t addr, uintptr_t buff, size_t len)
+TEE_Result sflash_write_buffer(uintptr_t addr, uintptr_t buff, size_t len)
 {
 	uintptr_t sflash_work_base = (uintptr_t)&sflash_work[0];
 	uintptr_t base_sector_addr = ROUNDDOWN(addr, SPI_SECTOR_SIZE);
@@ -56,6 +56,9 @@ void sflash_write_buffer(uintptr_t addr, uintptr_t buff, size_t len)
 
 	if (write_offset != 0) {
 		vaddr_t virt_addr = sflash_phys_to_virt(base_sector_addr);
+
+		if (!virt_addr)
+			return TEE_ERROR_BAD_PARAMETERS;
 
 		memcpy((void *)sflash_work_base, (void *)virt_addr,
 		       SPI_SECTOR_SIZE);
@@ -77,6 +80,9 @@ void sflash_write_buffer(uintptr_t addr, uintptr_t buff, size_t len)
 
 	if ((sector_count > 0) && ((write_length % SPI_SECTOR_SIZE) > 0)) {
 		vaddr_t virt_addr = sflash_phys_to_virt(last_sector_addr);
+
+		if (!virt_addr)
+			return TEE_ERROR_BAD_PARAMETERS;
 
 		memcpy((void *)sflash_work_base, (void *)virt_addr,
 		       SPI_SECTOR_SIZE);
@@ -101,20 +107,32 @@ void sflash_write_buffer(uintptr_t addr, uintptr_t buff, size_t len)
 				    buff + (base_sector_addr - addr),
 				    write_length);
 	}
+
+	return TEE_SUCCESS;
 }
 
-void sflash_read(uintptr_t addr, uintptr_t buff, size_t len)
+TEE_Result sflash_read(uintptr_t addr, uintptr_t buff, size_t len)
 {
 	vaddr_t virt_addr = sflash_phys_to_virt(addr);
 
+	if (!virt_addr)
+		return TEE_ERROR_BAD_PARAMETERS;
+
 	memcpy((void *)buff, (void *)virt_addr, len);
+
+	return TEE_SUCCESS;
 }
 
-void sflash_open(void)
+TEE_Result sflash_open(void)
 {
 	cpg_spi_multi_start();
 
-	spi_multi_setup();
+	if (spi_multi_setup() != SPI_MULTI_SUCCESS) {
+		cpg_spi_multi_stop();
+		return TEE_ERROR_GENERIC;
+	}
+
+	return TEE_SUCCESS;
 }
 
 void sflash_close(void)
