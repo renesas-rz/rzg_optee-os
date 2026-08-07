@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /*
- * Copyright (c) 2023-2026, Renesas Electronics Corporation
+ * Copyright (c) 2023-2025, Renesas Electronics Corporation
  */
 
-#include <string.h>
 #include <sys.h>
 #include <sys_regs.h>
 #include <initcall.h>
@@ -11,7 +10,6 @@
 #include <io.h>
 #include <kernel/panic.h>
 #include <mbxsem.h>
-#include <otp_drv.h>
 
 vaddr_t sys_base;
 vaddr_t sys_ns_base;
@@ -65,15 +63,6 @@ void sys_set_end_address(void)
 
 	/* Hardware Semaphore unlock */
 	mbxsem_post_regprotect();
-}
-
-void sys_get_chip_id(uint8_t *chipid)
-{
-	uint32_t uid[CHIPID_SIZE / sizeof(uint32_t)];
-
-	(void)r_otp_read(CHIPID_BASE, (uint32_t *)&uid[0], ARRAY_SIZE(uid));
-
-	(void)memcpy(chipid, &uid[0], sizeof(uid));
 }
 
 static TEE_Result sys_init(void)

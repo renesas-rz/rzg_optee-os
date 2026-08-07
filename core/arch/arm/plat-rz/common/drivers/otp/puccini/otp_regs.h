@@ -18,8 +18,8 @@
 #define OTP_OTPDATARD					(OTP_OTPDATARD_OFFSET)
 #define OTP_OTPFLAG					(OTP_OTPFLAG_OFFSET)
 
-#define OTP_IP_ADDR_MIN					(CFG_OTP_ADDR_MIN)
-#define OTP_IP_ADDR_MAX					(CFG_OTP_ADDR_MAX)
+#define OTP_IP_ADDR_MIN					U(0x0E5)
+#define OTP_IP_ADDR_MAX					U(0x3FF)
 #define OTP_IP_DUMMY_READ_ADDR				U(0x0200)
 
 /* OTPPWR Register */

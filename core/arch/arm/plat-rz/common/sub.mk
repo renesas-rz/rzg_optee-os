@@ -1,7 +1,6 @@
 srcs-$(CFG_RZ_HUK) += huk.c
-ifneq ($(filter y,$(CFG_RZ_TSIP) $(CFG_RZ_RSIP)),)
-	srcs-y+= hw_rng.c
-endif
+srcs-$(CFG_RZ_TSIP) += hw_rng_tsip.c
+srcs-$(CFG_RZ_RSIP) += hw_rng_rsip.c
 
 subdirs-y += drivers
 subdirs-y += pta

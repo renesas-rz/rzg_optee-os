@@ -1,39 +1,36 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /*
- * Copyright (c) 2021-2025, Renesas Electronics Corporation
+ * Copyright (c) 2024, Renesas Electronics Corporation
  */
 
 #include <trace.h>
-#include <io.h>
-#include <kernel/panic.h>
 #include <kernel/tee_common_otp.h>
-#include <mm/core_memprot.h>
 #include <tee/tee_cryp_pbkdf2.h>
 
 #include "platform_config.h"
+#include <otp_drv.h>
 
 #define REGISTER_SIZE	(sizeof(uint32_t))
 
 static void read_chipid(uint8_t *chipid)
 {
 	uint32_t i;
-	vaddr_t  addr_va;
-	uint32_t read_num = CHIPID_SIZE / REGISTER_SIZE;
+	uint32_t read_data;
+	uint32_t read_num = OTP_UNIQUE_ID_SIZE / REGISTER_SIZE;
+	uint8_t password[OTP_UNIQUE_ID_SIZE] = {0};
 
-	addr_va = (vaddr_t)phys_to_virt_io(CHIPID_BASE, CHIPID_SIZE);
+	r_otp_read(OTP_UNIQUE_ID_ADDR, (uint32_t *)&password[0], read_num);
 
 	for (i = 0U; i < read_num; i++) {
-		uint32_t read_data = io_read32(addr_va);
-
+		(void)memcpy(&read_data, &password[i * REGISTER_SIZE], REGISTER_SIZE);
 		read_data = TEE_U32_TO_BIG_ENDIAN(read_data);
 		(void)memcpy(&chipid[i * REGISTER_SIZE], &read_data, REGISTER_SIZE);
-		addr_va += REGISTER_SIZE;
 	}
 }
 
 static TEE_Result huk_kdf(uint8_t *huk, size_t huk_length)
 {
-	uint8_t password[CHIPID_SIZE];
+	uint8_t password[OTP_UNIQUE_ID_SIZE] = {0};
 
 	uint8_t salt[] = {0x76, 0x6A, 0xEF, 0x5C, 0x39, 0xEF, 0x6C, 0x26, 0x41, 0x6C, 0x46, 0x68, 0x05, 0x43, 0x06, 0xC0};
 
