@@ -1,8 +1,8 @@
-PLATFORM_FLAVOR ?= g2l_smarc_2
+PLATFORM_FLAVOR ?= smarc_rzg2l
 
-PLAT_FLAVORS_G2L := g2l_dev13_1 g2l_dev15_4 g2l_dev21_4 g2lc_smarc_1 g2l_smarc_2 g2l_smarc_4 g2ul_smarc
-PLAT_FLAVORS_G3S := g3s_smarc_2 g3s_dev14_1
-PLAT_FLAVORS_G3E := g3e_smarc
+PLAT_FLAVORS_G2L := smarc_rzg2l smarc_rzg2lc smarc_rzg2ul g2l_dev13_1 g2l_dev15_4 g2l_dev21_4 g2l_smarc_4
+PLAT_FLAVORS_G3S := smarc_rzg3s g3s_dev14_1
+PLAT_FLAVORS_G3E := smarc_rzg3e
 PLAT_FLAVORS_G3L := smarc_rzg3l
 PLAT_FLAVORS_V2H := v2h_evk_1 v2n_evk
 PLAT_FLAVORS_T2H := t2h_dev_1 n2h_eval

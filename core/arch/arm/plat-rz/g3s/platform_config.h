@@ -40,7 +40,7 @@
 #define NSEC_DDR_0_BASE 0x47E00000U
 #define NSEC_DDR_0_SIZE 0x38200000
 
-#elif defined(PLATFORM_FLAVOR_g3s_smarc_2)
+#elif defined(PLATFORM_FLAVOR_smarc_rzg3s)
 /* DDR 1Gbyte x2 */
 #define NSEC_DDR_0_BASE 0x47E00000U
 #define NSEC_DDR_0_SIZE 0x38200000

@@ -13,7 +13,7 @@ $(call force,CFG_ARM_GICV3,y)
 $(call force,CFG_RZ_HUK,y)
 $(call force,CFG_RZ_SPI_MULTI,y)
 
-ifeq ($(PLATFORM_FLAVOR),g2ul_smarc)
+ifeq ($(PLATFORM_FLAVOR),smarc_rzg2ul)
 CFG_TEE_CORE_NB_CORE ?= 1
 else
 CFG_TEE_CORE_NB_CORE ?= 2
@@ -40,7 +40,7 @@ ifeq ($(CFG_RZ_SCE),y)
 CFG_WITH_SOFTWARE_PRNG ?= n
 endif
 
-ifeq ($(PLATFORM_FLAVOR),g2ul_smarc)
+ifeq ($(PLATFORM_FLAVOR),smarc_rzg2ul)
 CFG_SPI_FLASH_DEV ?= AT25QL128A
 else
 CFG_SPI_FLASH_DEV ?= MT25QU512ABB
