@@ -1,312 +1,347 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Copyright (c) 2024, Renesas Electronics Corporation
+ * Copyright (c) 2024-2026, Renesas Electronics Corporation
  */
-
 #ifndef __PTA_RSIP_RSA_H
 #define __PTA_RSIP_RSA_H
 
-#include <r_rsip_api.h>
-
 #define PTA_RSIP_RSA_UUID                                               \
 	{                                                               \
-		0x38225144, 0xb347, 0x467e,                             \
+		0xb3485f45, 0xe0af, 0x427e,                             \
 		{                                                       \
-			0x93, 0x7e, 0x1e, 0xf8, 0xff, 0x7e, 0x5a, 0xe1, \
+			0x9f, 0x3b, 0x42, 0x7f, 0x8a, 0x6e, 0x1f, 0xa8, \
 		}                                                       \
 	}
 
-#define SIGNATURE_BYTE_SIZE_RSA_1024 (128U)
-#define SIGNATURE_BYTE_SIZE_RSA_2048 (256U)
-#define SIGNATURE_BYTE_SIZE_RSA_3072 (384U)
-#define SIGNATURE_BYTE_SIZE_RSA_4096 (512U)
-
-#define CIPHER_BYTE_SIZE_RSA_1024 (128U)
-#define CIPHER_BYTE_SIZE_RSA_2048 (256U)
-#define CIPHER_BYTE_SIZE_RSA_3072 (384U)
-#define CIPHER_BYTE_SIZE_RSA_4096 (512U)
-
 /*
- * Signs message with RSASSA-PKCS1-v1_5.
+ * The RSA key size is determined from the input wrapped key.
  *
- * Hash function : SHA-256
- */
-
-/*
- * [in]      memref[0] : Message
- * [in/out]  memref[1] : Signature (128byte)
- * [in]      memref[2] : Wrapped key (rsip_wrapped_key_t:292byte)
- */
-#define PTA_CMD_RSASSA_PKCS1024_SignatureGenerate (0x00040000)
-/*
- * [in]      memref[0] : Signature (128byte)
- * [in]      memref[1] : Message
- * [in]      memref[2] : Wrapped key (rsip_wrapped_key_t:180byte)
- */
-#define PTA_CMD_RSASSA_PKCS1024_SignatureVerify (0x00040010)
-/*
- * [in]      memref[0] : Message
- * [in/out]  memref[1] : Signature (256byte)
- * [in]      memref[2] : Wrapped key (rsip_wrapped_key_t:548byte)
- */
-#define PTA_CMD_RSASSA_PKCS2048_SignatureGenerate (0x00040100)
-/*
- * [in]      memref[0] : Signature (256byte)
- * [in]      memref[1] : Message
- * [in]      memref[2] : Wrapped key (rsip_wrapped_key_t:308byte)
- */
-#define PTA_CMD_RSASSA_PKCS2048_SignatureVerify (0x00040110)
-/*
- * [in]      memref[0] : Message
- * [in/out]  memref[1] : Signature (384byte)
- * [in]      memref[2] : Wrapped key (rsip_wrapped_key_t:804byte)
- */
-#define PTA_CMD_RSASSA_PKCS3072_SignatureGenerate (0x00040300)
-/*
- * [in]      memref[0] : Signature (384byte)
- * [in]      memref[1] : Message
- * [in]      memref[2] : Wrapped key (rsip_wrapped_key_t:436byte)
- */
-#define PTA_CMD_RSASSA_PKCS3072_SignatureVerify (0x00040310)
-/*
- * [in]      memref[0] : Message
- * [in/out]  memref[1] : Signature (512byte)
- * [in]      memref[2] : Wrapped key (rsip_wrapped_key_t:1060byte)
- */
-#define PTA_CMD_RSASSA_PKCS4096_SignatureGenerate (0x00040200)
-/*
- * [in]      memref[0] : Signature (512byte)
- * [in]      memref[1] : Message
- * [in]      memref[2] : Wrapped key (rsip_wrapped_key_t:564byte)
- */
-#define PTA_CMD_RSASSA_PKCS4096_SignatureVerify (0x00040210)
-
-/*
- * Encrypts plaintext with RSAES-PKCS1-v1_5.
+ * RSASSA-PSS commands use:
+ *   - the hash algorithm encoded in the command name
+ *   - MGF1 with the same hash algorithm
+ *   - a salt length equal to the hash size
  *
- * mLen (plain_length) and k (RSA key length) must meet the following condition.
- *
- * mlen <= k - 11
+ * RSAES-OAEP commands use:
+ *   - the hash algorithm encoded in the command name
+ *   - MGF1 with the same hash algorithm
  */
 
 /*
- * [in]      memref[0] : Plain (size <= 117byte)
- * [in/out]  memref[1] : Cipher (size == 128byte)
- * [in]      memref[2] : Wrapped key (rsip_wrapped_key_t:180byte)
+ * Generate RSASSA-PKCS1-v1_5 SHA-1 signature.
+ * memref[0] (in): Message buffer.
+ * memref[1] (out): Signature buffer.
+ *                  Length must be equal to the RSA modulus size.
+ * memref[2] (in): Wrapped private key buffer.
  */
-#define PTA_CMD_RSAES_PKCS1024_Encrypt (0x00041000)
-/*
- * [in]      memref[0] : Cipher (size == 128byte)
- * [in/out]  memref[1] : Plain (size <= 117byte)
- * [in]      memref[2] : Wrapped key (rsip_wrapped_key_t:292byte)
- */
-#define PTA_CMD_RSAES_PKCS1024_Decrypt (0x00041010)
-/*
- * [in]      memref[0] : Plain (size <= 245byte)
- * [in/out]  memref[1] : Cipher (size == 256byte)
- * [in]      memref[2] : Wrapped key (rsip_wrapped_key_t:308byte)
- */
-#define PTA_CMD_RSAES_PKCS2048_Encrypt (0x00041100)
-/*
- * [in]      memref[0] : Cipher (size == 256byte)
- * [in/out]  memref[1] : Plain (size <= 245byte)
- * [in]      memref[2] : Wrapped key (rsip_wrapped_key_t:548byte)
- */
-#define PTA_CMD_RSAES_PKCS2048_Decrypt (0x00041110)
-/*
- * [in]      memref[0] : Plain (size <= 373byte)
- * [in/out]  memref[1] : Cipher (size == 384byte)
- * [in]      memref[2] : Wrapped key (rsip_wrapped_key_t:436byte)
- */
-#define PTA_CMD_RSAES_PKCS3072_Encrypt (0x00041300)
-/*
- * [in]      memref[0] : Cipher (size == 384byte)
- * [in/out]  memref[1] : Plain (size <= 373byte)
- * [in]      memref[2] : Wrapped key (rsip_wrapped_key_t:804byte)
- */
-#define PTA_CMD_RSAES_PKCS3072_Decrypt (0x00041310)
-/*
- * [in]      memref[0] : Plain (size <= 501byte)
- * [in/out]  memref[1] : Cipher (size == 512byte)
- * [in]      memref[2] : Wrapped key (rsip_wrapped_key_t:564byte)
- */
-#define PTA_CMD_RSAES_PKCS4096_Encrypt (0x00041200)
-/*
- * [in]      memref[0] : Cipher (size == 512byte)
- * [in/out]  memref[1] : Plain (size <= 501byte)
- * [in]      memref[2] : Wrapped key (rsip_wrapped_key_t:1060byte)
- */
-#define PTA_CMD_RSAES_PKCS4096_Decrypt (0x00041210)
+#define PTA_CMD_RSASSA_PKCS1_SHA1_Sign (0x48642010)
 
 /*
- * Signs message with RSASSA-PSS.
- *
- * Hash function : SHA-256
- * Mask generation function : MGF1 with SHA-256
- * Salt length : 32byte (hash length of SHA-256)
+ * Verify RSASSA-PKCS1-v1_5 SHA-1 signature.
+ * memref[0] (in): Message buffer.
+ * memref[1] (in): Signature buffer.
+ *                 Length must be equal to the RSA modulus size.
+ * memref[2] (in): Wrapped public key buffer.
  */
+#define PTA_CMD_RSASSA_PKCS1_SHA1_Verify (0x48641018)
 
 /*
- * [in]      memref[0] : Message
- * [in/out]  memref[1] : Signature (128byte)
- * [in]      memref[2] : Wrapped key (rsip_wrapped_key_t:292byte)
+ * Generate RSASSA-PKCS1-v1_5 SHA-224 signature.
+ * memref[0] (in): Message buffer.
+ * memref[1] (out): Signature buffer.
+ *                  Length must be equal to the RSA modulus size.
+ * memref[2] (in): Wrapped private key buffer.
  */
-#define PTA_CMD_RSASSA_PSS1024_SignatureGenerate (0x00042000)
-/*
- * [in]      memref[0] : Signature (128byte)
- * [in]      memref[1] : Wrapped key (rsip_wrapped_key_t:180byte)
- */
-#define PTA_CMD_RSASSA_PSS1024_SignatureVerify (0x00042010)
-/*
- * [in]      memref[0] : Message
- * [in/out]  memref[1] : Signature (256byte)
- * [in]      memref[2] : Wrapped key (rsip_wrapped_key_t:548byte)
- */
-#define PTA_CMD_RSASSA_PSS2048_SignatureGenerate (0x00042100)
-/*
- * [in]      memref[0] : Signature (256byte)
- * [in]      memref[1] : Wrapped key (rsip_wrapped_key_t:384byte)
- */
-#define PTA_CMD_RSASSA_PSS2048_SignatureVerify (0x00042110)
-/*
- * [in]      memref[0] : Message
- * [in/out]  memref[1] : Signature (384byte)
- * [in]      memref[2] : Wrapped key (rsip_wrapped_key_t:804byte)
- */
-#define PTA_CMD_RSASSA_PSS3072_SignatureGenerate (0x00042200)
-/*
- * [in]      memref[0] : Signature (384byte)
- * [in]      memref[1] : Wrapped key (rsip_wrapped_key_t:436byte)
- */
-#define PTA_CMD_RSASSA_PSS3072_SignatureVerify (0x00042210)
-/*
- * [in]      memref[0] : Message
- * [in/out]  memref[1] : Signature (512byte)
- * [in]      memref[2] : Wrapped key (rsip_wrapped_key_t:1060byte)
- */
-#define PTA_CMD_RSASSA_PSS4096_SignatureGenerate (0x00042300)
-/*
- * [in]      memref[0] : Signature (512byte)
- * [in]      memref[1] : Wrapped key (rsip_wrapped_key_t:564byte)
- */
-#define PTA_CMD_RSASSA_PSS4096_SignatureVerify (0x00042310)
+#define PTA_CMD_RSASSA_PKCS1_SHA224_Sign (0x48642020)
 
 /*
- * [in]      memref[0] : Plain (128byte)
- * [in/out]  memref[1] : Cipher (128byte)
- * [in]      memref[2] : Wrapped key (rsip_wrapped_key_t:180byte)
+ * Verify RSASSA-PKCS1-v1_5 SHA-224 signature.
+ * memref[0] (in): Message buffer.
+ * memref[1] (in): Signature buffer.
+ *                 Length must be equal to the RSA modulus size.
+ * memref[2] (in): Wrapped public key buffer.
  */
-#define PTA_CMD_RSA_1024_Encrypt (0x00043000)
-/*
- * [in]      memref[0] : Cipher (128byte)
- * [in/out]  memref[1] : Plain (128byte)
- * [in]      memref[2] : Wrapped key (rsip_wrapped_key_t:292byte)
- */
-#define PTA_CMD_RSA_1024_Decrypt (0x00043010)
-/*
- * [in]      memref[0] : Plain (256byte)
- * [in/out]  memref[1] : Cipher (256byte)
- * [in]      memref[2] : Wrapped key (rsip_wrapped_key_t:308byte)
- */
-#define PTA_CMD_RSA_2048_Encrypt (0x00043100)
-/*
- * [in]      memref[0] : Cipher (256byte)
- * [in/out]  memref[1] : Plain (256byte)
- * [in]      memref[2] : Wrapped key (rsip_wrapped_key_t:548byte)
- */
-#define PTA_CMD_RSA_2048_Decrypt (0x00043110)
-/*
- * [in]      memref[0] : Plain (384byte)
- * [in/out]  memref[1] : Cipher (384byte)
- * [in]      memref[2] : Wrapped key (rsip_wrapped_key_t:436byte)
- */
-#define PTA_CMD_RSA_3072_Encrypt (0x00043200)
-/*
- * [in]      memref[0] : Cipher (384byte)
- * [in/out]  memref[1] : Plain (384byte)
- * [in]      memref[2] : Wrapped key (rsip_wrapped_key_t:804byte)
- */
-#define PTA_CMD_RSA_3072_Decrypt (0x00043210)
-/*
- * [in]      memref[0] : Plain (512byte)
- * [in/out]  memref[1] : Cipher (512byte)
- * [in]      memref[2] : Wrapped key (rsip_wrapped_key_t:564byte)
- */
-#define PTA_CMD_RSA_4096_Encrypt (0x00043300)
-/*
- * [in]      memref[0] : Cipher (512byte)
- * [in/out]  memref[1] : Plain (512byte)
- * [in]      memref[2] : Wrapped key (rsip_wrapped_key_t:1060byte)
- */
-#define PTA_CMD_RSA_4096_Decrypt (0x00043310)
+#define PTA_CMD_RSASSA_PKCS1_SHA224_Verify (0x48641028)
 
 /*
- * Encrypts plaintext with RSAES-OAEP.
- *
- * Hash function : SHA-256
- * Mask generation function : MGF1 with SHA-256
- *
- * mLen (plain_length), hLen (output length of hash_function), and k (RSA key length)
- * must meet the following condition.
- *
- * mLen <= k - 2 hLen - 2
+ * Generate RSASSA-PKCS1-v1_5 SHA-256 signature.
+ * memref[0] (in): Message buffer.
+ * memref[1] (out): Signature buffer.
+ *                  Length must be equal to the RSA modulus size.
+ * memref[2] (in): Wrapped private key buffer.
  */
+#define PTA_CMD_RSASSA_PKCS1_SHA256_Sign (0x48642030)
 
 /*
- * [in]      memref[0] : Plain (size <= 62byte)
- * [in/out]  memref[1] : Cipher (size == 128byte)
- * [in]      memref[2] : Wrapped key (rsip_wrapped_key_t:180byte)
- * [in]      memref[3] : Label
+ * Verify RSASSA-PKCS1-v1_5 SHA-256 signature.
+ * memref[0] (in): Message buffer.
+ * memref[1] (in): Signature buffer.
+ *                 Length must be equal to the RSA modulus size.
+ * memref[2] (in): Wrapped public key buffer.
  */
-#define PTA_CMD_RSAES_OAEP1024_Encrypt (0x00044000)
+#define PTA_CMD_RSASSA_PKCS1_SHA256_Verify (0x48641038)
+
 /*
- * [in]      memref[0] : Cipher (size == 128byte)
- * [in/out]  memref[1] : Plain (size <= 62byte)
- * [in]      memref[2] : Wrapped key (rsip_wrapped_key_t:292byte)
- * [in]      memref[3] : Label
+ * Generate RSASSA-PKCS1-v1_5 SHA-384 signature.
+ * memref[0] (in): Message buffer.
+ * memref[1] (out): Signature buffer.
+ *                  Length must be equal to the RSA modulus size.
+ * memref[2] (in): Wrapped private key buffer.
  */
-#define PTA_CMD_RSAES_OAEP1024_Decrypt (0x00044010)
+#define PTA_CMD_RSASSA_PKCS1_SHA384_Sign (0x48642040)
+
 /*
- * [in]      memref[0] : Plain (size <= 190byte)
- * [in/out]  memref[1] : Cipher (size == 256byte)
- * [in]      memref[2] : Wrapped key (rsip_wrapped_key_t:308byte)
- * [in]      memref[3] : Label
+ * Verify RSASSA-PKCS1-v1_5 SHA-384 signature.
+ * memref[0] (in): Message buffer.
+ * memref[1] (in): Signature buffer.
+ *                 Length must be equal to the RSA modulus size.
+ * memref[2] (in): Wrapped public key buffer.
  */
-#define PTA_CMD_RSAES_OAEP2048_Encrypt (0x00044100)
+#define PTA_CMD_RSASSA_PKCS1_SHA384_Verify (0x48641048)
+
 /*
- * [in]      memref[0] : Cipher (size == 256byte)
- * [in/out]  memref[1] : Plain (size <= 190byte)
- * [in]      memref[2] : Wrapped key (rsip_wrapped_key_t:548byte)
- * [in]      memref[3] : Label
+ * Generate RSASSA-PKCS1-v1_5 SHA-512 signature.
+ * memref[0] (in): Message buffer.
+ * memref[1] (out): Signature buffer.
+ *                  Length must be equal to the RSA modulus size.
+ * memref[2] (in): Wrapped private key buffer.
  */
-#define PTA_CMD_RSAES_OAEP2048_Decrypt (0x00044110)
+#define PTA_CMD_RSASSA_PKCS1_SHA512_Sign (0x48642050)
+
 /*
- * [in]      memref[0] : Plain (size <= 318byte)
- * [in/out]  memref[1] : Cipher (size == 384byte)
- * [in]      memref[2] : Wrapped key (rsip_wrapped_key_t:436byte)
- * [in]      memref[3] : Label
+ * Verify RSASSA-PKCS1-v1_5 SHA-512 signature.
+ * memref[0] (in): Message buffer.
+ * memref[1] (in): Signature buffer.
+ *                 Length must be equal to the RSA modulus size.
+ * memref[2] (in): Wrapped public key buffer.
  */
-#define PTA_CMD_RSAES_OAEP3072_Encrypt (0x00044200)
+#define PTA_CMD_RSASSA_PKCS1_SHA512_Verify (0x48641058)
+
 /*
- * [in]      memref[0] : Cipher (size == 384byte)
- * [in/out]  memref[1] : Plain (size <= 318byte)
- * [in]      memref[2] : Wrapped key (rsip_wrapped_key_t:804byte)
- * [in]      memref[3] : Label
+ * Generate RSASSA-PSS SHA-1 signature.
+ * memref[0] (in): Message buffer.
+ * memref[1] (out): Signature buffer.
+ *                  Length must be equal to the RSA modulus size.
+ * memref[2] (in): Wrapped private key buffer.
  */
-#define PTA_CMD_RSAES_OAEP3072_Decrypt (0x00044210)
+#define PTA_CMD_RSASSA_PSS_SHA1_Sign (0x48742010)
+
 /*
- * [in]      memref[0] : Plain (size <= 446byte)
- * [in/out]  memref[1] : Cipher (size == 512byte)
- * [in]      memref[2] : Wrapped key (rsip_wrapped_key_t:564byte)
- * [in]      memref[3] : Label
+ * Verify RSASSA-PSS SHA-1 signature.
+ * memref[0] (in): Message buffer.
+ * memref[1] (in): Signature buffer.
+ *                 Length must be equal to the RSA modulus size.
+ * memref[2] (in): Wrapped public key buffer.
  */
-#define PTA_CMD_RSAES_OAEP4096_Encrypt (0x00044300)
+#define PTA_CMD_RSASSA_PSS_SHA1_Verify (0x48741018)
+
 /*
- * [in]      memref[0] : Cipher (size == 512byte)
- * [in/out]  memref[1] : Plain (size <= 446byte)
- * [in]      memref[2] : Wrapped key (rsip_wrapped_key_t:1060byte)
- * [in]      memref[3] : Label
+ * Generate RSASSA-PSS SHA-224 signature.
+ * memref[0] (in): Message buffer.
+ * memref[1] (out): Signature buffer.
+ *                  Length must be equal to the RSA modulus size.
+ * memref[2] (in): Wrapped private key buffer.
  */
-#define PTA_CMD_RSAES_OAEP4096_Decrypt (0x00044310)
+#define PTA_CMD_RSASSA_PSS_SHA224_Sign (0x48742020)
+
+/*
+ * Verify RSASSA-PSS SHA-224 signature.
+ * memref[0] (in): Message buffer.
+ * memref[1] (in): Signature buffer.
+ *                 Length must be equal to the RSA modulus size.
+ * memref[2] (in): Wrapped public key buffer.
+ */
+#define PTA_CMD_RSASSA_PSS_SHA224_Verify (0x48741028)
+
+/*
+ * Generate RSASSA-PSS SHA-256 signature.
+ * memref[0] (in): Message buffer.
+ * memref[1] (out): Signature buffer.
+ *                  Length must be equal to the RSA modulus size.
+ * memref[2] (in): Wrapped private key buffer.
+ */
+#define PTA_CMD_RSASSA_PSS_SHA256_Sign (0x48742030)
+
+/*
+ * Verify RSASSA-PSS SHA-256 signature.
+ * memref[0] (in): Message buffer.
+ * memref[1] (in): Signature buffer.
+ *                 Length must be equal to the RSA modulus size.
+ * memref[2] (in): Wrapped public key buffer.
+ */
+#define PTA_CMD_RSASSA_PSS_SHA256_Verify (0x48741038)
+
+/*
+ * Generate RSASSA-PSS SHA-384 signature.
+ * memref[0] (in): Message buffer.
+ * memref[1] (out): Signature buffer.
+ *                  Length must be equal to the RSA modulus size.
+ * memref[2] (in): Wrapped private key buffer.
+ */
+#define PTA_CMD_RSASSA_PSS_SHA384_Sign (0x48742040)
+
+/*
+ * Verify RSASSA-PSS SHA-384 signature.
+ * memref[0] (in): Message buffer.
+ * memref[1] (in): Signature buffer.
+ *                 Length must be equal to the RSA modulus size.
+ * memref[2] (in): Wrapped public key buffer.
+ */
+#define PTA_CMD_RSASSA_PSS_SHA384_Verify (0x48741048)
+
+/*
+ * Generate RSASSA-PSS SHA-512 signature.
+ * memref[0] (in): Message buffer.
+ * memref[1] (out): Signature buffer.
+ *                  Length must be equal to the RSA modulus size.
+ * memref[2] (in): Wrapped private key buffer.
+ */
+#define PTA_CMD_RSASSA_PSS_SHA512_Sign (0x48742050)
+
+/*
+ * Verify RSASSA-PSS SHA-512 signature.
+ * memref[0] (in): Message buffer.
+ * memref[1] (in): Signature buffer.
+ *                 Length must be equal to the RSA modulus size.
+ * memref[2] (in): Wrapped public key buffer.
+ */
+#define PTA_CMD_RSASSA_PSS_SHA512_Verify (0x48741058)
+
+/*
+ * Encrypt RSAES-PKCS1-v1_5 plaintext.
+ * memref[0] (in): Plaintext buffer.
+ * memref[1] (out): Ciphertext buffer.
+ *                  Length must be equal to the RSA modulus size.
+ * memref[2] (in): Wrapped public key buffer.
+ */
+#define PTA_CMD_RSAES_PKCS1_Encrypt (0x46241000)
+
+/*
+ * Decrypt RSAES-PKCS1-v1_5 ciphertext.
+ * memref[0] (in): Ciphertext buffer.
+ *                 Length must be equal to the RSA modulus size.
+ * memref[1] (out): Plaintext buffer.
+ * memref[2] (in): Wrapped private key buffer.
+ */
+#define PTA_CMD_RSAES_PKCS1_Decrypt (0x46242008)
+
+/*
+ * Encrypt RSAES-OAEP SHA-1 plaintext.
+ * memref[0] (in): Plaintext buffer.
+ * memref[1] (out): Ciphertext buffer.
+ *                  Length must be equal to the RSA modulus size.
+ * memref[2] (in): Wrapped public key buffer.
+ * memref[3] (in, optional): OAEP label buffer.
+ */
+#define PTA_CMD_RSAES_OAEP_SHA1_Encrypt (0x46341010)
+
+/*
+ * Decrypt RSAES-OAEP SHA-1 ciphertext.
+ * memref[0] (in): Ciphertext buffer.
+ *                 Length must be equal to the RSA modulus size.
+ * memref[1] (out): Plaintext buffer.
+ * memref[2] (in): Wrapped private key buffer.
+ * memref[3] (in, optional): OAEP label buffer.
+ */
+#define PTA_CMD_RSAES_OAEP_SHA1_Decrypt (0x46342018)
+
+/*
+ * Encrypt RSAES-OAEP SHA-224 plaintext.
+ * memref[0] (in): Plaintext buffer.
+ * memref[1] (out): Ciphertext buffer.
+ *                  Length must be equal to the RSA modulus size.
+ * memref[2] (in): Wrapped public key buffer.
+ * memref[3] (in, optional): OAEP label buffer.
+ */
+#define PTA_CMD_RSAES_OAEP_SHA224_Encrypt (0x46341020)
+
+/*
+ * Decrypt RSAES-OAEP SHA-224 ciphertext.
+ * memref[0] (in): Ciphertext buffer.
+ *                 Length must be equal to the RSA modulus size.
+ * memref[1] (out): Plaintext buffer.
+ * memref[2] (in): Wrapped private key buffer.
+ * memref[3] (in, optional): OAEP label buffer.
+ */
+#define PTA_CMD_RSAES_OAEP_SHA224_Decrypt (0x46342028)
+
+/*
+ * Encrypt RSAES-OAEP SHA-256 plaintext.
+ * memref[0] (in): Plaintext buffer.
+ * memref[1] (out): Ciphertext buffer.
+ *                  Length must be equal to the RSA modulus size.
+ * memref[2] (in): Wrapped public key buffer.
+ * memref[3] (in, optional): OAEP label buffer.
+ */
+#define PTA_CMD_RSAES_OAEP_SHA256_Encrypt (0x46341030)
+
+/*
+ * Decrypt RSAES-OAEP SHA-256 ciphertext.
+ * memref[0] (in): Ciphertext buffer.
+ *                 Length must be equal to the RSA modulus size.
+ * memref[1] (out): Plaintext buffer.
+ * memref[2] (in): Wrapped private key buffer.
+ * memref[3] (in, optional): OAEP label buffer.
+ */
+#define PTA_CMD_RSAES_OAEP_SHA256_Decrypt (0x46342038)
+
+/*
+ * Encrypt RSAES-OAEP SHA-384 plaintext.
+ * memref[0] (in): Plaintext buffer.
+ * memref[1] (out): Ciphertext buffer.
+ *                  Length must be equal to the RSA modulus size.
+ * memref[2] (in): Wrapped public key buffer.
+ * memref[3] (in, optional): OAEP label buffer.
+ */
+#define PTA_CMD_RSAES_OAEP_SHA384_Encrypt (0x46341040)
+
+/*
+ * Decrypt RSAES-OAEP SHA-384 ciphertext.
+ * memref[0] (in): Ciphertext buffer.
+ *                 Length must be equal to the RSA modulus size.
+ * memref[1] (out): Plaintext buffer.
+ * memref[2] (in): Wrapped private key buffer.
+ * memref[3] (in, optional): OAEP label buffer.
+ */
+#define PTA_CMD_RSAES_OAEP_SHA384_Decrypt (0x46342048)
+
+/*
+ * Encrypt RSAES-OAEP SHA-512 plaintext.
+ * memref[0] (in): Plaintext buffer.
+ * memref[1] (out): Ciphertext buffer.
+ *                  Length must be equal to the RSA modulus size.
+ * memref[2] (in): Wrapped public key buffer.
+ * memref[3] (in, optional): OAEP label buffer.
+ */
+#define PTA_CMD_RSAES_OAEP_SHA512_Encrypt (0x46341050)
+
+/*
+ * Decrypt RSAES-OAEP SHA-512 ciphertext.
+ * memref[0] (in): Ciphertext buffer.
+ *                 Length must be equal to the RSA modulus size.
+ * memref[1] (out): Plaintext buffer.
+ * memref[2] (in): Wrapped private key buffer.
+ * memref[3] (in, optional): OAEP label buffer.
+ */
+#define PTA_CMD_RSAES_OAEP_SHA512_Decrypt (0x46342058)
+
+/*
+ * Raw RSA encryption.
+ * memref[0] (in): Plaintext buffer.
+ *                 Length must be equal to the RSA modulus size.
+ * memref[1] (out): Ciphertext buffer.
+ *                  Length must be equal to the RSA modulus size.
+ * memref[2] (in): Wrapped public key buffer.
+ */
+#define PTA_CMD_RSA_RAW_Encrypt (0x46141000)
+
+/*
+ * Raw RSA decryption.
+ * memref[0] (in): Ciphertext buffer.
+ *                 Length must be equal to the RSA modulus size.
+ * memref[1] (out): Plaintext buffer.
+ *                  Length must be equal to the RSA modulus size.
+ * memref[2] (in): Wrapped private key buffer.
+ */
+#define PTA_CMD_RSA_RAW_Decrypt (0x46142008)
 
 #endif /* __PTA_RSIP_RSA_H */

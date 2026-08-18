@@ -7,8 +7,8 @@
 #include <kernel/pseudo_ta.h>
 #include <platform_config.h>
 
+#include <hw_crypto.h>
 #include <r_sce.h>
-#include <sflash.h>
 #include <pta_sce.h>
 
 #define PTA_NAME "sce.pta"
@@ -1062,10 +1062,9 @@ static TEE_Result open_session(uint32_t nParamTypes __unused,
 			       void **ppSessionContext __unused)
 {
 	DMSG("open entry point for pseudo ta \"%s\"", PTA_NAME);
-	sflash_open();
-	sflash_read(CFG_KUK_BASE, &key_update_key, sizeof(key_update_key));
-	sflash_close();
-	return TEE_SUCCESS;
+
+	return plat_crypto_get_key_update_key(&key_update_key,
+					      sizeof(key_update_key));
 }
 
 static void close_session(void *pSessionContext __unused)

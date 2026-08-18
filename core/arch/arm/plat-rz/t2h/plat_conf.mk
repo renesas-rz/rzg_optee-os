@@ -31,7 +31,6 @@ endif
 CFG_RZ_SCE ?= n
 CFG_SECURE_IP_LIB ?= $(CFG_RZ_SCE_LIB_DIR)/libr_secure_ip_4_0.a.1.0.0
 ifeq ($(CFG_RZ_SCE),y)
-CFG_KUK_BASE ?= 0x40A00000
 ldflags-external += $(CFG_SECURE_IP_LIB)
 $(call force,CFG_RZ_RSIP_PROTECTED,y)
 endif

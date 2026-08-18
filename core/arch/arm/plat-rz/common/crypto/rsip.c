@@ -9,7 +9,8 @@
 #include <io.h>
 #include <mm/core_memprot.h>
 #include <kernel/panic.h>
-#include <rng_support.h>
+#include <hw_crypto.h>
+#include <sflash.h>
 #include <r_rsip.h>
 #include <r_rsip_addr.h>
 #include <platform_config.h>
@@ -19,7 +20,7 @@ rsip_instance_ctrl_t rsip_instance_ctrl;
 
 volatile uint32_t *gp_sce;
 
-TEE_Result hw_get_random_bytes(void *buf, size_t len)
+TEE_Result plat_crypto_get_random_bytes(void *buf, size_t len)
 {
 	TEE_Result ret = TEE_ERROR_GENERIC;
 
@@ -41,6 +42,16 @@ TEE_Result hw_get_random_bytes(void *buf, size_t len)
 
 	return ret;
 }
+
+#if defined(SFLASH_KUK_ADDR)
+TEE_Result plat_crypto_get_key_update_key(uint8_t *key, size_t len)
+{
+	sflash_open();
+	sflash_read(SFLASH_KUK_ADDR, (uintptr_t)key, len);
+	sflash_close();
+	return TEE_SUCCESS;
+}
+#endif /* SFLASH_KUK_ADDR */
 
 static TEE_Result rsip_init(void)
 {

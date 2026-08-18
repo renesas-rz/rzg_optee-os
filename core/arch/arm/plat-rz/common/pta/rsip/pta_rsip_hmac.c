@@ -4,375 +4,360 @@
  */
 
 #include <kernel/pseudo_ta.h>
-
 #include <r_rsip.h>
 #include <pta_rsip_hmac.h>
 
+#include "pta_rsip_cmd.h"
+#include "pta_rsip_util.h"
+
 #define PTA_NAME "rsip_hmac.pta"
 
-extern rsip_instance_ctrl_t rsip_instance_ctrl;
+struct rsip_hmac_desc {
+	size_t mac_size;
+};
 
-static TEE_Result hmac_generateinit(uint32_t types,
-				    TEE_Param params[TEE_NUM_PARAMS],
-				    rsip_byte_size_wrapped_key_t key_size)
+struct hmac_ctx {
+	struct rsip_hmac_desc desc;
+	rsip_hmac_handle_t handle;
+};
+
+static TEE_Result get_hmac_desc(rsip_key_type_t key_type,
+				struct rsip_hmac_desc *desc)
 {
-	fsp_err_t err;
+	switch (key_type) {
+	case RSIP_KEY_TYPE_HMAC_SHA1:
+		desc->mac_size = RSIP_DIGEST_SIZE_SHA1;
+		return TEE_SUCCESS;
+	case RSIP_KEY_TYPE_HMAC_SHA224:
+		desc->mac_size = RSIP_DIGEST_SIZE_SHA224;
+		return TEE_SUCCESS;
+	case RSIP_KEY_TYPE_HMAC_SHA256:
+		desc->mac_size = RSIP_DIGEST_SIZE_SHA256;
+		return TEE_SUCCESS;
+	default:
+		return TEE_ERROR_NOT_SUPPORTED;
+	}
+}
 
-	rsip_hmac_handle_t *handle;
-	rsip_wrapped_key_t *wrapped_key;
+static TEE_Result get_hmac_wrapped_key(TEE_Param *p,
+				       const rsip_wrapped_key_t **wrapped_key)
+{
+	TEE_Result res = TEE_ERROR_GENERIC;
 
-	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
+	const struct rsip_key_desc *key_desc = NULL;
+
+	size_t wrapped_len = p->memref.size;
+	rsip_wrapped_key_t *key = p->memref.buffer;
+
+	if (!key || !IS_ALIGNED_WITH_UINT32(key))
+		return TEE_ERROR_BAD_PARAMETERS;
+	if (wrapped_len < sizeof(key->type))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	handle = (rsip_hmac_handle_t *)params[0].memref.buffer;
-	if (!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer,
-				  rsip_hmac_handle_t)) {
-		EMSG("handle err");
+	res = get_key_desc(key->type, &key_desc);
+	if (res != TEE_SUCCESS)
+		return res;
+	if (wrapped_len != key_desc->wrapped_size)
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	switch (key->type) {
+	case RSIP_KEY_TYPE_HMAC_SHA1:
+	case RSIP_KEY_TYPE_HMAC_SHA224:
+	case RSIP_KEY_TYPE_HMAC_SHA256:
+		*wrapped_key = key;
+		return TEE_SUCCESS;
+	default:
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
+}
 
-	wrapped_key = (rsip_wrapped_key_t *)params[1].memref.buffer;
-	if (!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t) ||
-	    (key_size > params[1].memref.size)) {
-		EMSG("key err");
+static TEE_Result hmac_gen_init(struct hmac_ctx *ctx, uint32_t types,
+				TEE_Param params[TEE_NUM_PARAMS])
+{
+	TEE_Result res = TEE_ERROR_GENERIC;
+	fsp_err_t err = FSP_ERR_CRYPTO_RSIP_FAIL;
+
+	const rsip_wrapped_key_t *wrapped_key = NULL;
+
+	uint32_t exp_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
+					     TEE_PARAM_TYPE_NONE,
+					     TEE_PARAM_TYPE_NONE,
+					     TEE_PARAM_TYPE_NONE);
+	if (types != exp_types)
 		return TEE_ERROR_BAD_PARAMETERS;
-	}
 
-	err = R_RSIP_HMAC_GenerateInit(&rsip_instance_ctrl, handle,
+	res = get_hmac_wrapped_key(&params[0], &wrapped_key);
+	if (res != TEE_SUCCESS)
+		return res;
+
+	res = get_hmac_desc(wrapped_key->type, &ctx->desc);
+	if (res != TEE_SUCCESS)
+		return res;
+
+	err = R_RSIP_HMAC_GenerateInit(&rsip_instance_ctrl, &ctx->handle,
 				       wrapped_key);
-	switch ((uint32_t)err) {
-	case FSP_SUCCESS:
-		break;
-	case FSP_ERR_ASSERTION:
-		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_NOT_OPEN:
-		return TEE_ERROR_BAD_STATE;
-	case FSP_ERR_INVALID_STATE:
-		return TEE_ERROR_BAD_STATE;
-	case FSP_ERR_NOT_ENABLED:
-		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_INVALID_ARGUMENT:
-		return TEE_ERROR_BAD_PARAMETERS;
-	default:
-		return TEE_ERROR_GENERIC;
-	}
-
-	params[0].memref.size = sizeof(rsip_hmac_handle_t);
+	if (err != FSP_SUCCESS)
+		return rsip_err_to_tee(err);
 
 	return TEE_SUCCESS;
 }
 
-static TEE_Result hmac_generateupdate(uint32_t types,
-				      TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result hmac_gen_update(struct hmac_ctx *ctx, uint32_t types,
+				  TEE_Param params[TEE_NUM_PARAMS])
 {
-	fsp_err_t err;
+	fsp_err_t err = FSP_ERR_CRYPTO_RSIP_FAIL;
 
-	rsip_hmac_handle_t *handle;
-	uint8_t *message;
-	uint32_t message_length;
+	uint8_t *msg = NULL;
+	uint32_t msg_len = 0;
 
-	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
+	uint32_t exp_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
+					     TEE_PARAM_TYPE_NONE,
+					     TEE_PARAM_TYPE_NONE,
+					     TEE_PARAM_TYPE_NONE);
+
+	if (types != exp_types)
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	handle = (rsip_hmac_handle_t *)params[0].memref.buffer;
-	if (!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer,
-				  rsip_hmac_handle_t)) {
-		EMSG("handle err");
+	msg = params[0].memref.buffer;
+	msg_len = (uint32_t)params[0].memref.size;
+	if (msg_len && (!msg || !IS_ALIGNED_WITH_UINT32(msg)))
 		return TEE_ERROR_BAD_PARAMETERS;
-	}
+	if (!IS_ALIGNED(msg_len, sizeof(uint32_t)))
+		return TEE_ERROR_BAD_PARAMETERS;
 
-	message = (uint8_t *)params[1].memref.buffer;
-	message_length = (uint32_t)params[1].memref.size;
-	if (!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) {
-		EMSG("message err");
-		return TEE_ERROR_BAD_PARAMETERS;
-	}
-
-	err = R_RSIP_HMAC_GenerateUpdate(&rsip_instance_ctrl, handle, message,
-					 message_length);
-	switch ((uint32_t)err) {
-	case FSP_SUCCESS:
-		break;
-	case FSP_ERR_ASSERTION:
-		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_NOT_OPEN:
-		return TEE_ERROR_BAD_STATE;
-	case FSP_ERR_INVALID_STATE:
-		return TEE_ERROR_BAD_STATE;
-	case FSP_ERR_CRYPTO_RSIP_KEY_SET_FAIL:
-		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_CRYPTO_RSIP_RESOURCE_CONFLICT:
-		return TEE_ERROR_ACCESS_CONFLICT;
-	case FSP_ERR_CRYPTO_RSIP_FATAL:
-		return TEE_ERROR_GENERIC;
-	default:
-		return TEE_ERROR_BAD_STATE;
-	}
+	err = R_RSIP_HMAC_GenerateUpdate(&rsip_instance_ctrl, &ctx->handle, msg,
+					 msg_len);
+	if (err != FSP_SUCCESS)
+		return rsip_err_to_tee(err);
 
 	return TEE_SUCCESS;
 }
 
-static TEE_Result hmac_generatefinal(uint32_t types,
-				     TEE_Param params[TEE_NUM_PARAMS],
-				     uint32_t mac_size)
-{
-	fsp_err_t err;
-
-	rsip_hmac_handle_t *handle;
-	uint8_t *mac;
-
-	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
-		return TEE_ERROR_BAD_PARAMETERS;
-
-	handle = (rsip_hmac_handle_t *)params[0].memref.buffer;
-	if (!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer,
-				  rsip_hmac_handle_t)) {
-		EMSG("handle err");
-		return TEE_ERROR_BAD_PARAMETERS;
-	}
-
-	mac = (uint8_t *)params[1].memref.buffer;
-	if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) ||
-	    (mac_size > params[1].memref.size)) {
-		EMSG("mac err");
-		return TEE_ERROR_BAD_PARAMETERS;
-	}
-
-	err = R_RSIP_HMAC_GenerateFinal(&rsip_instance_ctrl, handle, mac);
-	switch ((uint32_t)err) {
-	case FSP_SUCCESS:
-		break;
-	case FSP_ERR_ASSERTION:
-		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_NOT_OPEN:
-		return TEE_ERROR_BAD_STATE;
-	case FSP_ERR_INVALID_STATE:
-		return TEE_ERROR_BAD_STATE;
-	case FSP_ERR_CRYPTO_RSIP_KEY_SET_FAIL:
-		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_CRYPTO_RSIP_RESOURCE_CONFLICT:
-		return TEE_ERROR_ACCESS_CONFLICT;
-	case FSP_ERR_CRYPTO_RSIP_FATAL:
-		return TEE_ERROR_GENERIC;
-	default:
-		return TEE_ERROR_BAD_STATE;
-	}
-
-	params[1].memref.size = mac_size;
-
-	return TEE_SUCCESS;
-}
-
-static TEE_Result hmac_verifyinit(uint32_t types,
-				  TEE_Param params[TEE_NUM_PARAMS],
-				  rsip_byte_size_wrapped_key_t key_size)
-{
-	fsp_err_t err;
-
-	rsip_hmac_handle_t *handle;
-	rsip_wrapped_key_t *wrapped_key;
-
-	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
-		return TEE_ERROR_BAD_PARAMETERS;
-
-	handle = (rsip_hmac_handle_t *)params[0].memref.buffer;
-	if (!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t)) {
-		EMSG("handle err");
-		return TEE_ERROR_BAD_PARAMETERS;
-	}
-
-	wrapped_key = (rsip_wrapped_key_t *)params[1].memref.buffer;
-	if (!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t) ||
-	    (key_size > params[1].memref.size)) {
-		EMSG("key err");
-		return TEE_ERROR_BAD_PARAMETERS;
-	}
-
-	err = R_RSIP_HMAC_VerifyInit(&rsip_instance_ctrl, handle, wrapped_key);
-	switch ((uint32_t)err) {
-	case FSP_SUCCESS:
-		break;
-	case FSP_ERR_ASSERTION:
-		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_NOT_OPEN:
-		return TEE_ERROR_BAD_STATE;
-	case FSP_ERR_INVALID_STATE:
-		return TEE_ERROR_BAD_STATE;
-	case FSP_ERR_NOT_ENABLED:
-		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_INVALID_ARGUMENT:
-		return TEE_ERROR_BAD_PARAMETERS;
-	default:
-		return TEE_ERROR_GENERIC;
-	}
-
-	params[0].memref.size = sizeof(rsip_hmac_handle_t);
-
-	return TEE_SUCCESS;
-}
-
-static TEE_Result hmac_verifyupdate(uint32_t types,
-				    TEE_Param params[TEE_NUM_PARAMS])
-{
-	fsp_err_t err;
-
-	rsip_hmac_handle_t *handle;
-	uint8_t *message;
-	uint32_t message_length;
-
-	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
-		return TEE_ERROR_BAD_PARAMETERS;
-
-	handle = (rsip_hmac_handle_t *)params[0].memref.buffer;
-	if (!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t)) {
-		EMSG("handle err");
-		return TEE_ERROR_BAD_PARAMETERS;
-	}
-
-	message = (uint8_t *)params[1].memref.buffer;
-	message_length = (uint32_t)params[1].memref.size;
-	if (!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) {
-		EMSG("message err");
-		return TEE_ERROR_BAD_PARAMETERS;
-	}
-
-	err = R_RSIP_HMAC_VerifyUpdate(&rsip_instance_ctrl, handle, message,
-				       message_length);
-	switch ((uint32_t)err) {
-	case FSP_SUCCESS:
-		break;
-	case FSP_ERR_ASSERTION:
-		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_NOT_OPEN:
-		return TEE_ERROR_BAD_STATE;
-	case FSP_ERR_INVALID_STATE:
-		return TEE_ERROR_BAD_STATE;
-	case FSP_ERR_CRYPTO_RSIP_KEY_SET_FAIL:
-		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_CRYPTO_RSIP_RESOURCE_CONFLICT:
-		return TEE_ERROR_ACCESS_CONFLICT;
-	case FSP_ERR_CRYPTO_RSIP_FATAL:
-		return TEE_ERROR_GENERIC;
-	default:
-		return TEE_ERROR_BAD_STATE;
-	}
-
-	return TEE_SUCCESS;
-}
-
-static TEE_Result hmac_verifyfinal(uint32_t types,
-				   TEE_Param params[TEE_NUM_PARAMS])
-{
-	fsp_err_t err;
-
-	rsip_hmac_handle_t *handle;
-	uint8_t *mac;
-	uint32_t mac_length;
-
-	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
-		return TEE_ERROR_BAD_PARAMETERS;
-
-	handle = (rsip_hmac_handle_t *)params[0].memref.buffer;
-	if (!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t)) {
-		EMSG("handle err");
-		return TEE_ERROR_BAD_PARAMETERS;
-	}
-
-	mac = (uint8_t *)params[1].memref.buffer;
-	mac_length = (uint32_t)params[1].memref.size;
-	if (!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) {
-		EMSG("mac err");
-		return TEE_ERROR_BAD_PARAMETERS;
-	}
-
-	err = R_RSIP_HMAC_VerifyFinal(&rsip_instance_ctrl, handle, mac,
-				      mac_length);
-	switch ((uint32_t)err) {
-	case FSP_SUCCESS:
-		break;
-	case FSP_ERR_ASSERTION:
-		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_NOT_OPEN:
-		return TEE_ERROR_BAD_STATE;
-	case FSP_ERR_INVALID_STATE:
-		return TEE_ERROR_BAD_STATE;
-	case FSP_ERR_INVALID_SIZE:
-		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_CRYPTO_RSIP_KEY_SET_FAIL:
-		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_CRYPTO_RSIP_FAIL:
-		return TEE_ERROR_GENERIC;
-	case FSP_ERR_CRYPTO_RSIP_RESOURCE_CONFLICT:
-		return TEE_ERROR_ACCESS_CONFLICT;
-	case FSP_ERR_CRYPTO_RSIP_FATAL:
-		return TEE_ERROR_GENERIC;
-	default:
-		return TEE_ERROR_BAD_STATE;
-	}
-
-	return TEE_SUCCESS;
-}
-
-static TEE_Result invoke_command(void *session __unused, uint32_t cmd,
-				 uint32_t ptypes,
+static TEE_Result hmac_gen_final(struct hmac_ctx *ctx, uint32_t types,
 				 TEE_Param params[TEE_NUM_PARAMS])
 {
-	EMSG(PTA_NAME " command %#" PRIx32 " ptypes %#" PRIx32, cmd, ptypes);
+	TEE_Result res = TEE_SUCCESS;
+	fsp_err_t err = FSP_ERR_CRYPTO_RSIP_FAIL;
+
+	uint8_t *msg = NULL;
+	uint32_t msg_len = 0;
+	uint32_t msg_tail[1] = { 0 };
+	uint8_t *mac = NULL;
+	uint32_t mac_max = 0;
+	uint32_t mac_buff[RSIP_HMAC_MAC_SIZE_MAX / sizeof(uint32_t)] = { 0 };
+
+	uint32_t exp_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
+					     TEE_PARAM_TYPE_MEMREF_OUTPUT,
+					     TEE_PARAM_TYPE_NONE,
+					     TEE_PARAM_TYPE_NONE);
+
+	if (types != exp_types)
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	msg = params[0].memref.buffer;
+	msg_len = (uint32_t)params[0].memref.size;
+	if (msg_len && (!msg || !IS_ALIGNED_WITH_UINT32(msg)))
+		return TEE_ERROR_BAD_PARAMETERS;
+	if (msg_len >= sizeof(msg_tail))
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	mac = params[1].memref.buffer;
+	mac_max = params[1].memref.size;
+	params[1].memref.size = ctx->desc.mac_size;
+	if (!mac || !IS_ALIGNED_WITH_UINT32(mac))
+		return TEE_ERROR_BAD_PARAMETERS;
+	if (mac_max < params[1].memref.size)
+		return TEE_ERROR_SHORT_BUFFER;
+
+	if (msg_len) {
+		memcpy(msg_tail, msg, msg_len);
+
+		err = R_RSIP_HMAC_GenerateUpdate(&rsip_instance_ctrl,
+						 &ctx->handle,
+						 (uint8_t *)msg_tail, msg_len);
+		if (err != FSP_SUCCESS)
+			res = rsip_err_to_tee(err);
+	}
+
+	err = R_RSIP_HMAC_GenerateFinal(&rsip_instance_ctrl, &ctx->handle,
+					(uint8_t *)mac_buff);
+	if (res == TEE_SUCCESS && err != FSP_SUCCESS)
+		res = rsip_err_to_tee(err);
+
+	if (res == TEE_SUCCESS)
+		memcpy(mac, mac_buff, ctx->desc.mac_size);
+
+	return res;
+}
+
+static TEE_Result hmac_verify_init(struct hmac_ctx *ctx, uint32_t types,
+				   TEE_Param params[TEE_NUM_PARAMS])
+{
+	TEE_Result res = TEE_SUCCESS;
+	fsp_err_t err = FSP_ERR_CRYPTO_RSIP_FAIL;
+
+	const rsip_wrapped_key_t *wrapped_key = NULL;
+
+	uint32_t exp_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
+					     TEE_PARAM_TYPE_NONE,
+					     TEE_PARAM_TYPE_NONE,
+					     TEE_PARAM_TYPE_NONE);
+	if (types != exp_types)
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	res = get_hmac_wrapped_key(&params[0], &wrapped_key);
+	if (res != TEE_SUCCESS)
+		return res;
+
+	res = get_hmac_desc(wrapped_key->type, &ctx->desc);
+	if (res != TEE_SUCCESS)
+		return res;
+
+	err = R_RSIP_HMAC_VerifyInit(&rsip_instance_ctrl, &ctx->handle,
+				     wrapped_key);
+	if (err != FSP_SUCCESS)
+		return rsip_err_to_tee(err);
+
+	return TEE_SUCCESS;
+}
+
+static TEE_Result hmac_verify_update(struct hmac_ctx *ctx, uint32_t types,
+				     TEE_Param params[TEE_NUM_PARAMS])
+{
+	fsp_err_t err = FSP_ERR_CRYPTO_RSIP_FAIL;
+
+	uint8_t *msg = NULL;
+	uint32_t msg_len = 0;
+
+	uint32_t exp_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
+					     TEE_PARAM_TYPE_NONE,
+					     TEE_PARAM_TYPE_NONE,
+					     TEE_PARAM_TYPE_NONE);
+
+	if (types != exp_types)
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	msg = params[0].memref.buffer;
+	msg_len = (uint32_t)params[0].memref.size;
+	if (msg_len && (!msg || !IS_ALIGNED_WITH_UINT32(msg)))
+		return TEE_ERROR_BAD_PARAMETERS;
+	if (!IS_ALIGNED(msg_len, sizeof(uint32_t)))
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	err = R_RSIP_HMAC_VerifyUpdate(&rsip_instance_ctrl, &ctx->handle, msg,
+				       msg_len);
+	if (err != FSP_SUCCESS)
+		return rsip_err_to_tee(err);
+
+	return TEE_SUCCESS;
+}
+
+static TEE_Result hmac_verify_final(struct hmac_ctx *ctx, uint32_t types,
+				    TEE_Param params[TEE_NUM_PARAMS])
+{
+	TEE_Result res = TEE_SUCCESS;
+	fsp_err_t err = FSP_ERR_CRYPTO_RSIP_FAIL;
+
+	uint8_t *msg = NULL;
+	uint32_t msg_len = 0;
+	uint32_t msg_tail[1] = { 0 };
+	uint8_t *mac = NULL;
+	uint32_t mac_len = 0;
+	uint32_t mac_buff[RSIP_HMAC_MAC_SIZE_MAX / sizeof(uint32_t)] = { 0 };
+
+	uint32_t exp_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
+					     TEE_PARAM_TYPE_MEMREF_INPUT,
+					     TEE_PARAM_TYPE_NONE,
+					     TEE_PARAM_TYPE_NONE);
+
+	if (types != exp_types)
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	msg = params[0].memref.buffer;
+	msg_len = (uint32_t)params[0].memref.size;
+	if (msg_len && (!msg || !IS_ALIGNED_WITH_UINT32(msg)))
+		return TEE_ERROR_BAD_PARAMETERS;
+	if (msg_len >= sizeof(msg_tail))
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	mac = params[1].memref.buffer;
+	mac_len = (uint32_t)params[1].memref.size;
+	if (!mac || !IS_ALIGNED_WITH_UINT32(mac))
+		return TEE_ERROR_BAD_PARAMETERS;
+	if (mac_len < RSIP_HMAC_MAC_SIZE_MIN)
+		return TEE_ERROR_BAD_PARAMETERS;
+	if (mac_len > ctx->desc.mac_size)
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	if (msg_len) {
+		memcpy(msg_tail, msg, msg_len);
+
+		err = R_RSIP_HMAC_VerifyUpdate(&rsip_instance_ctrl,
+					       &ctx->handle,
+					       (uint8_t *)msg_tail, msg_len);
+		if (err != FSP_SUCCESS)
+			res = rsip_err_to_tee(err);
+	}
+
+	memcpy(mac_buff, mac, mac_len);
+	err = R_RSIP_HMAC_VerifyFinal(&rsip_instance_ctrl, &ctx->handle,
+				      (uint8_t *)mac_buff, mac_len);
+	if (res == TEE_SUCCESS && err != FSP_SUCCESS)
+		res = rsip_verify_err_to_tee(err, RSIP_VERIFY_MAC);
+
+	return res;
+}
+
+/*
+ * PTA session entry point.
+ */
+static TEE_Result open_session(uint32_t nParamTypes __unused,
+			       TEE_Param pParams[TEE_NUM_PARAMS] __unused,
+			       void **ppSessionContext)
+{
+	struct hmac_ctx *ctx = NULL;
+
+	DMSG("open entry point for pseudo ta \"%s\"", PTA_NAME);
+
+	ctx = calloc(1, sizeof(*ctx));
+	if (!ctx)
+		return TEE_ERROR_OUT_OF_MEMORY;
+	*ppSessionContext = ctx;
+
+	return TEE_SUCCESS;
+}
+
+/*
+ * PTA session exit point.
+ */
+static void close_session(void *session)
+{
+	DMSG("close entry point for pseudo ta \"%s\"", PTA_NAME);
+
+	free(session);
+}
+
+static TEE_Result invoke_command(void *session, uint32_t cmd, uint32_t ptypes,
+				 TEE_Param params[TEE_NUM_PARAMS])
+{
+	DMSG(PTA_NAME " command %#" PRIx32 " ptypes %#" PRIx32, cmd, ptypes);
+
+	if (!session)
+		return TEE_ERROR_BAD_PARAMETERS;
 
 	switch (cmd) {
-	case PTA_CMD_HMAC_SHA1_GenerateInit:
-		return hmac_generateinit(ptypes, params,
-					 RSIP_BYTE_SIZE_WRAPPED_KEY_HMAC_SHA1);
-	case PTA_CMD_HMAC_SHA224_GenerateInit:
-		return hmac_generateinit(
-			ptypes, params, RSIP_BYTE_SIZE_WRAPPED_KEY_HMAC_SHA224);
-	case PTA_CMD_HMAC_SHA256_GenerateInit:
-		return hmac_generateinit(
-			ptypes, params, RSIP_BYTE_SIZE_WRAPPED_KEY_HMAC_SHA256);
-
-	case PTA_CMD_HMAC_SHA1_GenerateUpdate:
-	case PTA_CMD_HMAC_SHA224_GenerateUpdate:
-	case PTA_CMD_HMAC_SHA256_GenerateUpdate:
-		return hmac_generateupdate(ptypes, params);
-
-	case PTA_CMD_HMAC_SHA1_GenerateFinal:
-		return hmac_generatefinal(ptypes, params, SHA1_MAC_SIZE);
-	case PTA_CMD_HMAC_SHA224_GenerateFinal:
-		return hmac_generatefinal(ptypes, params, SHA224_MAC_SIZE);
-	case PTA_CMD_HMAC_SHA256_GenerateFinal:
-		return hmac_generatefinal(ptypes, params, SHA256_MAC_SIZE);
-
-	case PTA_CMD_HMAC_SHA1_VerifyInit:
-		return hmac_verifyinit(ptypes, params,
-				       RSIP_BYTE_SIZE_WRAPPED_KEY_HMAC_SHA1);
-	case PTA_CMD_HMAC_SHA224_VerifyInit:
-		return hmac_verifyinit(ptypes, params,
-				       RSIP_BYTE_SIZE_WRAPPED_KEY_HMAC_SHA224);
-	case PTA_CMD_HMAC_SHA256_VerifyInit:
-		return hmac_verifyinit(ptypes, params,
-				       RSIP_BYTE_SIZE_WRAPPED_KEY_HMAC_SHA256);
-
-	case PTA_CMD_HMAC_SHA1_VerifyUpdate:
-	case PTA_CMD_HMAC_SHA224_VerifyUpdate:
-	case PTA_CMD_HMAC_SHA256_VerifyUpdate:
-		return hmac_verifyupdate(ptypes, params);
-
-	case PTA_CMD_HMAC_SHA1_VerifyFinal:
-	case PTA_CMD_HMAC_SHA224_VerifyFinal:
-	case PTA_CMD_HMAC_SHA256_VerifyFinal:
-		return hmac_verifyfinal(ptypes, params);
+	case PTA_CMD_HMAC_GenerateInit:
+		return hmac_gen_init(session, ptypes, params);
+	case PTA_CMD_HMAC_GenerateUpdate:
+		return hmac_gen_update(session, ptypes, params);
+	case PTA_CMD_HMAC_GenerateFinal:
+		return hmac_gen_final(session, ptypes, params);
+	case PTA_CMD_HMAC_VerifyInit:
+		return hmac_verify_init(session, ptypes, params);
+	case PTA_CMD_HMAC_VerifyUpdate:
+		return hmac_verify_update(session, ptypes, params);
+	case PTA_CMD_HMAC_VerifyFinal:
+		return hmac_verify_final(session, ptypes, params);
 	default:
 		return TEE_ERROR_NOT_SUPPORTED;
 	}
@@ -380,4 +365,6 @@ static TEE_Result invoke_command(void *session __unused, uint32_t cmd,
 
 pseudo_ta_register(.uuid = PTA_RSIP_HMAC_UUID, .name = PTA_NAME,
 		   .flags = PTA_DEFAULT_FLAGS,
+		   .open_session_entry_point = open_session,
+		   .close_session_entry_point = close_session,
 		   .invoke_command_entry_point = invoke_command);

@@ -1,450 +1,297 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Copyright (c) 2024, Renesas Electronics Corporation
+ * Copyright (c) 2024-2026, Renesas Electronics Corporation
  */
 
 #ifndef __PTA_RSIP_H
 #define __PTA_RSIP_H
 
-#include <r_rsip_api.h>
-
 #define PTA_RSIP_UUID                                                   \
 	{                                                               \
-		0xc0bcc4d4, 0x5b01, 0x46e7,                             \
+		0x4c00fad8, 0x7b34, 0x422f,                             \
 		{                                                       \
-			0xa1, 0x11, 0xc2, 0x9b, 0x28, 0xd8, 0x3d, 0xa0, \
+			0xb7, 0x3c, 0x04, 0xa7, 0x9b, 0x58, 0x1b, 0x7e, \
 		}                                                       \
 	}
 
-#define WRAPPED_KEY_BYTE_SIZE_RSA_1024_PUBLIC_N 128U ///< RSA-1024 public key
-#define WRAPPED_KEY_BYTE_SIZE_RSA_1024_PUBLIC_E 4U ///< RSA-1024 public key
-#define WRAPPED_KEY_BYTE_SIZE_RSA_2048_PUBLIC_N 256U ///< RSA-2048 public key
-#define WRAPPED_KEY_BYTE_SIZE_RSA_2048_PUBLIC_E 4U ///< RSA-2048 public key
-#define WRAPPED_KEY_BYTE_SIZE_RSA_3072_PUBLIC_N 384U ///< RSA-3072 public key
-#define WRAPPED_KEY_BYTE_SIZE_RSA_3072_PUBLIC_E 4U ///< RSA-3072 public key
-#define WRAPPED_KEY_BYTE_SIZE_RSA_4096_PUBLIC_N 512U ///< RSA-4096 public key
-#define WRAPPED_KEY_BYTE_SIZE_RSA_4096_PUBLIC_E 4U ///< RSA-4096 public key
-
-#define WRAPPED_KEY_BYTE_SIZE_ECC_secp192r1_PUBLIC_QX \
-	24U ///< secp192r1 public key
-#define WRAPPED_KEY_BYTE_SIZE_ECC_secp192r1_PUBLIC_QY \
-	24U ///< secp192r1 public key
-#define WRAPPED_KEY_BYTE_SIZE_ECC_secp224r1_PUBLIC_QX \
-	28U ///< secp224r1 public key
-#define WRAPPED_KEY_BYTE_SIZE_ECC_secp224r1_PUBLIC_QY \
-	28U ///< secp224r1 public key
-#define WRAPPED_KEY_BYTE_SIZE_ECC_secp256r1_PUBLIC_QX \
-	32U ///< secp256r1 public key
-#define WRAPPED_KEY_BYTE_SIZE_ECC_secp256r1_PUBLIC_QY \
-	32U ///< secp256r1 public key
-#define WRAPPED_KEY_BYTE_SIZE_ECC_BRAINPOOLP256R1_PUBLIC_QX \
-	32U ///< brainpoolP256r1 public key
-#define WRAPPED_KEY_BYTE_SIZE_ECC_BRAINPOOLP256R1_PUBLIC_QY \
-	32U ///< brainpoolP256r1 public key
+/*
+ * Generate an AES-128 wrapped key.
+ * memref[0] (out): Wrapped key buffer (52 bytes).
+ */
+#define PTA_CMD_AES128_WrappedKeyGenerate (0x11020100)
 
 /*
- * [in/out]    memref[0] : Wrapped key (rsip_wrapped_key_t:52byte)
+ * Generate an AES-256 wrapped key.
+ * memref[0] (out): Wrapped key buffer (68 bytes).
  */
-#define PTA_CMD_AES128_WrappedKeyGenerate (0x00010000)
+#define PTA_CMD_AES256_WrappedKeyGenerate (0x11020400)
 
 /*
- * [in/out]    memref[0] : Wrapped key (rsip_wrapped_key_t:68byte)
+ * Generate an AES-128-XTS wrapped key.
+ * memref[0] (out): Wrapped key buffer (68 bytes).
  */
-#define PTA_CMD_AES256_WrappedKeyGenerate (0x00010100)
+#define PTA_CMD_AES128_XTS_WrappedKeyGenerate (0x11420100)
 
 /*
- * [in/out]    memref[0] : Wrapped key (rsip_wrapped_key_t:68byte)
+ * Generate an AES-256-XTS wrapped key.
+ * memref[0] (out): Wrapped key buffer (100 bytes).
  */
-#define PTA_CMD_AES128_XTS_WrappedKeyGenerate (0x00010200)
+#define PTA_CMD_AES256_XTS_WrappedKeyGenerate (0x11420400)
 
 /*
- * [in/out]    memref[0] : Wrapped key (rsip_wrapped_key_t:100byte)
+ * Generate an RSA-1024 wrapped key pair.
+ * memref[0] (out): Wrapped private key buffer (292 bytes).
+ * memref[1] (out): Wrapped public key buffer (180 bytes).
  */
-#define PTA_CMD_AES256_XTS_WrappedKeyGenerate (0x00010300)
+#define PTA_CMD_RSA_1024_WrappedKeyPairGenerate (0x12040800)
 
 /*
- * [in/out]    memref[0] : Wrapped Public  key (rsip_wrapped_key_t:180byte)
- * [in/out]    memref[1] : Wrapped Private key (rsip_wrapped_key_t:292byte)
+ * Generate an RSA-2048 wrapped key pair.
+ * memref[0] (out): Wrapped private key buffer (548 bytes).
+ * memref[1] (out): Wrapped public key buffer (308 bytes).
  */
-#define PTA_CMD_RSA1024_WrappedKeyPairGenerate (0x00011000)
+#define PTA_CMD_RSA_2048_WrappedKeyPairGenerate (0x12040900)
 
 /*
- * [in/out]    memref[0] : Wrapped Public  key (rsip_wrapped_key_t:308byte)
- * [in/out]    memref[1] : Wrapped Private key (rsip_wrapped_key_t:548byte)
+ * Generate an RSA-3072 wrapped key pair.
+ * memref[0] (out): Wrapped private key buffer (804 bytes).
+ * memref[1] (out): Wrapped public key buffer (436 bytes).
  */
-#define PTA_CMD_RSA2048_WrappedKeyPairGenerate (0x00011100)
+#define PTA_CMD_RSA_3072_WrappedKeyPairGenerate (0x12040A00)
 
 /*
- * [in/out]    memref[0] : Wrapped Public  key (rsip_wrapped_key_t:436byte)
- * [in/out]    memref[1] : Wrapped Private key (rsip_wrapped_key_t:804byte)
+ * Generate an RSA-4096 wrapped key pair.
+ * memref[0] (out): Wrapped private key buffer (1060 bytes).
+ * memref[1] (out): Wrapped public key buffer (564 bytes).
  */
-#define PTA_CMD_RSA3072_WrappedKeyPairGenerate (0x00011200)
+#define PTA_CMD_RSA_4096_WrappedKeyPairGenerate (0x12040B00)
 
 /*
- * [in/out]    memref[0] : Wrapped Public  key (rsip_wrapped_key_t:564byte)
- * [in/out]    memref[1] : Wrapped Private key (rsip_wrapped_key_t:1060byte)
+ * Generate a secp192r1 wrapped key pair.
+ * memref[0] (out): Wrapped private key buffer (68 bytes).
+ * memref[1] (out): Wrapped public key buffer (100 bytes).
  */
-#define PTA_CMD_RSA4096_WrappedKeyPairGenerate (0x00011300)
+#define PTA_CMD_ECC_secp192r1_WrappedKeyPairGenerate (0x12150200)
 
 /*
- * [in/out]    memref[0] : Wrapped Public  key (rsip_wrapped_key_t:100byte)
- * [in/out]    memref[1] : Wrapped Private key (rsip_wrapped_key_t:68byte)
+ * Generate a secp224r1 wrapped key pair.
+ * memref[0] (out): Wrapped private key buffer (68 bytes).
+ * memref[1] (out): Wrapped public key buffer (100 bytes).
  */
-#define PTA_CMD_ECC_secp192r1_WrappedKeyPairGenerate (0x00012000)
+#define PTA_CMD_ECC_secp224r1_WrappedKeyPairGenerate (0x12150300)
 
 /*
- * [in/out]    memref[0] : Wrapped Public  key (rsip_wrapped_key_t:100byte)
- * [in/out]    memref[1] : Wrapped Private key (rsip_wrapped_key_t:68byte)
+ * Generate a secp256r1 wrapped key pair.
+ * memref[0] (out): Wrapped private key buffer (68 bytes).
+ * memref[1] (out): Wrapped public key buffer (100 bytes).
  */
-#define PTA_CMD_ECC_secp224r1_WrappedKeyPairGenerate (0x00012100)
+#define PTA_CMD_ECC_secp256r1_WrappedKeyPairGenerate (0x12150400)
 
 /*
- * [in/out]    memref[0] : Wrapped Public  key (rsip_wrapped_key_t:100byte)
- * [in/out]    memref[1] : Wrapped Private key (rsip_wrapped_key_t:68byte)
+ * Generate a BrainpoolP256r1 wrapped key pair.
+ * memref[0] (out): Wrapped private key buffer (68 bytes).
+ * memref[1] (out): Wrapped public key buffer (100 bytes).
  */
-#define PTA_CMD_ECC_secp256r1_WrappedKeyPairGenerate (0x00012200)
+#define PTA_CMD_ECC_BrainpoolP256r1_WrappedKeyPairGenerate (0x12250400)
 
 /*
- * [in/out]    memref[0] : Wrapped Public  key (rsip_wrapped_key_t:100byte)
- * [in/out]    memref[1] : Wrapped Private key (rsip_wrapped_key_t:68byte)
+ * Wrap an encrypted AES-128 key.
+ * memref[0] (in): Encrypted AES-128 key blob (60 bytes).
+ * memref[1] (out): Wrapped key buffer (52 bytes).
  */
-#define PTA_CMD_ECC_BrainpoolP256r1_WrappedKeyPairGenerate (0x0001D000)
+#define PTA_CMD_AES128_EncryptedKeyWrap (0x13020100)
 
 /*
- * [in/out]    memref[0] : random data (16byte)
+ * Wrap an encrypted AES-256 key.
+ * memref[0] (in): Encrypted AES-256 key blob (76 bytes).
+ * memref[1] (out): Wrapped key buffer (68 bytes).
  */
-#define PTA_CMD_RandomNumberGenerate (0x00014000)
+#define PTA_CMD_AES256_EncryptedKeyWrap (0x13020400)
 
 /*
- * [in]        memref[0] : Encrypted Key (st_encrypted_aes128_key_t)
- * [in/out]    memref[1] : Wrapped key (rsip_wrapped_key_t:52byte)
+ * Wrap an encrypted AES-128-XTS key.
+ * memref[0] (in): Encrypted AES-128-XTS key blob (76 bytes).
+ * memref[1] (out): Wrapped key buffer (68 bytes).
  */
-typedef struct {
-	uint32_t unused[2];
-	uint8_t initial_vector[16];
-	uint8_t encrypted_user_key[32];
-	uint8_t crc[4];
-} st_encrypted_aes128_key_t;
-#define PTA_CMD_AES128_EncryptedKeyWrap (0x00015000)
+#define PTA_CMD_AES128_XTS_EncryptedKeyWrap (0x13420100)
 
 /*
- * [in]        memref[0] : Encrypted Key (st_encrypted_aes256_key_t)
- * [in/out]    memref[1] : Wrapped key (rsip_wrapped_key_t:68byte)
+ * Wrap an encrypted AES-256-XTS key.
+ * memref[0] (in): Encrypted AES-256-XTS key blob (108 bytes).
+ * memref[1] (out): Wrapped key buffer (100 bytes).
  */
-typedef struct {
-	uint32_t unused[2];
-	uint8_t initial_vector[16];
-	uint8_t encrypted_user_key[48];
-	uint8_t crc[4];
-} st_encrypted_aes256_key_t;
-#define PTA_CMD_AES256_EncryptedKeyWrap (0x00015100)
+#define PTA_CMD_AES256_XTS_EncryptedKeyWrap (0x13420400)
 
 /*
- * [in]        memref[0] : Encrypted Key (st_encrypted_aes128xts_key_t)
- * [in/out]    memref[1] : Wrapped key (rsip_wrapped_key_t:68byte)
+ * Wrap an encrypted HMAC-SHA1 key.
+ * memref[0] (in): Encrypted HMAC-SHA1 key blob (76 bytes).
+ * memref[1] (out): Wrapped key buffer (68 bytes).
  */
-typedef struct {
-	uint32_t unused[2];
-	uint8_t initial_vector[16];
-	uint8_t encrypted_user_key[48];
-	uint8_t crc[4];
-} st_encrypted_aes128xts_key_t;
-#define PTA_CMD_AES128_XTS_EncryptedKeyWrap (0x00015200)
+#define PTA_CMD_HMAC_SHA1_EncryptedKeyWrap (0x13160100)
 
 /*
- * [in]        memref[0] : Encrypted Key (st_encrypted_aes256xts_key_t)
- * [in/out]    memref[1] : Wrapped key (rsip_wrapped_key_t:100byte)
+ * Wrap an encrypted HMAC-SHA224 key.
+ * memref[0] (in): Encrypted HMAC-SHA224 key blob (76 bytes).
+ * memref[1] (out): Wrapped key buffer (68 bytes).
  */
-typedef struct {
-	uint32_t unused[2];
-	uint8_t initial_vector[16];
-	uint8_t encrypted_user_key[80];
-	uint8_t crc[4];
-} st_encrypted_aes256xts_key_t;
-#define PTA_CMD_AES256_XTS_EncryptedKeyWrap (0x00015300)
+#define PTA_CMD_HMAC_SHA224_EncryptedKeyWrap (0x13260200)
 
 /*
- * [in]        memref[0] : Encrypted Key (st_encrypted_rsa_1024_public_key_t)
- * [in/out]    memref[1] : Wrapped key (rsip_wrapped_key_t:180byte)
+ * Wrap an encrypted HMAC-SHA256 key.
+ * memref[0] (in): Encrypted HMAC-SHA256 key blob (76 bytes).
+ * memref[1] (out): Wrapped key buffer (68 bytes).
  */
-typedef struct {
-	uint32_t unused[2];
-	uint8_t initial_vector[16];
-	uint8_t encrypted_user_key[160];
-	uint8_t crc[4];
-} st_encrypted_rsa_1024_public_key_t;
-#define PTA_CMD_RSA1024_EncryptedPublicKeyWrap (0x00016000)
+#define PTA_CMD_HMAC_SHA256_EncryptedKeyWrap (0x13360300)
 
 /*
- * [in]        memref[0] : Encrypted Key (st_encrypted_rsa_1024_private_key_t)
- * [in/out]    memref[1] : Wrapped key (rsip_wrapped_key_t:292byte)
+ * Wrap an encrypted RSA-1024 public key.
+ * memref[0] (in): Encrypted RSA-1024 public key blob (188 bytes).
+ * memref[1] (out): Wrapped public key buffer (180 bytes).
  */
-typedef struct {
-	uint32_t unused[2];
-	uint8_t initial_vector[16];
-	uint8_t encrypted_user_key[272];
-	uint8_t crc[4];
-} st_encrypted_rsa_1024_private_key_t;
-#define PTA_CMD_RSA1024_EncryptedPrivateKeyWrap (0x00016010)
+#define PTA_CMD_RSA_1024_EncryptedPublicKeyWrap (0x13041800)
 
 /*
- * [in]        memref[0] : Encrypted Key (st_encrypted_rsa_2048_public_key_t)
- * [in/out]    memref[1] : Wrapped key (rsip_wrapped_key_t:308byte)
+ * Wrap an encrypted RSA-1024 private key.
+ * memref[0] (in): Encrypted RSA-1024 private key blob (300 bytes).
+ * memref[1] (out): Wrapped private key buffer (292 bytes).
  */
-typedef struct {
-	uint32_t unused[2];
-	uint8_t initial_vector[16];
-	uint8_t encrypted_user_key[288];
-	uint8_t crc[4];
-} st_encrypted_rsa_2048_public_key_t;
-#define PTA_CMD_RSA2048_EncryptedPublicKeyWrap (0x00016100)
+#define PTA_CMD_RSA_1024_EncryptedPrivateKeyWrap (0x13042800)
 
 /*
- * [in]        memref[0] : Encrypted Key (st_encrypted_rsa_2048_private_key_t)
- * [in/out]    memref[1] : Wrapped key (rsip_wrapped_key_t:548byte)
+ * Wrap an encrypted RSA-2048 public key.
+ * memref[0] (in): Encrypted RSA-2048 public key blob (316 bytes).
+ * memref[1] (out): Wrapped public key buffer (308 bytes).
  */
-typedef struct {
-	uint32_t unused[2];
-	uint8_t initial_vector[16];
-	uint8_t encrypted_user_key[528];
-	uint8_t crc[4];
-} st_encrypted_rsa_2048_private_key_t;
-#define PTA_CMD_RSA2048_EncryptedPrivateKeyWrap (0x00016110)
+#define PTA_CMD_RSA_2048_EncryptedPublicKeyWrap (0x13041900)
 
 /*
- * [in]        memref[0] : Encrypted Key (st_encrypted_rsa_3072_public_key_t)
- * [in/out]    memref[1] : Wrapped key (rsip_wrapped_key_t:436byte)
+ * Wrap an encrypted RSA-2048 private key.
+ * memref[0] (in): Encrypted RSA-2048 private key blob (556 bytes).
+ * memref[1] (out): Wrapped private key buffer (548 bytes).
  */
-typedef struct {
-	uint32_t unused[2];
-	uint8_t initial_vector[16];
-	uint8_t encrypted_user_key[416];
-	uint8_t crc[4];
-} st_encrypted_rsa_3072_public_key_t;
-#define PTA_CMD_RSA3072_EncryptedPublicKeyWrap (0x00016300)
+#define PTA_CMD_RSA_2048_EncryptedPrivateKeyWrap (0x13042900)
 
 /*
- * [in]        memref[0] : Encrypted Key (st_encrypted_rsa_3072_private_key_t)
- * [in/out]    memref[1] : Wrapped key (rsip_wrapped_key_t:804byte)
+ * Wrap an encrypted RSA-3072 public key.
+ * memref[0] (in): Encrypted RSA-3072 public key blob (444 bytes).
+ * memref[1] (out): Wrapped public key buffer (436 bytes).
  */
-typedef struct {
-	uint32_t unused[2];
-	uint8_t initial_vector[16];
-	uint8_t encrypted_user_key[784];
-	uint8_t crc[4];
-} st_encrypted_rsa_3072_private_key_t;
-#define PTA_CMD_RSA3072_EncryptedPrivateKeyWrap (0x00016310)
+#define PTA_CMD_RSA_3072_EncryptedPublicKeyWrap (0x13041A00)
 
 /*
- * [in]        memref[0] : Encrypted Key (st_encrypted_rsa_4096_public_key_t)
- * [in/out]    memref[1] : Wrapped key (rsip_wrapped_key_t:564byte)
+ * Wrap an encrypted RSA-3072 private key.
+ * memref[0] (in): Encrypted RSA-3072 private key blob (812 bytes).
+ * memref[1] (out): Wrapped private key buffer (804 bytes).
  */
-typedef struct {
-	uint32_t unused[2];
-	uint8_t initial_vector[16];
-	uint8_t encrypted_user_key[544];
-	uint8_t crc[4];
-} st_encrypted_rsa_4096_public_key_t;
-#define PTA_CMD_RSA4096_EncryptedPublicKeyWrap (0x00016200)
+#define PTA_CMD_RSA_3072_EncryptedPrivateKeyWrap (0x13042A00)
 
 /*
- * [in]        memref[0] : Encrypted Key (st_encrypted_rsa_4096_private_key_t)
- * [in/out]    memref[1] : Wrapped key (rsip_wrapped_key_t:1060byte)
+ * Wrap an encrypted RSA-4096 public key.
+ * memref[0] (in): Encrypted RSA-4096 public key blob (572 bytes).
+ * memref[1] (out): Wrapped public key buffer (564 bytes).
  */
-typedef struct {
-	uint32_t unused[2];
-	uint8_t initial_vector[16];
-	uint8_t encrypted_user_key[1040];
-	uint8_t crc[4];
-} st_encrypted_rsa_4096_private_key_t;
-#define PTA_CMD_RSA4096_EncryptedPrivateKeyWrap (0x00016210)
+#define PTA_CMD_RSA_4096_EncryptedPublicKeyWrap (0x13041B00)
 
 /*
- * [in]        memref[0] : Encrypted Key (st_encrypted_ecc_secp192r1_public_key_t)
- * [in/out]    memref[1] : Wrapped key (rsip_wrapped_key_t:100byte)
+ * Wrap an encrypted RSA-4096 private key.
+ * memref[0] (in): Encrypted RSA-4096 private key blob (1068 bytes).
+ * memref[1] (out): Wrapped private key buffer (1060 bytes).
  */
-typedef struct {
-	uint32_t unused[2];
-	uint8_t initial_vector[16];
-	uint8_t encrypted_user_key[80];
-	uint8_t crc[4];
-} st_encrypted_ecc_secp192r1_public_key_t;
-#define PTA_CMD_ECC_secp192r1_EncryptedPublicKeyWrap (0x00017000)
+#define PTA_CMD_RSA_4096_EncryptedPrivateKeyWrap (0x13042B00)
 
 /*
- * [in]        memref[0] : Encrypted Key (st_encrypted_ecc_secp192r1_private_key_t)
- * [in/out]    memref[1] : Wrapped key (rsip_wrapped_key_t:68byte)
+ * Wrap an encrypted secp192r1 public key.
+ * memref[0] (in): Encrypted secp192r1 public key blob (108 bytes).
+ * memref[1] (out): Wrapped public key buffer (100 bytes).
  */
-typedef struct {
-	uint32_t unused[2];
-	uint8_t initial_vector[16];
-	uint8_t encrypted_user_key[48];
-	uint8_t crc[4];
-} st_encrypted_ecc_secp192r1_private_key_t;
-#define PTA_CMD_ECC_secp192r1_EncryptedPrivateKeyWrap (0x00017010)
+#define PTA_CMD_ECC_secp192r1_EncryptedPublicKeyWrap (0x13151200)
 
 /*
- * [in]        memref[0] : Encrypted Key (st_encrypted_ecc_secp224r1_public_key_t)
- * [in/out]    memref[1] : Wrapped key (rsip_wrapped_key_t:100byte)
+ * Wrap an encrypted secp192r1 private key.
+ * memref[0] (in): Encrypted secp192r1 private key blob (76 bytes).
+ * memref[1] (out): Wrapped private key buffer (68 bytes).
  */
-typedef struct {
-	uint32_t unused[2];
-	uint8_t initial_vector[16];
-	uint8_t encrypted_user_key[80];
-	uint8_t crc[4];
-} st_encrypted_ecc_secp224r1_public_key_t;
-#define PTA_CMD_ECC_secp224r1_EncryptedPublicKeyWrap (0x00017100)
+#define PTA_CMD_ECC_secp192r1_EncryptedPrivateKeyWrap (0x13152200)
 
 /*
- * [in]        memref[0] : Encrypted Key (st_encrypted_ecc_secp224r1_private_key_t)
- * [in/out]    memref[1] : Wrapped key (rsip_wrapped_key_t:68byte)
+ * Wrap an encrypted secp224r1 public key.
+ * memref[0] (in): Encrypted secp224r1 public key blob (108 bytes).
+ * memref[1] (out): Wrapped public key buffer (100 bytes).
  */
-typedef struct {
-	uint32_t unused[2];
-	uint8_t initial_vector[16];
-	uint8_t encrypted_user_key[48];
-	uint8_t crc[4];
-} st_encrypted_ecc_secp224r1_private_key_t;
-#define PTA_CMD_ECC_secp224r1_EncryptedPrivateKeyWrap (0x00017110)
+#define PTA_CMD_ECC_secp224r1_EncryptedPublicKeyWrap (0x13151300)
 
 /*
- * [in]        memref[0] : Encrypted Key (st_encrypted_ecc_secp256r1_public_key_t)
- * [in/out]    memref[1] : Wrapped key (rsip_wrapped_key_t:100byte)
+ * Wrap an encrypted secp224r1 private key.
+ * memref[0] (in): Encrypted secp224r1 private key blob (76 bytes).
+ * memref[1] (out): Wrapped private key buffer (68 bytes).
  */
-typedef struct {
-	uint32_t unused[2];
-	uint8_t initial_vector[16];
-	uint8_t encrypted_user_key[80];
-	uint8_t crc[4];
-} st_encrypted_ecc_secp256r1_public_key_t;
-#define PTA_CMD_ECC_secp256r1_EncryptedPublicKeyWrap (0x00017200)
+#define PTA_CMD_ECC_secp224r1_EncryptedPrivateKeyWrap (0x13152300)
 
 /*
- * [in]        memref[0] : Encrypted Key (st_encrypted_ecc_secp256r1_private_key_t)
- * [in/out]    memref[1] : Wrapped key (rsip_wrapped_key_t:68byte)
+ * Wrap an encrypted secp256r1 public key.
+ * memref[0] (in): Encrypted secp256r1 public key blob (108 bytes).
+ * memref[1] (out): Wrapped public key buffer (100 bytes).
  */
-typedef struct {
-	uint32_t unused[2];
-	uint8_t initial_vector[16];
-	uint8_t encrypted_user_key[48];
-	uint8_t crc[4];
-} st_encrypted_ecc_secp256r1_private_key_t;
-#define PTA_CMD_ECC_secp256r1_EncryptedPrivateKeyWrap (0x00017210)
+#define PTA_CMD_ECC_secp256r1_EncryptedPublicKeyWrap (0x13151400)
 
 /*
- * [in]        memref[0] : Encrypted Key (st_encrypted_ecc_brainpoolp256r1_public_key_t)
- * [in/out]    memref[1] : Wrapped key (rsip_wrapped_key_t:100byte)
+ * Wrap an encrypted secp256r1 private key.
+ * memref[0] (in): Encrypted secp256r1 private key blob (76 bytes).
+ * memref[1] (out): Wrapped private key buffer (68 bytes).
  */
-typedef struct {
-	uint32_t unused[2];
-	uint8_t initial_vector[16];
-	uint8_t encrypted_user_key[80];
-	uint8_t crc[4];
-} st_encrypted_ecc_brainpoolp256r1_public_key_t;
-#define PTA_CMD_ECC_BrainpoolP256r1_EncryptedPublicKeyWrap (0x00019000)
+#define PTA_CMD_ECC_secp256r1_EncryptedPrivateKeyWrap (0x13152400)
 
 /*
- * [in]        memref[0] : Encrypted Key (st_encrypted_ecc_brainpoolp256r1_private_key_t)
- * [in/out]    memref[1] : Wrapped key (rsip_wrapped_key_t:68byte)
+ * Wrap an encrypted BrainpoolP256r1 public key.
+ * memref[0] (in): Encrypted BrainpoolP256r1 public key blob (108 bytes).
+ * memref[1] (out): Wrapped public key buffer (100 bytes).
  */
-typedef struct {
-	uint32_t unused[2];
-	uint8_t initial_vector[16];
-	uint8_t encrypted_user_key[48];
-	uint8_t crc[4];
-} st_encrypted_ecc_brainpoolp256r1_private_key_t;
-#define PTA_CMD_ECC_BrainpoolP256r1_EncryptedPrivateKeyWrap (0x00019010)
+#define PTA_CMD_ECC_BrainpoolP256r1_EncryptedPublicKeyWrap (0x13251400)
 
 /*
- * [in]        memref[0] : Encrypted Key (st_encrypted_hmac_sha1_key_t)
- * [in/out]    memref[1] : Wrapped key (rsip_wrapped_key_t:68byte)
+ * Wrap an encrypted BrainpoolP256r1 private key.
+ * memref[0] (in): Encrypted BrainpoolP256r1 private key blob (76 bytes).
+ * memref[1] (out): Wrapped private key buffer (68 bytes).
  */
-typedef struct {
-	uint32_t unused[2];
-	uint8_t initial_vector[16];
-	uint8_t encrypted_user_key[48];
-	uint8_t crc[4];
-} st_encrypted_hmac_sha1_key_t;
-#define PTA_CMD_HMAC_SHA1_EncryptedKeyWrap (0x0001A000)
+#define PTA_CMD_ECC_BrainpoolP256r1_EncryptedPrivateKeyWrap (0x13252400)
 
 /*
- * [in]        memref[0] : Encrypted Key (48byte)
- * [in/out]    memref[1] : Wrapped key (rsip_wrapped_key_t:68byte)
+ * Export RSA public key parameters.
+ *
+ * The RSA key size is determined from the input wrapped key type.
+ *
+ * memref[0] (in): Wrapped RSA public key buffer.
+ * memref[1] (out): RSA modulus buffer.
+ *                  Required size depends on the wrapped key type:
+ *                  - RSA-1024 : 128 bytes
+ *                  - RSA-2048 : 256 bytes
+ *                  - RSA-3072 : 384 bytes
+ *                  - RSA-4096 : 512 bytes
+ * memref[2] (out): RSA public exponent buffer (4 bytes).
  */
-typedef struct {
-	uint32_t unused[2];
-	uint8_t initial_vector[16];
-	uint8_t encrypted_user_key[48];
-	uint8_t crc[4];
-} st_encrypted_hmac_sha224_key_t;
-#define PTA_CMD_HMAC_SHA224_EncryptedKeyWrap (0x0001A100)
+#define PTA_CMD_RSA_Public_Key_Export (0x14040000)
 
 /*
- * [in]        memref[0] : Encrypted Key (st_encrypted_hmac_sha256_key_t)
- * [in/out]    memref[1] : Wrapped key (rsip_wrapped_key_t:68byte)
+ * Export ECC public key parameters.
+ *
+ * The ECC curve is determined from the input wrapped key type.
+ *
+ * memref[0] (in): Wrapped ECC public key buffer.
+ * memref[1] (out): Public key Qx buffer.
+ * memref[2] (out): Public key Qy buffer.
+ *
+ * Required output sizes depend on the wrapped key type:
+ * - secp192r1        : 24 bytes
+ * - secp224r1        : 28 bytes
+ * - secp256r1        : 32 bytes
+ * - brainpoolP256r1  : 32 bytes
  */
-typedef struct {
-	uint32_t unused[2];
-	uint8_t initial_vector[16];
-	uint8_t encrypted_user_key[48];
-	uint8_t crc[4];
-} st_encrypted_hmac_sha256_key_t;
-#define PTA_CMD_HMAC_SHA256_EncryptedKeyWrap (0x0001A200)
+#define PTA_CMD_ECC_Public_Key_Export (0x14050000)
 
 /*
- * [in]         memref[0] : Wrapped key (rsip_wrapped_key_t:180byte)
- * [in/out]     memref[1] : Raw_N (128byte)
- * [in/out]     memref[2] : Raw_E (4byte)
+ * Generate random data.
+ * memref[0] (out): Output buffer filled with random data.
  */
-#define PTA_CMD_RSA_1024_Public_Key_Export (0x0001B000)
-
-/*
- * [in]         memref[0] : Wrapped key (rsip_wrapped_key_t:308byte)
- * [in/out]     memref[1] : Raw_N (256byte)
- * [in/out]     memref[2] : Raw_E (4byte)
- */
-#define PTA_CMD_RSA_2048_Public_Key_Export (0x0001B100)
-
-/*
- * [in]         memref[0] : Wrapped key (rsip_wrapped_key_t:436byte)
- * [in/out]     memref[1] : Raw_N (384byte)
- * [in/out]     memref[2] : Raw_E (4byte)
- */
-#define PTA_CMD_RSA_3072_Public_Key_Export (0x0001B200)
-
-/*
- * [in]         memref[0] : Wrapped key (rsip_wrapped_key_t:564byte)
- * [in/out]     memref[1] : Raw_N (512byte)
- * [in/out]     memref[2] : Raw_E (4byte)
- */
-#define PTA_CMD_RSA_4096_Public_Key_Export (0x0001B300)
-
-/*
- * [in]         memref[0] : Wrapped key (rsip_wrapped_key_t:100byte)
- * [in/out]     memref[1] : Raw_Qx (32byte)
- * [in/out]     memref[2] : Raw_Qy (32byte)
- */
-#define PTA_CMD_ECC_secp192r1_Public_Key_Export (0x0001C000)
-
-/*
- * [in]         memref[0] : Wrapped key (rsip_wrapped_key_t:100byte)
- * [in/out]     memref[1] : Raw_Qx (32byte)
- * [in/out]     memref[2] : Raw_Qy (32byte)
- */
-#define PTA_CMD_ECC_secp224r1_Public_Key_Export (0x0001C100)
-
-/*
- * [in]         memref[0] : Wrapped key (rsip_wrapped_key_t:100byte)
- * [in/out]     memref[1] : Raw_Qx (32byte)
- * [in/out]     memref[2] : Raw_Qy (32byte)
- */
-#define PTA_CMD_ECC_secp256r1_Public_Key_Export (0x0001C200)
-
-/*
- * [in]         memref[0] : Wrapped key (rsip_wrapped_key_t:100byte)
- * [in/out]     memref[1] : Raw_Qx (32byte)
- * [in/out]     memref[2] : Raw_Qy (32byte)
- */
-#define PTA_CMD_ECC_BrainpoolP256r1_Public_Key_Export (0x0001C300)
+#define PTA_CMD_RandomNumberGenerate (0x16000000)
 
 #endif /* __PTA_RSIP_H */

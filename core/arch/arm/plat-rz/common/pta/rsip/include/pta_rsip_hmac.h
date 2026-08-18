@@ -1,116 +1,69 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Copyright (c) 2024, Renesas Electronics Corporation
+ * Copyright (c) 2024-2026, Renesas Electronics Corporation
  */
-
 #ifndef __PTA_RSIP_HMAC_H
 #define __PTA_RSIP_HMAC_H
 
-#include <r_rsip_api.h>
-
 #define PTA_RSIP_HMAC_UUID                                              \
 	{                                                               \
-		0xb528d9ee, 0x98d3, 0x4890,                             \
+		0xded785d5, 0xc912, 0x46cd,                             \
 		{                                                       \
-			0xb0, 0xf2, 0xa7, 0x91, 0xc3, 0xd7, 0x92, 0x08, \
+			0xb6, 0xd4, 0xcf, 0x74, 0x21, 0xfa, 0xe4, 0xbe, \
 		}                                                       \
 	}
-
-#define SHA1_MAC_SIZE (20U)
-#define SHA224_MAC_SIZE (28U)
-#define SHA256_MAC_SIZE (32U)
-
 /*
- * [in/out]     memref[0] : HMAC handler (rsip_hmac_handle_t)
- * [in]         memref[1] : Wrapped key (rsip_wrapped_key_t:68byte)
+ * The HMAC hash algorithm is determined from the input wrapped key type:
  */
-#define PTA_CMD_HMAC_SHA1_GenerateInit (0x00060000)
-/*
- * [in/out]     memref[0] : HMAC handler (rsip_hmac_handle_t)
- * [in]         memref[1] : Message
- */
-#define PTA_CMD_HMAC_SHA1_GenerateUpdate (0x00060001)
-/*
- * [in/out]     memref[0] : HMAC handler (rsip_hmac_handle_t)
- * [in/out]     memref[1] : MAC (20byte)
- */
-#define PTA_CMD_HMAC_SHA1_GenerateFinal (0x00060002)
-/*
- * [in/out]     memref[0] : HMAC handler (rsip_hmac_handle_t)
- * [in]         memref[1] : Wrapped key (rsip_wrapped_key_t:68byte)
- */
-#define PTA_CMD_HMAC_SHA1_VerifyInit (0x00060010)
-/*
- * [in/out]     memref[0] : HMAC handler (rsip_hmac_handle_t)
- * [in]         memref[1] : Message
- */
-#define PTA_CMD_HMAC_SHA1_VerifyUpdate (0x00060011)
-/*
- * [in/out]     memref[0] : HMAC handler (rsip_hmac_handle_t)
- * [in]         memref[1] : MAC (4 to 20byte)
- */
-#define PTA_CMD_HMAC_SHA1_VerifyFinal (0x00060012)
 
 /*
- * [in/out]     memref[0] : HMAC handler (rsip_hmac_handle_t)
- * [in]         memref[1] : Wrapped key (rsip_wrapped_key_t:68byte)
+ * Initialize HMAC generation.
+ * memref[0] (in): Wrapped HMAC key buffer.
  */
-#define PTA_CMD_HMAC_SHA224_GenerateInit (0x00060100)
-/*
- * [in/out]     memref[0] : HMAC handler (rsip_hmac_handle_t)
- * [in]         memref[1] : Message
- */
-#define PTA_CMD_HMAC_SHA224_GenerateUpdate (0x00060101)
-/*
- * [in/out]     memref[0] : HMAC handler (rsip_hmac_handle_t)
- * [in/out]     memref[1] : MAC (28byte)
- */
-#define PTA_CMD_HMAC_SHA224_GenerateFinal (0x00060102)
-/*
- * [in/out]     memref[0] : HMAC handler (rsip_hmac_handle_t)
- * [in]         memref[1] : Wrapped key (rsip_wrapped_key_t:68byte)
- */
-#define PTA_CMD_HMAC_SHA224_VerifyInit (0x00060110)
-/*
- * [in/out]     memref[0] : HMAC handler (rsip_hmac_handle_t)
- * [in]         memref[1] : Message
- */
-#define PTA_CMD_HMAC_SHA224_VerifyUpdate (0x00060111)
-/*
- * [in/out]     memref[0] : HMAC handler (rsip_hmac_handle_t)
- * [in]         memref[1] : MAC (4 to 28byte)
- */
-#define PTA_CMD_HMAC_SHA224_VerifyFinal (0x00060112)
+#define PTA_CMD_HMAC_GenerateInit (0x67060001)
 
 /*
- * [in/out]     memref[0] : HMAC handler (rsip_hmac_handle_t)
- * [in]         memref[1] : Wrapped key (rsip_wrapped_key_t:68byte)
+ * Update HMAC generation.
+ * memref[0] (in): Message buffer.
+ *                 Length must be a multiple of sizeof(uint32_t).
  */
-#define PTA_CMD_HMAC_SHA256_GenerateInit (0x00060200)
+#define PTA_CMD_HMAC_GenerateUpdate (0x67060002)
+
 /*
- * [in/out]     memref[0] : HMAC handler (rsip_hmac_handle_t)
- * [in]         memref[1] : Message
+ * Finalize HMAC generation.
+ * memref[0] (in): Final message buffer.
+ *                 Length must be less than sizeof(uint32_t).
+ * memref[1] (out): MAC buffer.
+ *                  Required size depends on the wrapped key type:
+ *                  - HMAC-SHA1   : 20 bytes
+ *                  - HMAC-SHA224 : 28 bytes
+ *                  - HMAC-SHA256 : 32 bytes
  */
-#define PTA_CMD_HMAC_SHA256_GenerateUpdate (0x00060201)
+#define PTA_CMD_HMAC_GenerateFinal (0x67060003)
+
 /*
- * [in/out]     memref[0] : HMAC handler (rsip_hmac_handle_t)
- * [in/out]     memref[1] : MAC (32byte)
+ * Initialize HMAC verification.
+ * memref[0] (in): Wrapped HMAC key buffer.
  */
-#define PTA_CMD_HMAC_SHA256_GenerateFinal (0x00060202)
+#define PTA_CMD_HMAC_VerifyInit (0x67060009)
+
 /*
- * [in/out]     memref[0] : HMAC handler (rsip_hmac_handle_t)
- * [in]         memref[1] : Wrapped key (rsip_wrapped_key_t:68byte)
+ * Update HMAC verification.
+ * memref[0] (in): Message buffer.
+ *                 Length must be a multiple of sizeof(uint32_t).
  */
-#define PTA_CMD_HMAC_SHA256_VerifyInit (0x00060210)
+#define PTA_CMD_HMAC_VerifyUpdate (0x6706000A)
+
 /*
- * [in/out]     memref[0] : HMAC handler (rsip_hmac_handle_t)
- * [in]         memref[1] : Message
+ * Finalize HMAC verification.
+ * memref[0] (in): Final message buffer.
+ *                 Length must be less than sizeof(uint32_t).
+ * memref[1] (in): MAC buffer.
+ *                 Required size depends on the wrapped key type:
+ *                 - HMAC-SHA1   : 4 to 20 bytes
+ *                 - HMAC-SHA224 : 4 to 28 bytes
+ *                 - HMAC-SHA256 : 4 to 32 bytes
  */
-#define PTA_CMD_HMAC_SHA256_VerifyUpdate (0x00060211)
-/*
- * [in/out]     memref[0] : HMAC handler (rsip_hmac_handle_t)
- * [in]         memref[1] : MAC (4 to 32byte)
- */
-#define PTA_CMD_HMAC_SHA256_VerifyFinal (0x00060212)
+#define PTA_CMD_HMAC_VerifyFinal (0x6706000B)
 
 #endif /* __PTA_RSIP_HMAC_H */

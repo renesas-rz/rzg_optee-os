@@ -4,1227 +4,1361 @@
  */
 
 #include <kernel/pseudo_ta.h>
-
 #include <r_rsip.h>
 #include <pta_rsip_aes.h>
 
+#include "pta_rsip_cmd.h"
+#include "pta_rsip_util.h"
+
 #define PTA_NAME "rsip_aes.pta"
 
-extern rsip_instance_ctrl_t rsip_instance_ctrl;
-
-static TEE_Result aes_cipher_encryptinit(uint32_t types,
-					 TEE_Param params[TEE_NUM_PARAMS],
-					 rsip_aes_mode_t mode,
-					 rsip_byte_size_wrapped_key_t key_size)
+static TEE_Result get_aes_wrapped_key(TEE_Param *p,
+				      const rsip_wrapped_key_t **wrapped_key)
 {
-	fsp_err_t err;
+	TEE_Result res = TEE_ERROR_GENERIC;
 
-	rsip_wrapped_key_t *wrapped_key;
-	uint8_t *initial_vector;
+	const struct rsip_key_desc *key_desc = NULL;
 
-	initial_vector = (uint8_t *)params[1].memref.buffer;
-	if (mode != RSIP_AES_MODE_ECB) {
-		if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
-					     TEE_PARAM_TYPE_MEMREF_INPUT,
-					     TEE_PARAM_TYPE_NONE,
-					     TEE_PARAM_TYPE_NONE))
-			return TEE_ERROR_BAD_PARAMETERS;
+	size_t wrapped_len = p->memref.size;
+	rsip_wrapped_key_t *key = p->memref.buffer;
 
-		if (!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) {
-			EMSG("initial_vector err");
-			return TEE_ERROR_BAD_PARAMETERS;
-		}
-	} else {
-		if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
-					     TEE_PARAM_TYPE_NONE,
-					     TEE_PARAM_TYPE_NONE,
-					     TEE_PARAM_TYPE_NONE)) {
-			return TEE_ERROR_BAD_PARAMETERS;
-		}
-	}
-
-	wrapped_key = (rsip_wrapped_key_t *)params[0].memref.buffer;
-	if ((!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t)) ||
-	    (key_size > params[0].memref.size)) {
-		EMSG("key err");
+	if (!key || !IS_ALIGNED_WITH_UINT32(key))
 		return TEE_ERROR_BAD_PARAMETERS;
+	if (wrapped_len < sizeof(key->type))
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	res = get_key_desc(key->type, &key_desc);
+	if (res != TEE_SUCCESS)
+		return res;
+	if (wrapped_len != key_desc->wrapped_size)
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	switch (key->type) {
+	case RSIP_KEY_TYPE_AES_128:
+	case RSIP_KEY_TYPE_AES_256:
+		*wrapped_key = key;
+		return TEE_SUCCESS;
+	default:
+		return TEE_ERROR_BAD_PARAMETERS;
+	}
+}
+
+static TEE_Result get_xts_wrapped_key(TEE_Param *p,
+				      const rsip_wrapped_key_t **wrapped_key)
+{
+	TEE_Result res = TEE_ERROR_GENERIC;
+
+	size_t wrapped_len = p->memref.size;
+	rsip_wrapped_key_t *key = p->memref.buffer;
+	const struct rsip_key_desc *key_desc = NULL;
+
+	if (!key || !IS_ALIGNED_WITH_UINT32(key))
+		return TEE_ERROR_BAD_PARAMETERS;
+	if (wrapped_len < sizeof(key->type))
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	res = get_key_desc(key->type, &key_desc);
+	if (res != TEE_SUCCESS)
+		return res;
+	if (wrapped_len != key_desc->wrapped_size)
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	switch (key->type) {
+	case RSIP_KEY_TYPE_AES_128_XTS:
+	case RSIP_KEY_TYPE_AES_256_XTS:
+		*wrapped_key = key;
+		return TEE_SUCCESS;
+	default:
+		return TEE_ERROR_BAD_PARAMETERS;
+	}
+}
+
+static void aes_pad_final_block(uint8_t *block, const uint8_t *src, size_t len,
+				rsip_aes_mode_t mode __unused)
+{
+	/* Apply zero padding. Add other padding methods here if needed. */
+	memset(block, 0, AES_BLOCK_SIZE);
+	memcpy(block, src, len);
+}
+
+static void aes_unpad_final_block(uint8_t *dst, const uint8_t *block,
+				  size_t *len, rsip_aes_mode_t mode __unused)
+{
+	/* Zero padding does not require unpadding. */
+	memcpy(dst, block, *len);
+}
+
+static TEE_Result aes_enc_init(uint32_t types, TEE_Param params[TEE_NUM_PARAMS],
+			       rsip_aes_mode_t mode)
+{
+	TEE_Result res = TEE_ERROR_GENERIC;
+	fsp_err_t err = FSP_ERR_CRYPTO_RSIP_FAIL;
+
+	size_t init_vec_max = 0;
+	uint8_t *init_vec = NULL;
+
+	const rsip_wrapped_key_t *wrapped_key = NULL;
+
+	uint32_t exp_types =
+		(mode != RSIP_AES_MODE_ECB) ?
+			TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
+					TEE_PARAM_TYPE_MEMREF_OUTPUT,
+					TEE_PARAM_TYPE_NONE,
+					TEE_PARAM_TYPE_NONE) :
+			TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
+					TEE_PARAM_TYPE_NONE,
+					TEE_PARAM_TYPE_NONE,
+					TEE_PARAM_TYPE_NONE);
+	if (types != exp_types)
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	res = get_aes_wrapped_key(&params[0], &wrapped_key);
+	if (res != TEE_SUCCESS)
+		return res;
+
+	if (mode != RSIP_AES_MODE_ECB) {
+		init_vec = params[1].memref.buffer;
+		init_vec_max = params[1].memref.size;
+		params[1].memref.size = AES_BLOCK_SIZE;
+		if (!init_vec || !IS_ALIGNED_WITH_UINT32(init_vec))
+			return TEE_ERROR_BAD_PARAMETERS;
+		if (init_vec_max < params[1].memref.size)
+			return TEE_ERROR_SHORT_BUFFER;
+
+		err = R_RSIP_RandomNumberGenerate(&rsip_instance_ctrl,
+						  init_vec);
+		if (err != FSP_SUCCESS)
+			return rsip_err_to_tee(err);
 	}
 
 	err = R_RSIP_AES_Cipher_EncryptInit(&rsip_instance_ctrl, mode,
-					    wrapped_key, initial_vector);
-	switch ((uint32_t)err) {
-	case FSP_SUCCESS:
-		break;
-	case FSP_ERR_ASSERTION:
-		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_NOT_OPEN:
-		return TEE_ERROR_BAD_STATE;
-	case FSP_ERR_INVALID_STATE:
-		return TEE_ERROR_BAD_STATE;
-	case FSP_ERR_NOT_ENABLED:
-		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_INVALID_ARGUMENT:
-		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_CRYPTO_RSIP_KEY_SET_FAIL:
-		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_CRYPTO_RSIP_RESOURCE_CONFLICT:
-		return TEE_ERROR_ACCESS_CONFLICT;
-	case FSP_ERR_CRYPTO_RSIP_FATAL:
-		return TEE_ERROR_GENERIC;
-	default:
-		return TEE_ERROR_BAD_STATE;
-	}
+					    wrapped_key, init_vec);
+	if (err != FSP_SUCCESS)
+		return rsip_err_to_tee(err);
 
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes_cipher_encryptupdate(uint32_t types,
-					   TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result xts_enc_init(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
 {
-	fsp_err_t err;
+	TEE_Result res = TEE_ERROR_GENERIC;
+	fsp_err_t err = FSP_ERR_CRYPTO_RSIP_FAIL;
 
-	uint8_t *plain;
-	uint8_t *cipher;
-	uint32_t plain_length;
-	uint32_t cipher_length;
+	size_t tweak_len = 0;
+	uint8_t *tweak = NULL;
 
-	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
-		return TEE_ERROR_BAD_PARAMETERS;
+	const rsip_wrapped_key_t *wrapped_key = NULL;
 
-	plain = (uint8_t *)params[0].memref.buffer;
-	plain_length = (uint32_t)params[0].memref.size;
-	if (!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t)) {
-		EMSG("plain err");
-		return TEE_ERROR_BAD_PARAMETERS;
-	}
-
-	cipher = (uint8_t *)params[1].memref.buffer;
-	cipher_length = (uint32_t)params[1].memref.size;
-	if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) ||
-	    (cipher_length < plain_length)) {
-		EMSG("cipher err");
-		return TEE_ERROR_BAD_PARAMETERS;
-	}
-
-	err = R_RSIP_AES_Cipher_EncryptUpdate(&rsip_instance_ctrl, plain,
-					      cipher, plain_length);
-	switch ((uint32_t)err) {
-	case FSP_SUCCESS:
-		break;
-	case FSP_ERR_ASSERTION:
-		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_NOT_OPEN:
-		return TEE_ERROR_BAD_STATE;
-	case FSP_ERR_INVALID_STATE:
-		return TEE_ERROR_BAD_STATE;
-	case FSP_ERR_INVALID_SIZE:
-		return TEE_ERROR_BAD_PARAMETERS;
-	default:
-		return TEE_ERROR_BAD_STATE;
-	}
-
-	params[1].memref.size = plain_length;
-
-	return TEE_SUCCESS;
-}
-
-static TEE_Result aes_cipher_encryptfinal(uint32_t types,
-					  TEE_Param params[TEE_NUM_PARAMS])
-{
-	fsp_err_t err;
-
-	uint8_t *cipher;
-	uint32_t cipher_length = 0;
-
-	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE))
-		return TEE_ERROR_BAD_PARAMETERS;
-
-	cipher = (uint8_t *)params[0].memref.buffer;
-	cipher_length = (uint32_t)params[0].memref.size;
-	if ((!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t)) ||
-	    (AES_BLOCK_LEN > params[0].memref.size)) {
-		EMSG("cipher err");
-		return TEE_ERROR_BAD_PARAMETERS;
-	}
-
-	err = R_RSIP_AES_Cipher_EncryptFinal(&rsip_instance_ctrl, cipher,
-					     &cipher_length);
-	switch ((uint32_t)err) {
-	case FSP_SUCCESS:
-		break;
-	case FSP_ERR_ASSERTION:
-		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_NOT_OPEN:
-		return TEE_ERROR_BAD_STATE;
-	case FSP_ERR_INVALID_STATE:
-		return TEE_ERROR_BAD_STATE;
-	case FSP_ERR_CRYPTO_RSIP_FAIL:
-		return TEE_ERROR_GENERIC;
-	case FSP_ERR_CRYPTO_RSIP_FATAL:
-		return TEE_ERROR_GENERIC;
-	default:
-		return TEE_ERROR_BAD_STATE;
-	}
-
-	params[0].memref.size = cipher_length;
-
-	return TEE_SUCCESS;
-}
-
-static TEE_Result aes_cipher_decryptinit(uint32_t types,
-					 TEE_Param params[TEE_NUM_PARAMS],
-					 rsip_aes_mode_t mode,
-					 rsip_byte_size_wrapped_key_t key_size)
-{
-	fsp_err_t err;
-
-	rsip_wrapped_key_t *wrapped_key;
-	uint8_t *initial_vector;
-
-	initial_vector = (uint8_t *)params[1].memref.buffer;
-	if (mode != RSIP_AES_MODE_ECB) {
-		if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
+	uint32_t exp_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
 					     TEE_PARAM_TYPE_MEMREF_INPUT,
 					     TEE_PARAM_TYPE_NONE,
-					     TEE_PARAM_TYPE_NONE))
-			return TEE_ERROR_BAD_PARAMETERS;
+					     TEE_PARAM_TYPE_NONE);
+	if (types != exp_types)
+		return TEE_ERROR_BAD_PARAMETERS;
 
-		if (!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) {
-			EMSG("initial_vector err");
-			return TEE_ERROR_BAD_PARAMETERS;
-		}
-	} else {
-		if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
+	res = get_xts_wrapped_key(&params[0], &wrapped_key);
+	if (res != TEE_SUCCESS)
+		return res;
+
+	tweak = params[1].memref.buffer;
+	tweak_len = params[1].memref.size;
+	if (!tweak || !IS_ALIGNED_WITH_UINT32(tweak))
+		return TEE_ERROR_BAD_PARAMETERS;
+	if (tweak_len != AES_BLOCK_SIZE)
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	err = R_RSIP_AES_Cipher_EncryptInit(
+		&rsip_instance_ctrl, RSIP_AES_MODE_XTS, wrapped_key, tweak);
+	if (err != FSP_SUCCESS)
+		return rsip_err_to_tee(err);
+
+	return TEE_SUCCESS;
+}
+
+static TEE_Result aes_enc_update(uint32_t types,
+				 TEE_Param params[TEE_NUM_PARAMS])
+{
+	fsp_err_t err = FSP_ERR_CRYPTO_RSIP_FAIL;
+
+	uint8_t *plain = NULL;
+	uint32_t plain_len = 0;
+	uint8_t *cipher = NULL;
+	uint32_t cipher_max = 0;
+
+	uint32_t exp_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
+					     TEE_PARAM_TYPE_MEMREF_OUTPUT,
 					     TEE_PARAM_TYPE_NONE,
+					     TEE_PARAM_TYPE_NONE);
+	if (types != exp_types)
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	plain = params[0].memref.buffer;
+	plain_len = (uint32_t)params[0].memref.size;
+	if (plain_len && (!plain || !IS_ALIGNED_WITH_UINT32(plain)))
+		return TEE_ERROR_BAD_PARAMETERS;
+	if (!IS_ALIGNED(plain_len, AES_BLOCK_SIZE))
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	cipher = params[1].memref.buffer;
+	cipher_max = (uint32_t)params[1].memref.size;
+	params[1].memref.size = (size_t)plain_len;
+	if (plain_len && (!cipher || !IS_ALIGNED_WITH_UINT32(cipher)))
+		return TEE_ERROR_BAD_PARAMETERS;
+	if (cipher_max < params[1].memref.size)
+		return TEE_ERROR_SHORT_BUFFER;
+
+	err = R_RSIP_AES_Cipher_EncryptUpdate(&rsip_instance_ctrl, plain,
+					      cipher, plain_len);
+	if (err != FSP_SUCCESS)
+		return rsip_err_to_tee(err);
+
+	return TEE_SUCCESS;
+}
+
+static TEE_Result aes_enc_final(uint32_t types,
+				TEE_Param params[TEE_NUM_PARAMS],
+				rsip_aes_mode_t mode)
+{
+	TEE_Result res = TEE_SUCCESS;
+	fsp_err_t err = FSP_ERR_CRYPTO_RSIP_FAIL;
+
+	uint8_t *plain = NULL;
+	uint32_t plain_len = 0;
+	uint32_t plain_tail[AES_BLOCK_SIZE / sizeof(uint32_t)] = { 0 };
+	uint8_t *cipher = NULL;
+	uint32_t cipher_max = 0;
+	uint32_t cipher_tail[AES_BLOCK_SIZE / sizeof(uint32_t)] = { 0 };
+
+	uint32_t exp_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
+					     TEE_PARAM_TYPE_MEMREF_OUTPUT,
 					     TEE_PARAM_TYPE_NONE,
-					     TEE_PARAM_TYPE_NONE))
+					     TEE_PARAM_TYPE_NONE);
+	if (types != exp_types)
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	plain = params[0].memref.buffer;
+	plain_len = (uint32_t)params[0].memref.size;
+	if (plain_len && (!plain || !IS_ALIGNED_WITH_UINT32(plain)))
+		return TEE_ERROR_BAD_PARAMETERS;
+	if (plain_len >= AES_BLOCK_SIZE)
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	cipher = params[1].memref.buffer;
+	cipher_max = (uint32_t)params[1].memref.size;
+
+	if (mode == RSIP_AES_MODE_CTR)
+		params[1].memref.size = plain_len;
+	else
+		params[1].memref.size = plain_len ? AES_BLOCK_SIZE : 0;
+
+	if (plain_len) {
+		if (!cipher || !IS_ALIGNED_WITH_UINT32(cipher))
 			return TEE_ERROR_BAD_PARAMETERS;
+		if (cipher_max < params[1].memref.size)
+			return TEE_ERROR_SHORT_BUFFER;
+
+		aes_pad_final_block((void *)plain_tail, plain, plain_len, mode);
+
+		err = R_RSIP_AES_Cipher_EncryptUpdate(&rsip_instance_ctrl,
+						      (uint8_t *)plain_tail,
+						      (uint8_t *)cipher_tail,
+						      AES_BLOCK_SIZE);
+		if (err != FSP_SUCCESS)
+			res = rsip_err_to_tee(err);
+		else
+			memcpy(cipher, cipher_tail, params[1].memref.size);
 	}
 
-	wrapped_key = (rsip_wrapped_key_t *)params[0].memref.buffer;
-	if ((!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t)) ||
-	    (key_size > params[0].memref.size)) {
-		EMSG("key err");
+	err = R_RSIP_AES_Cipher_EncryptFinal(&rsip_instance_ctrl, NULL, NULL);
+	if (res == TEE_SUCCESS && err != FSP_SUCCESS)
+		res = rsip_err_to_tee(err);
+
+	return res;
+}
+
+static TEE_Result xts_enc_final(uint32_t types,
+				TEE_Param params[TEE_NUM_PARAMS])
+{
+	TEE_Result res = TEE_SUCCESS;
+	fsp_err_t err = FSP_ERR_CRYPTO_RSIP_FAIL;
+
+	uint8_t *plain = NULL;
+	uint32_t plain_len = 0;
+	uint32_t plain_tail[(2 * AES_BLOCK_SIZE) / sizeof(uint32_t)] = { 0 };
+	uint8_t *cipher = NULL;
+	uint32_t cipher_max = 0;
+	uint32_t cipher_tail[(2 * AES_BLOCK_SIZE) / sizeof(uint32_t)] = { 0 };
+
+	uint32_t exp_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
+					     TEE_PARAM_TYPE_MEMREF_OUTPUT,
+					     TEE_PARAM_TYPE_NONE,
+					     TEE_PARAM_TYPE_NONE);
+	if (types != exp_types)
 		return TEE_ERROR_BAD_PARAMETERS;
+
+	plain = params[0].memref.buffer;
+	plain_len = (uint32_t)params[0].memref.size;
+	if (plain_len && (!plain || !IS_ALIGNED_WITH_UINT32(plain)))
+		return TEE_ERROR_BAD_PARAMETERS;
+	if (plain_len &&
+	    (plain_len <= AES_BLOCK_SIZE || plain_len >= (2 * AES_BLOCK_SIZE)))
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	cipher = params[1].memref.buffer;
+	cipher_max = (uint32_t)params[1].memref.size;
+
+	params[1].memref.size = plain_len;
+
+	if (plain_len) {
+		if (!cipher || !IS_ALIGNED_WITH_UINT32(cipher))
+			return TEE_ERROR_BAD_PARAMETERS;
+		if (cipher_max < params[1].memref.size)
+			return TEE_ERROR_SHORT_BUFFER;
+
+		memcpy(plain_tail, plain, plain_len);
+		err = R_RSIP_AES_Cipher_EncryptUpdate(&rsip_instance_ctrl,
+						      (uint8_t *)plain_tail,
+						      (uint8_t *)cipher_tail,
+						      plain_len);
+		if (err != FSP_SUCCESS)
+			res = rsip_err_to_tee(err);
+	}
+
+	err = R_RSIP_AES_Cipher_EncryptFinal(
+		&rsip_instance_ctrl, (uint8_t *)cipher_tail, &cipher_max);
+	if (res == TEE_SUCCESS && err != FSP_SUCCESS)
+		res = rsip_err_to_tee(err);
+
+	/* XTS Final must return same size as input tail */
+	if (res == TEE_SUCCESS && cipher_max != plain_len)
+		res = TEE_ERROR_GENERIC;
+
+	if (res == TEE_SUCCESS && plain_len)
+		memcpy(cipher, cipher_tail, plain_len);
+
+	return res;
+}
+
+static TEE_Result aes_dec_init(uint32_t types, TEE_Param params[TEE_NUM_PARAMS],
+			       rsip_aes_mode_t mode)
+{
+	TEE_Result res = TEE_ERROR_GENERIC;
+	fsp_err_t err = FSP_ERR_CRYPTO_RSIP_FAIL;
+
+	size_t init_vec_len = 0;
+	uint8_t *init_vec = NULL;
+
+	const rsip_wrapped_key_t *wrapped_key = NULL;
+
+	uint32_t exp_types =
+		(mode != RSIP_AES_MODE_ECB) ?
+			TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
+					TEE_PARAM_TYPE_MEMREF_INPUT,
+					TEE_PARAM_TYPE_NONE,
+					TEE_PARAM_TYPE_NONE) :
+			TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
+					TEE_PARAM_TYPE_NONE,
+					TEE_PARAM_TYPE_NONE,
+					TEE_PARAM_TYPE_NONE);
+	if (types != exp_types)
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	res = get_aes_wrapped_key(&params[0], &wrapped_key);
+	if (res != TEE_SUCCESS)
+		return res;
+
+	if (mode != RSIP_AES_MODE_ECB) {
+		init_vec = params[1].memref.buffer;
+		init_vec_len = params[1].memref.size;
+		if (!init_vec || !IS_ALIGNED_WITH_UINT32(init_vec))
+			return TEE_ERROR_BAD_PARAMETERS;
+		if (init_vec_len != AES_BLOCK_SIZE)
+			return TEE_ERROR_BAD_PARAMETERS;
 	}
 
 	err = R_RSIP_AES_Cipher_DecryptInit(&rsip_instance_ctrl, mode,
-					    wrapped_key, initial_vector);
-	switch ((uint32_t)err) {
-	case FSP_SUCCESS:
-		break;
-	case FSP_ERR_ASSERTION:
-		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_NOT_OPEN:
-		return TEE_ERROR_BAD_STATE;
-	case FSP_ERR_INVALID_STATE:
-		return TEE_ERROR_BAD_STATE;
-	case FSP_ERR_NOT_ENABLED:
-		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_INVALID_ARGUMENT:
-		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_CRYPTO_RSIP_KEY_SET_FAIL:
-		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_CRYPTO_RSIP_RESOURCE_CONFLICT:
-		return TEE_ERROR_ACCESS_CONFLICT;
-	case FSP_ERR_CRYPTO_RSIP_FATAL:
-		return TEE_ERROR_GENERIC;
-	default:
-		return TEE_ERROR_BAD_STATE;
-	}
+					    wrapped_key, init_vec);
+	if (err != FSP_SUCCESS)
+		return rsip_err_to_tee(err);
 
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes_cipher_decryptupdate(uint32_t types,
-					   TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result xts_dec_init(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
 {
-	fsp_err_t err;
+	TEE_Result res = TEE_ERROR_GENERIC;
+	fsp_err_t err = FSP_ERR_CRYPTO_RSIP_FAIL;
 
-	uint8_t *cipher;
-	uint8_t *plain;
-	uint32_t cipher_length;
-	uint32_t plain_length;
+	size_t tweak_len = 0;
+	uint8_t *tweak = NULL;
 
-	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
+	const rsip_wrapped_key_t *wrapped_key = NULL;
+
+	uint32_t exp_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
+					     TEE_PARAM_TYPE_MEMREF_INPUT,
+					     TEE_PARAM_TYPE_NONE,
+					     TEE_PARAM_TYPE_NONE);
+	if (types != exp_types)
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	cipher = (uint8_t *)params[0].memref.buffer;
-	cipher_length = (uint32_t)params[0].memref.size;
-	if (!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t)) {
-		EMSG("cipher err");
-		return TEE_ERROR_BAD_PARAMETERS;
-	}
+	res = get_xts_wrapped_key(&params[0], &wrapped_key);
+	if (res != TEE_SUCCESS)
+		return res;
 
-	plain = (uint8_t *)params[1].memref.buffer;
-	plain_length = (uint32_t)params[1].memref.size;
-	if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) ||
-	    (plain_length < cipher_length)) {
-		EMSG("plain err");
+	tweak = params[1].memref.buffer;
+	tweak_len = params[1].memref.size;
+	if (!tweak || !IS_ALIGNED_WITH_UINT32(tweak))
 		return TEE_ERROR_BAD_PARAMETERS;
-	}
+	if (tweak_len != AES_BLOCK_SIZE)
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	err = R_RSIP_AES_Cipher_DecryptInit(
+		&rsip_instance_ctrl, RSIP_AES_MODE_XTS, wrapped_key, tweak);
+	if (err != FSP_SUCCESS)
+		return rsip_err_to_tee(err);
+
+	return TEE_SUCCESS;
+}
+
+static TEE_Result aes_dec_update(uint32_t types,
+				 TEE_Param params[TEE_NUM_PARAMS])
+{
+	fsp_err_t err = FSP_ERR_CRYPTO_RSIP_FAIL;
+
+	uint8_t *cipher = NULL;
+	uint32_t cipher_len = 0;
+	uint8_t *plain = NULL;
+	uint32_t plain_max = 0;
+
+	uint32_t exp_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
+					     TEE_PARAM_TYPE_MEMREF_OUTPUT,
+					     TEE_PARAM_TYPE_NONE,
+					     TEE_PARAM_TYPE_NONE);
+	if (types != exp_types)
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	cipher = params[0].memref.buffer;
+	cipher_len = (uint32_t)params[0].memref.size;
+	if (cipher_len && (!cipher || !IS_ALIGNED_WITH_UINT32(cipher)))
+		return TEE_ERROR_BAD_PARAMETERS;
+	if (!IS_ALIGNED(cipher_len, AES_BLOCK_SIZE))
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	plain = params[1].memref.buffer;
+	plain_max = (uint32_t)params[1].memref.size;
+	params[1].memref.size = (size_t)cipher_len;
+	if (cipher_len && (!plain || !IS_ALIGNED_WITH_UINT32(plain)))
+		return TEE_ERROR_BAD_PARAMETERS;
+	if (plain_max < params[1].memref.size)
+		return TEE_ERROR_SHORT_BUFFER;
 
 	err = R_RSIP_AES_Cipher_DecryptUpdate(&rsip_instance_ctrl, cipher,
-					      plain, cipher_length);
-	switch ((uint32_t)err) {
-	case FSP_SUCCESS:
-		break;
-	case FSP_ERR_ASSERTION:
-		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_NOT_OPEN:
-		return TEE_ERROR_BAD_STATE;
-	case FSP_ERR_INVALID_STATE:
-		return TEE_ERROR_BAD_STATE;
-	case FSP_ERR_INVALID_SIZE:
-		return TEE_ERROR_BAD_PARAMETERS;
-	default:
-		return TEE_ERROR_BAD_STATE;
-	}
-
-	params[1].memref.size = cipher_length;
+					      plain, cipher_len);
+	if (err != FSP_SUCCESS)
+		return rsip_err_to_tee(err);
 
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes_cipher_decryptfinal(uint32_t types,
-					  TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result aes_dec_final(uint32_t types,
+				TEE_Param params[TEE_NUM_PARAMS],
+				rsip_aes_mode_t mode)
 {
-	fsp_err_t err;
+	TEE_Result res = TEE_SUCCESS;
+	fsp_err_t err = FSP_ERR_CRYPTO_RSIP_FAIL;
 
-	uint8_t *plain;
-	uint32_t plain_length = 0;
+	uint8_t *cipher = NULL;
+	uint32_t cipher_len = 0;
+	uint32_t cipher_tail[AES_BLOCK_SIZE / sizeof(uint32_t)] = { 0 };
+	uint8_t *plain = NULL;
+	uint32_t plain_max = 0;
+	uint32_t plain_tail[AES_BLOCK_SIZE / sizeof(uint32_t)] = { 0 };
 
-	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE))
+	uint32_t exp_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
+					     TEE_PARAM_TYPE_MEMREF_OUTPUT,
+					     TEE_PARAM_TYPE_NONE,
+					     TEE_PARAM_TYPE_NONE);
+	if (types != exp_types)
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	plain = (uint8_t *)params[0].memref.buffer;
-	plain_length = (uint32_t)params[0].memref.size;
-	if ((!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t)) ||
-	    (AES_BLOCK_LEN > params[0].memref.size)) {
-		EMSG("plain err");
+	cipher = params[0].memref.buffer;
+	cipher_len = (uint32_t)params[0].memref.size;
+	if (cipher_len && (!cipher || !IS_ALIGNED_WITH_UINT32(cipher)))
 		return TEE_ERROR_BAD_PARAMETERS;
+	if ((cipher_len % AES_BLOCK_SIZE) && mode != RSIP_AES_MODE_CTR)
+		return TEE_ERROR_BAD_PARAMETERS;
+	if (cipher_len > AES_BLOCK_SIZE)
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	plain = params[1].memref.buffer;
+	plain_max = (uint32_t)params[1].memref.size;
+	params[1].memref.size = cipher_len;
+
+	if (cipher_len) {
+		if (!plain || !IS_ALIGNED_WITH_UINT32(plain))
+			return TEE_ERROR_BAD_PARAMETERS;
+		if (plain_max < params[1].memref.size)
+			return TEE_ERROR_SHORT_BUFFER;
+
+		memcpy(cipher_tail, cipher, cipher_len);
+		err = R_RSIP_AES_Cipher_DecryptUpdate(&rsip_instance_ctrl,
+						      (uint8_t *)cipher_tail,
+						      (uint8_t *)plain_tail,
+						      AES_BLOCK_SIZE);
+		if (err != FSP_SUCCESS)
+			res = rsip_err_to_tee(err);
+		else
+			aes_unpad_final_block(plain, (uint8_t *)plain_tail,
+					      &params[1].memref.size, mode);
 	}
 
-	err = R_RSIP_AES_Cipher_DecryptFinal(&rsip_instance_ctrl, plain,
-					     &plain_length);
-	switch ((uint32_t)err) {
-	case FSP_SUCCESS:
-		break;
-	case FSP_ERR_ASSERTION:
-		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_NOT_OPEN:
-		return TEE_ERROR_BAD_STATE;
-	case FSP_ERR_INVALID_STATE:
-		return TEE_ERROR_BAD_STATE;
-	case FSP_ERR_CRYPTO_RSIP_FAIL:
-		return TEE_ERROR_GENERIC;
-	case FSP_ERR_CRYPTO_RSIP_FATAL:
-		return TEE_ERROR_GENERIC;
-	default:
-		return TEE_ERROR_BAD_STATE;
-	}
+	err = R_RSIP_AES_Cipher_DecryptFinal(&rsip_instance_ctrl, NULL, NULL);
+	if (res == TEE_SUCCESS && err != FSP_SUCCESS)
+		res = rsip_err_to_tee(err);
 
-	params[0].memref.size = plain_length;
-
-	return TEE_SUCCESS;
+	return res;
 }
 
-static TEE_Result aes_cmac_generateinit(uint32_t types,
-					TEE_Param params[TEE_NUM_PARAMS],
-					rsip_byte_size_wrapped_key_t key_size)
+static TEE_Result xts_dec_final(uint32_t types,
+				TEE_Param params[TEE_NUM_PARAMS])
 {
-	fsp_err_t err;
+	TEE_Result res = TEE_SUCCESS;
+	fsp_err_t err = FSP_ERR_CRYPTO_RSIP_FAIL;
 
-	rsip_wrapped_key_t *wrapped_key;
+	uint8_t *cipher = NULL;
+	uint32_t cipher_len = 0;
+	uint32_t cipher_tail[(2 * AES_BLOCK_SIZE) / sizeof(uint32_t)] = { 0 };
+	uint8_t *plain = NULL;
+	uint32_t plain_max = 0;
+	uint32_t plain_tail[(2 * AES_BLOCK_SIZE) / sizeof(uint32_t)] = { 0 };
 
-	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE))
+	uint32_t exp_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
+					     TEE_PARAM_TYPE_MEMREF_OUTPUT,
+					     TEE_PARAM_TYPE_NONE,
+					     TEE_PARAM_TYPE_NONE);
+	if (types != exp_types)
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	wrapped_key = (rsip_wrapped_key_t *)params[0].memref.buffer;
-	if ((!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t)) ||
-	    (key_size > params[0].memref.size)) {
-		EMSG("key err");
+	cipher = params[0].memref.buffer;
+	cipher_len = (uint32_t)params[0].memref.size;
+	if (cipher_len && (!cipher || !IS_ALIGNED_WITH_UINT32(cipher)))
 		return TEE_ERROR_BAD_PARAMETERS;
+	if (cipher_len && (cipher_len <= AES_BLOCK_SIZE ||
+			   cipher_len >= (AES_BLOCK_SIZE * 2)))
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	plain = params[1].memref.buffer;
+	plain_max = (uint32_t)params[1].memref.size;
+	params[1].memref.size = cipher_len;
+
+	if (cipher_len) {
+		if (!plain || !IS_ALIGNED_WITH_UINT32(plain))
+			return TEE_ERROR_BAD_PARAMETERS;
+		if (plain_max < cipher_len)
+			return TEE_ERROR_SHORT_BUFFER;
+
+		memcpy(cipher_tail, cipher, cipher_len);
+		err = R_RSIP_AES_Cipher_DecryptUpdate(&rsip_instance_ctrl,
+						      (uint8_t *)cipher_tail,
+						      (uint8_t *)plain_tail,
+						      cipher_len);
+		if (err != FSP_SUCCESS)
+			res = rsip_err_to_tee(err);
 	}
 
-	err = R_RSIP_AES_CMAC_GenerateInit(&rsip_instance_ctrl, wrapped_key);
-	switch ((uint32_t)err) {
-	case FSP_SUCCESS:
-		break;
-	case FSP_ERR_ASSERTION:
-		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_NOT_OPEN:
-		return TEE_ERROR_BAD_STATE;
-	case FSP_ERR_INVALID_STATE:
-		return TEE_ERROR_BAD_STATE;
-	case FSP_ERR_NOT_ENABLED:
-		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_INVALID_ARGUMENT:
-		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_CRYPTO_RSIP_KEY_SET_FAIL:
-		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_CRYPTO_RSIP_RESOURCE_CONFLICT:
-		return TEE_ERROR_ACCESS_CONFLICT;
-	case FSP_ERR_CRYPTO_RSIP_FATAL:
-		return TEE_ERROR_GENERIC;
-	default:
-		return TEE_ERROR_BAD_STATE;
-	}
+	err = R_RSIP_AES_Cipher_DecryptFinal(&rsip_instance_ctrl,
+					     (uint8_t *)plain_tail, &plain_max);
+	if (res == TEE_SUCCESS && err != FSP_SUCCESS)
+		res = rsip_err_to_tee(err);
 
-	return TEE_SUCCESS;
+	/* XTS Final must return same size as input tail */
+	if (res == TEE_SUCCESS && plain_max != cipher_len)
+		res = TEE_ERROR_GENERIC;
+
+	if (res == TEE_SUCCESS && cipher_len)
+		memcpy(plain, plain_tail, cipher_len);
+
+	return res;
 }
 
-static TEE_Result aes_cmac_generateupdate(uint32_t types,
-					  TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result gcm_enc_init(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
 {
-	fsp_err_t err;
+	TEE_Result res = TEE_SUCCESS;
+	fsp_err_t err = FSP_ERR_CRYPTO_RSIP_FAIL;
 
-	uint8_t *message;
-	uint32_t message_length;
+	size_t nonce_max = 0;
+	uint8_t *nonce = NULL;
+	uint32_t nonce_buff[AES_BLOCK_SIZE / sizeof(uint32_t)] = { 0 };
 
-	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE))
+	const rsip_wrapped_key_t *wrapped_key = NULL;
+
+	uint32_t exp_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
+					     TEE_PARAM_TYPE_MEMREF_OUTPUT,
+					     TEE_PARAM_TYPE_NONE,
+					     TEE_PARAM_TYPE_NONE);
+	if (types != exp_types)
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	message = (uint8_t *)params[0].memref.buffer;
-	message_length = (uint32_t)params[0].memref.size;
-	if (!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t))
+	res = get_aes_wrapped_key(&params[0], &wrapped_key);
+	if (res != TEE_SUCCESS)
+		return res;
+
+	nonce = params[1].memref.buffer;
+	nonce_max = params[1].memref.size;
+	params[1].memref.size = GCM_NONCE_SIZE;
+	if (!nonce || !IS_ALIGNED_WITH_UINT32(nonce))
 		return TEE_ERROR_BAD_PARAMETERS;
+	if (nonce_max < params[1].memref.size)
+		return TEE_ERROR_SHORT_BUFFER;
 
-	err = R_RSIP_AES_CMAC_GenerateUpdate(&rsip_instance_ctrl, message,
-					     message_length);
-	switch ((uint32_t)err) {
-	case FSP_SUCCESS:
-		break;
-	case FSP_ERR_ASSERTION:
-		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_NOT_OPEN:
-		return TEE_ERROR_BAD_STATE;
-	case FSP_ERR_INVALID_STATE:
-		return TEE_ERROR_BAD_STATE;
-	default:
-		return TEE_ERROR_BAD_STATE;
-	}
-
-	return TEE_SUCCESS;
-}
-
-static TEE_Result aes_cmac_generatefinal(uint32_t types,
-					 TEE_Param params[TEE_NUM_PARAMS])
-{
-	fsp_err_t err;
-
-	uint8_t *mac;
-	uint32_t mac_length;
-
-	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE))
-		return TEE_ERROR_BAD_PARAMETERS;
-
-	mac = (uint8_t *)params[0].memref.buffer;
-	mac_length = params[0].memref.size;
-	if ((!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t)) ||
-	    (MAC_BYTE_SIZE > mac_length))
-		return TEE_ERROR_BAD_PARAMETERS;
-
-	err = R_RSIP_AES_CMAC_GenerateFinal(&rsip_instance_ctrl, mac);
-	switch ((uint32_t)err) {
-	case FSP_SUCCESS:
-		break;
-	case FSP_ERR_ASSERTION:
-		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_NOT_OPEN:
-		return TEE_ERROR_BAD_STATE;
-	case FSP_ERR_INVALID_STATE:
-		return TEE_ERROR_BAD_STATE;
-	case FSP_ERR_CRYPTO_RSIP_FAIL:
-		return TEE_ERROR_GENERIC;
-	case FSP_ERR_CRYPTO_RSIP_FATAL:
-		return TEE_ERROR_GENERIC;
-	default:
-		return TEE_ERROR_BAD_STATE;
-	}
-
-	params[0].memref.size = RSIP_BYTE_SIZE_AES_BLOCK;
-
-	return TEE_SUCCESS;
-}
-
-static TEE_Result aes_cmac_verifyinit(uint32_t types,
-				      TEE_Param params[TEE_NUM_PARAMS],
-				      rsip_byte_size_wrapped_key_t key_size)
-{
-	fsp_err_t err;
-
-	rsip_wrapped_key_t *wrapped_key;
-
-	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE))
-		return TEE_ERROR_BAD_PARAMETERS;
-
-	wrapped_key = (rsip_wrapped_key_t *)params[0].memref.buffer;
-	if ((!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t)) ||
-	    (key_size > params[0].memref.size)) {
-		EMSG("key err");
-		return TEE_ERROR_BAD_PARAMETERS;
-	}
-
-	err = R_RSIP_AES_CMAC_VerifyInit(&rsip_instance_ctrl, wrapped_key);
-	switch ((uint32_t)err) {
-	case FSP_SUCCESS:
-		break;
-	case FSP_ERR_ASSERTION:
-		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_NOT_OPEN:
-		return TEE_ERROR_BAD_STATE;
-	case FSP_ERR_INVALID_STATE:
-		return TEE_ERROR_BAD_STATE;
-	case FSP_ERR_NOT_ENABLED:
-		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_INVALID_ARGUMENT:
-		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_CRYPTO_RSIP_KEY_SET_FAIL:
-		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_CRYPTO_RSIP_RESOURCE_CONFLICT:
-		return TEE_ERROR_ACCESS_CONFLICT;
-	case FSP_ERR_CRYPTO_RSIP_FATAL:
-		return TEE_ERROR_GENERIC;
-	default:
-		return TEE_ERROR_BAD_STATE;
-	}
-
-	return TEE_SUCCESS;
-}
-
-static TEE_Result aes_cmac_verifyupdate(uint32_t types,
-					TEE_Param params[TEE_NUM_PARAMS])
-{
-	fsp_err_t err;
-
-	uint8_t *message;
-	uint32_t message_length;
-
-	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE))
-		return TEE_ERROR_BAD_PARAMETERS;
-
-	message = (uint8_t *)params[0].memref.buffer;
-	message_length = (uint32_t)params[0].memref.size;
-	if (!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t))
-		return TEE_ERROR_BAD_PARAMETERS;
-
-	err = R_RSIP_AES_CMAC_VerifyUpdate(&rsip_instance_ctrl, message,
-					   message_length);
-	switch ((uint32_t)err) {
-	case FSP_SUCCESS:
-		break;
-	case FSP_ERR_ASSERTION:
-		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_NOT_OPEN:
-		return TEE_ERROR_BAD_STATE;
-	case FSP_ERR_INVALID_STATE:
-		return TEE_ERROR_BAD_STATE;
-	default:
-		return TEE_ERROR_BAD_STATE;
-	}
-
-	return TEE_SUCCESS;
-}
-
-static TEE_Result aes_cmac_verifyfinal(uint32_t types,
-				       TEE_Param params[TEE_NUM_PARAMS])
-{
-	fsp_err_t err;
-
-	uint8_t *mac;
-	uint32_t mac_length;
-
-	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE,
-				     TEE_PARAM_TYPE_NONE))
-		return TEE_ERROR_BAD_PARAMETERS;
-
-	mac = (uint8_t *)params[0].memref.buffer;
-	mac_length = params[0].memref.size;
-	if (!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t)) {
-		EMSG("mac err");
-		return TEE_ERROR_BAD_PARAMETERS;
-	}
-
-	err = R_RSIP_AES_CMAC_VerifyFinal(&rsip_instance_ctrl, mac, mac_length);
-	switch ((uint32_t)err) {
-	case FSP_SUCCESS:
-		break;
-	case FSP_ERR_ASSERTION:
-		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_NOT_OPEN:
-		return TEE_ERROR_BAD_STATE;
-	case FSP_ERR_INVALID_STATE:
-		return TEE_ERROR_BAD_STATE;
-	case FSP_ERR_INVALID_SIZE:
-		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_CRYPTO_RSIP_FAIL:
-		return TEE_ERROR_GENERIC;
-	case FSP_ERR_CRYPTO_RSIP_AUTHENTICATION:
-		return TEE_ERROR_MAC_INVALID;
-	case FSP_ERR_CRYPTO_RSIP_FATAL:
-		return TEE_ERROR_GENERIC;
-	default:
-		return TEE_ERROR_BAD_STATE;
-	}
-
-	return TEE_SUCCESS;
-}
-
-static TEE_Result aes_gcm_encryptinit(uint32_t types,
-				      TEE_Param params[TEE_NUM_PARAMS],
-				      rsip_byte_size_wrapped_key_t key_size)
-{
-	fsp_err_t err;
-
-	rsip_wrapped_key_t *wrapped_key;
-	uint8_t *initial_vector;
-	uint32_t initial_vector_length;
-
-	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
-		return TEE_ERROR_BAD_PARAMETERS;
-
-	wrapped_key = (rsip_wrapped_key_t *)params[0].memref.buffer;
-	if ((!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t)) ||
-	    (key_size > params[0].memref.size)) {
-		EMSG("key err");
-		return TEE_ERROR_BAD_PARAMETERS;
-	}
-
-	initial_vector = (uint8_t *)params[1].memref.buffer;
-	initial_vector_length = params[1].memref.size;
-	if (!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t))
-		return TEE_ERROR_BAD_PARAMETERS;
+	err = R_RSIP_RandomNumberGenerate(&rsip_instance_ctrl,
+					  (uint8_t *)nonce_buff);
+	if (err != FSP_SUCCESS)
+		return rsip_err_to_tee(err);
 
 	err = R_RSIP_AES_GCM_EncryptInit(&rsip_instance_ctrl, wrapped_key,
-					 initial_vector, initial_vector_length);
-	switch ((uint32_t)err) {
-	case FSP_SUCCESS:
-		break;
-	case FSP_ERR_ASSERTION:
+					 (uint8_t *)nonce_buff, GCM_NONCE_SIZE);
+	if (err != FSP_SUCCESS)
+		return rsip_err_to_tee(err);
+
+	memcpy(nonce, nonce_buff, GCM_NONCE_SIZE);
+
+	return TEE_SUCCESS;
+}
+
+static TEE_Result gcm_enc_aad(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+{
+	fsp_err_t err = FSP_ERR_CRYPTO_RSIP_FAIL;
+
+	uint8_t *aad = NULL;
+	uint32_t aad_len = 0;
+
+	uint32_t exp_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
+					     TEE_PARAM_TYPE_NONE,
+					     TEE_PARAM_TYPE_NONE,
+					     TEE_PARAM_TYPE_NONE);
+	if (types != exp_types)
 		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_NOT_OPEN:
-		return TEE_ERROR_BAD_STATE;
-	case FSP_ERR_INVALID_STATE:
-		return TEE_ERROR_BAD_STATE;
-	case FSP_ERR_NOT_ENABLED:
+
+	aad = params[0].memref.buffer;
+	aad_len = (uint32_t)params[0].memref.size;
+	if (aad_len && (!aad || !IS_ALIGNED_WITH_UINT32(aad)))
 		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_INVALID_ARGUMENT:
+	if (!IS_ALIGNED(aad_len, AES_BLOCK_SIZE))
 		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_CRYPTO_RSIP_KEY_SET_FAIL:
+
+	err = R_RSIP_AES_GCM_EncryptUpdate(&rsip_instance_ctrl, NULL, NULL, 0,
+					   aad, aad_len);
+	if (err != FSP_SUCCESS)
+		return rsip_err_to_tee(err);
+
+	return TEE_SUCCESS;
+}
+
+static TEE_Result gcm_enc_aad_final(uint32_t types,
+				    TEE_Param params[TEE_NUM_PARAMS])
+{
+	fsp_err_t err = FSP_ERR_CRYPTO_RSIP_FAIL;
+
+	uint8_t *aad = NULL;
+	uint32_t aad_len = 0;
+	uint32_t aad_buff[AES_BLOCK_SIZE / sizeof(uint32_t)] = { 0 };
+
+	uint32_t exp_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
+					     TEE_PARAM_TYPE_NONE,
+					     TEE_PARAM_TYPE_NONE,
+					     TEE_PARAM_TYPE_NONE);
+	if (types != exp_types)
 		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_CRYPTO_RSIP_RESOURCE_CONFLICT:
-		return TEE_ERROR_ACCESS_CONFLICT;
-	case FSP_ERR_CRYPTO_RSIP_FATAL:
-		return TEE_ERROR_GENERIC;
-	default:
-		return TEE_ERROR_BAD_STATE;
+
+	aad = params[0].memref.buffer;
+	aad_len = (uint32_t)params[0].memref.size;
+	if (aad_len && (!aad || !IS_ALIGNED_WITH_UINT32(aad)))
+		return TEE_ERROR_BAD_PARAMETERS;
+	if (aad_len >= AES_BLOCK_SIZE)
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	if (aad_len) {
+		memcpy(aad_buff, aad, aad_len);
+		err = R_RSIP_AES_GCM_EncryptUpdate(&rsip_instance_ctrl, NULL,
+						   NULL, 0, (uint8_t *)aad_buff,
+						   aad_len);
+		if (err != FSP_SUCCESS)
+			return rsip_err_to_tee(err);
 	}
 
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes_gcm_encryptupdate(uint32_t types,
-					TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result gcm_enc_update(uint32_t types,
+				 TEE_Param params[TEE_NUM_PARAMS])
 {
-	fsp_err_t err;
+	fsp_err_t err = FSP_ERR_CRYPTO_RSIP_FAIL;
 
-	uint8_t *plain;
-	uint8_t *cipher;
-	uint8_t *aad;
-	uint32_t plain_length;
-	uint32_t cipher_length;
-	uint32_t aad_length;
+	uint8_t *plain = NULL;
+	uint32_t plain_len = 0;
+	uint8_t *cipher = NULL;
+	uint32_t cipher_max = 0;
 
-	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_NONE))
+	uint32_t exp_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
+					     TEE_PARAM_TYPE_MEMREF_OUTPUT,
+					     TEE_PARAM_TYPE_NONE,
+					     TEE_PARAM_TYPE_NONE);
+	if (types != exp_types)
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	plain = (uint8_t *)params[0].memref.buffer;
-	plain_length = (uint32_t)params[0].memref.size;
-	if (!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t))
+	plain = params[0].memref.buffer;
+	plain_len = (uint32_t)params[0].memref.size;
+	if (plain_len && (!plain || !IS_ALIGNED_WITH_UINT32(plain)))
+		return TEE_ERROR_BAD_PARAMETERS;
+	if (!IS_ALIGNED(plain_len, AES_BLOCK_SIZE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	cipher = (uint8_t *)params[1].memref.buffer;
-	cipher_length = (uint32_t)params[1].memref.size;
-	if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) ||
-	    (cipher_length < plain_length))
+	cipher = params[1].memref.buffer;
+	cipher_max = (uint32_t)params[1].memref.size;
+	params[1].memref.size = (size_t)plain_len;
+	if (plain_len && (!cipher || !IS_ALIGNED_WITH_UINT32(cipher)))
 		return TEE_ERROR_BAD_PARAMETERS;
-
-	aad = (uint8_t *)params[2].memref.buffer;
-	aad_length = (uint32_t)params[2].memref.size;
-	if (!IS_ALIGNED_WITH_TYPE(params[2].memref.buffer, uint32_t))
-		return TEE_ERROR_BAD_PARAMETERS;
+	if (cipher_max < params[1].memref.size)
+		return TEE_ERROR_SHORT_BUFFER;
 
 	err = R_RSIP_AES_GCM_EncryptUpdate(&rsip_instance_ctrl, plain, cipher,
-					   plain_length, aad, aad_length);
-	switch ((uint32_t)err) {
-	case FSP_SUCCESS:
-		break;
-	case FSP_ERR_ASSERTION:
-		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_NOT_OPEN:
-		return TEE_ERROR_BAD_STATE;
-	case FSP_ERR_INVALID_STATE:
-		return TEE_ERROR_BAD_STATE;
-	case FSP_ERR_INVALID_SIZE:
-		return TEE_ERROR_BAD_PARAMETERS;
-	default:
-		return TEE_ERROR_BAD_STATE;
-	}
-
-	params[1].memref.size = plain_length;
+					   plain_len, NULL, 0);
+	if (err != FSP_SUCCESS)
+		return rsip_err_to_tee(err);
 
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes_gcm_encryptfinal(uint32_t types,
-				       TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result gcm_enc_final(uint32_t types,
+				TEE_Param params[TEE_NUM_PARAMS])
 {
-	fsp_err_t err;
+	TEE_Result res = TEE_SUCCESS;
+	fsp_err_t err = FSP_ERR_CRYPTO_RSIP_FAIL;
 
-	uint8_t *cipher;
-	uint8_t *p_tag;
-	uint32_t remaining_length = 0;
+	uint8_t *plain = NULL;
+	uint32_t plain_len = 0;
+	uint32_t plain_tail[AES_BLOCK_SIZE / sizeof(uint32_t)] = { 0 };
+	uint8_t *cipher = NULL;
+	uint32_t cipher_max = 0;
+	uint32_t cipher_tail[AES_BLOCK_SIZE / sizeof(uint32_t)] = { 0 };
+	uint8_t *tag = NULL;
+	uint32_t tag_max = 0;
+	uint32_t tag_buff[AES_BLOCK_SIZE / sizeof(uint32_t)] = { 0 };
 
-	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
+	uint32_t exp_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
+					     TEE_PARAM_TYPE_MEMREF_OUTPUT,
+					     TEE_PARAM_TYPE_MEMREF_OUTPUT,
+					     TEE_PARAM_TYPE_NONE);
+	if (types != exp_types)
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	cipher = (uint8_t *)params[0].memref.buffer;
-	if ((!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t)) ||
-	    (AES_BLOCK_LEN > params[0].memref.size)) {
-		EMSG("cipher err");
+	plain = params[0].memref.buffer;
+	plain_len = (uint32_t)params[0].memref.size;
+	if (plain_len && (!plain || !IS_ALIGNED_WITH_UINT32(plain)))
 		return TEE_ERROR_BAD_PARAMETERS;
+	if (plain_len >= AES_BLOCK_SIZE)
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	cipher = params[1].memref.buffer;
+	cipher_max = (uint32_t)params[1].memref.size;
+	params[1].memref.size = (size_t)plain_len;
+	if (plain_len && (!cipher || !IS_ALIGNED_WITH_UINT32(cipher)))
+		return TEE_ERROR_BAD_PARAMETERS;
+	if (cipher_max < params[1].memref.size)
+		return TEE_ERROR_SHORT_BUFFER;
+
+	tag = params[2].memref.buffer;
+	tag_max = (uint32_t)params[2].memref.size;
+	params[2].memref.size = AES_BLOCK_SIZE;
+	if (!tag || !IS_ALIGNED_WITH_UINT32(tag))
+		return TEE_ERROR_BAD_PARAMETERS;
+	if (tag_max < params[2].memref.size)
+		return TEE_ERROR_SHORT_BUFFER;
+
+	if (plain_len) {
+		memcpy(plain_tail, plain, plain_len);
+		err = R_RSIP_AES_GCM_EncryptUpdate(&rsip_instance_ctrl,
+						   (uint8_t *)plain_tail,
+						   (uint8_t *)cipher_tail,
+						   plain_len, NULL, 0);
+		if (err != FSP_SUCCESS)
+			res = rsip_err_to_tee(err);
 	}
 
-	p_tag = (uint8_t *)params[1].memref.buffer;
-	if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) ||
-	    (AES_BLOCK_LEN > params[1].memref.size)) {
-		EMSG("tag err");
-		return TEE_ERROR_BAD_PARAMETERS;
+	err = R_RSIP_AES_GCM_EncryptFinal(&rsip_instance_ctrl,
+					  (uint8_t *)cipher_tail, &cipher_max,
+					  (uint8_t *)tag_buff);
+	if (res == TEE_SUCCESS && err != FSP_SUCCESS)
+		res = rsip_err_to_tee(err);
+
+	/* GCM Final must return same size as input tail */
+	if (res == TEE_SUCCESS && cipher_max != plain_len)
+		res = TEE_ERROR_GENERIC;
+
+	if (res == TEE_SUCCESS) {
+		if (cipher_max)
+			memcpy(cipher, cipher_tail, cipher_max);
+		memcpy(tag, tag_buff, AES_BLOCK_SIZE);
 	}
 
-	err = R_RSIP_AES_GCM_EncryptFinal(&rsip_instance_ctrl, cipher,
-					  &remaining_length, p_tag);
-	switch ((uint32_t)err) {
-	case FSP_SUCCESS:
-		break;
-	case FSP_ERR_ASSERTION:
-		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_NOT_OPEN:
-		return TEE_ERROR_BAD_STATE;
-	case FSP_ERR_INVALID_STATE:
-		return TEE_ERROR_BAD_STATE;
-	case FSP_ERR_CRYPTO_RSIP_FAIL:
-		return TEE_ERROR_GENERIC;
-	case FSP_ERR_CRYPTO_RSIP_FATAL:
-		return TEE_ERROR_GENERIC;
-	default:
-		return TEE_ERROR_BAD_STATE;
-	}
-
-	params[0].memref.size = remaining_length;
-	params[1].memref.size = RSIP_BYTE_SIZE_AES_BLOCK; // tag size 16byte
-
-	return TEE_SUCCESS;
+	return res;
 }
 
-static TEE_Result aes_gcm_decryptinit(uint32_t types,
-				      TEE_Param params[TEE_NUM_PARAMS],
-				      rsip_byte_size_wrapped_key_t key_size)
+static TEE_Result gcm_dec_init(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
 {
-	fsp_err_t err;
+	TEE_Result res = TEE_SUCCESS;
+	fsp_err_t err = FSP_ERR_CRYPTO_RSIP_FAIL;
 
-	rsip_wrapped_key_t *wrapped_key;
-	uint8_t *initial_vector;
-	uint32_t initial_vector_length;
+	uint8_t *nonce = NULL;
+	uint32_t nonce_len = 0;
 
-	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
+	const rsip_wrapped_key_t *wrapped_key = NULL;
+
+	uint32_t exp_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
+					     TEE_PARAM_TYPE_MEMREF_INPUT,
+					     TEE_PARAM_TYPE_NONE,
+					     TEE_PARAM_TYPE_NONE);
+	if (types != exp_types)
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	wrapped_key = (rsip_wrapped_key_t *)params[0].memref.buffer;
-	if ((!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t)) ||
-	    (key_size > params[0].memref.size)) {
-		EMSG("key err");
-		return TEE_ERROR_BAD_PARAMETERS;
-	}
+	res = get_aes_wrapped_key(&params[0], &wrapped_key);
+	if (res != TEE_SUCCESS)
+		return res;
 
-	initial_vector = (uint8_t *)params[1].memref.buffer;
-	initial_vector_length = params[1].memref.size;
-	if (!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t))
+	nonce = params[1].memref.buffer;
+	nonce_len = (uint32_t)params[1].memref.size;
+	if (!nonce || !IS_ALIGNED_WITH_UINT32(nonce))
+		return TEE_ERROR_BAD_PARAMETERS;
+	if (!nonce_len || nonce_len > AES_BLOCK_SIZE)
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	err = R_RSIP_AES_GCM_DecryptInit(&rsip_instance_ctrl, wrapped_key,
-					 initial_vector, initial_vector_length);
-	switch ((uint32_t)err) {
-	case FSP_SUCCESS:
-		break;
-	case FSP_ERR_ASSERTION:
+					 nonce, nonce_len);
+	if (err != FSP_SUCCESS)
+		return rsip_err_to_tee(err);
+
+	return TEE_SUCCESS;
+}
+
+static TEE_Result gcm_dec_aad(uint32_t types, TEE_Param params[TEE_NUM_PARAMS])
+{
+	fsp_err_t err = FSP_ERR_CRYPTO_RSIP_FAIL;
+
+	uint8_t *aad = NULL;
+	uint32_t aad_len = 0;
+
+	uint32_t exp_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
+					     TEE_PARAM_TYPE_NONE,
+					     TEE_PARAM_TYPE_NONE,
+					     TEE_PARAM_TYPE_NONE);
+	if (types != exp_types)
 		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_NOT_OPEN:
-		return TEE_ERROR_BAD_STATE;
-	case FSP_ERR_INVALID_STATE:
-		return TEE_ERROR_BAD_STATE;
-	case FSP_ERR_NOT_ENABLED:
+
+	aad = params[0].memref.buffer;
+	aad_len = (uint32_t)params[0].memref.size;
+	if (aad_len && (!aad || !IS_ALIGNED_WITH_UINT32(aad)))
 		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_INVALID_ARGUMENT:
+	if (!IS_ALIGNED(aad_len, AES_BLOCK_SIZE))
 		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_CRYPTO_RSIP_KEY_SET_FAIL:
+
+	err = R_RSIP_AES_GCM_DecryptUpdate(&rsip_instance_ctrl, NULL, NULL, 0,
+					   aad, aad_len);
+	if (err != FSP_SUCCESS)
+		return rsip_err_to_tee(err);
+
+	return TEE_SUCCESS;
+}
+
+static TEE_Result gcm_dec_aad_final(uint32_t types,
+				    TEE_Param params[TEE_NUM_PARAMS])
+{
+	fsp_err_t err = FSP_ERR_CRYPTO_RSIP_FAIL;
+
+	uint8_t *aad = NULL;
+	uint32_t aad_len = 0;
+	uint32_t aad_buff[AES_BLOCK_SIZE / sizeof(uint32_t)] = { 0 };
+
+	uint32_t exp_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
+					     TEE_PARAM_TYPE_NONE,
+					     TEE_PARAM_TYPE_NONE,
+					     TEE_PARAM_TYPE_NONE);
+	if (types != exp_types)
 		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_CRYPTO_RSIP_RESOURCE_CONFLICT:
-		return TEE_ERROR_ACCESS_CONFLICT;
-	case FSP_ERR_CRYPTO_RSIP_FATAL:
-		return TEE_ERROR_GENERIC;
-	default:
-		return TEE_ERROR_BAD_STATE;
+
+	aad = params[0].memref.buffer;
+	aad_len = (uint32_t)params[0].memref.size;
+	if (aad_len && (!aad || !IS_ALIGNED_WITH_UINT32(aad)))
+		return TEE_ERROR_BAD_PARAMETERS;
+	if (aad_len >= AES_BLOCK_SIZE)
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	if (aad_len) {
+		memcpy(aad_buff, aad, aad_len);
+		err = R_RSIP_AES_GCM_DecryptUpdate(&rsip_instance_ctrl, NULL,
+						   NULL, 0, (uint8_t *)aad_buff,
+						   aad_len);
+		if (err != FSP_SUCCESS)
+			return rsip_err_to_tee(err);
 	}
 
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes_gcm_decryptupdate(uint32_t types,
-					TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result gcm_dec_update(uint32_t types,
+				 TEE_Param params[TEE_NUM_PARAMS])
 {
-	fsp_err_t err;
+	fsp_err_t err = FSP_ERR_CRYPTO_RSIP_FAIL;
 
-	uint8_t *cipher;
-	uint8_t *plain;
-	uint8_t *aad;
-	uint32_t cipher_length;
-	uint32_t plain_length;
-	uint32_t aad_length;
+	uint8_t *cipher = NULL;
+	uint32_t cipher_len = 0;
+	uint8_t *plain = NULL;
+	uint32_t plain_max = 0;
 
-	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_NONE))
+	uint32_t exp_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
+					     TEE_PARAM_TYPE_MEMREF_OUTPUT,
+					     TEE_PARAM_TYPE_NONE,
+					     TEE_PARAM_TYPE_NONE);
+	if (types != exp_types)
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	cipher = (uint8_t *)params[0].memref.buffer;
-	cipher_length = (uint32_t)params[0].memref.size;
-	if (!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t))
+	cipher = params[0].memref.buffer;
+	cipher_len = (uint32_t)params[0].memref.size;
+	if (cipher_len && (!cipher || !IS_ALIGNED_WITH_UINT32(cipher)))
+		return TEE_ERROR_BAD_PARAMETERS;
+	if (!IS_ALIGNED(cipher_len, AES_BLOCK_SIZE))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	plain = (uint8_t *)params[1].memref.buffer;
-	plain_length = (uint32_t)params[1].memref.size;
-	if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) ||
-	    (plain_length < cipher_length))
+	plain = params[1].memref.buffer;
+	plain_max = (uint32_t)params[1].memref.size;
+	params[1].memref.size = (size_t)cipher_len;
+	if (cipher_len && (!plain || !IS_ALIGNED_WITH_UINT32(plain)))
 		return TEE_ERROR_BAD_PARAMETERS;
-
-	aad = (uint8_t *)params[2].memref.buffer;
-	aad_length = (uint32_t)params[2].memref.size;
-	if (!IS_ALIGNED_WITH_TYPE(params[2].memref.buffer, uint32_t))
-		return TEE_ERROR_BAD_PARAMETERS;
+	if (plain_max < params[1].memref.size)
+		return TEE_ERROR_SHORT_BUFFER;
 
 	err = R_RSIP_AES_GCM_DecryptUpdate(&rsip_instance_ctrl, cipher, plain,
-					   cipher_length, aad, aad_length);
-	switch ((uint32_t)err) {
-	case FSP_SUCCESS:
-		break;
-	case FSP_ERR_ASSERTION:
-		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_NOT_OPEN:
-		return TEE_ERROR_BAD_STATE;
-	case FSP_ERR_INVALID_STATE:
-		return TEE_ERROR_BAD_STATE;
-	case FSP_ERR_INVALID_SIZE:
-		return TEE_ERROR_BAD_PARAMETERS;
-	default:
-		return TEE_ERROR_BAD_STATE;
-	}
-
-	params[1].memref.size = cipher_length;
+					   cipher_len, NULL, 0);
+	if (err != FSP_SUCCESS)
+		return rsip_err_to_tee(err);
 
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes_gcm_decryptfinal(uint32_t types,
-				       TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result gcm_dec_final(uint32_t types,
+				TEE_Param params[TEE_NUM_PARAMS])
 {
-	fsp_err_t err;
+	TEE_Result res = TEE_SUCCESS;
+	fsp_err_t err = FSP_ERR_CRYPTO_RSIP_FAIL;
 
-	uint8_t *plain;
-	uint8_t *p_tag;
-	uint32_t p_tag_length;
-	uint32_t remaining_length = 0;
+	uint8_t *cipher = NULL;
+	uint32_t cipher_len = 0;
+	uint32_t cipher_tail[AES_BLOCK_SIZE / sizeof(uint32_t)] = { 0 };
+	uint8_t *plain = NULL;
+	uint32_t plain_max = 0;
+	uint32_t plain_tail[AES_BLOCK_SIZE / sizeof(uint32_t)] = { 0 };
+	uint8_t *tag = NULL;
+	uint32_t tag_len = 0;
+	uint32_t tag_buff[AES_BLOCK_SIZE / sizeof(uint32_t)] = { 0 };
 
-	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_NONE, TEE_PARAM_TYPE_NONE))
+	uint32_t exp_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
+					     TEE_PARAM_TYPE_MEMREF_OUTPUT,
+					     TEE_PARAM_TYPE_MEMREF_INPUT,
+					     TEE_PARAM_TYPE_NONE);
+	if (types != exp_types)
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	plain = (uint8_t *)params[0].memref.buffer;
-	if ((!IS_ALIGNED_WITH_TYPE(params[0].memref.buffer, uint32_t)) ||
-	    (AES_BLOCK_LEN > params[0].memref.size)) {
-		EMSG("plain err");
+	cipher = params[0].memref.buffer;
+	cipher_len = (uint32_t)params[0].memref.size;
+	if (cipher_len && (!cipher || !IS_ALIGNED_WITH_UINT32(cipher)))
 		return TEE_ERROR_BAD_PARAMETERS;
+	if (cipher_len >= AES_BLOCK_SIZE)
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	plain = params[1].memref.buffer;
+	plain_max = (uint32_t)params[1].memref.size;
+	params[1].memref.size = (size_t)cipher_len;
+	if (cipher_len && (!plain || !IS_ALIGNED_WITH_UINT32(plain)))
+		return TEE_ERROR_BAD_PARAMETERS;
+	if (plain_max < params[1].memref.size)
+		return TEE_ERROR_SHORT_BUFFER;
+
+	tag = params[2].memref.buffer;
+	tag_len = (uint32_t)params[2].memref.size;
+	if (!tag || !IS_ALIGNED_WITH_UINT32(tag))
+		return TEE_ERROR_BAD_PARAMETERS;
+	if (!tag_len || (tag_len > AES_BLOCK_SIZE))
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	if (cipher_len) {
+		memcpy(cipher_tail, cipher, cipher_len);
+		err = R_RSIP_AES_GCM_DecryptUpdate(&rsip_instance_ctrl,
+						   (uint8_t *)cipher_tail,
+						   (uint8_t *)plain_tail,
+						   cipher_len, NULL, 0);
+		if (err != FSP_SUCCESS)
+			res = rsip_err_to_tee(err);
 	}
 
-	p_tag = (uint8_t *)params[1].memref.buffer;
-	p_tag_length = params[1].memref.size;
-	if ((!IS_ALIGNED_WITH_TYPE(params[1].memref.buffer, uint32_t)) ||
-	    (AES_BLOCK_LEN > params[1].memref.size))
-		return TEE_ERROR_BAD_PARAMETERS;
+	memcpy(tag_buff, tag, tag_len);
+	err = R_RSIP_AES_GCM_DecryptFinal(&rsip_instance_ctrl,
+					  (uint8_t *)plain_tail, &plain_max,
+					  (uint8_t *)tag_buff, tag_len);
+	if (res == TEE_SUCCESS && err != FSP_SUCCESS)
+		res = rsip_err_to_tee(err);
 
-	err = R_RSIP_AES_GCM_DecryptFinal(&rsip_instance_ctrl, plain,
-					  &remaining_length, p_tag,
-					  p_tag_length);
-	switch ((uint32_t)err) {
-	case FSP_SUCCESS:
-		break;
-	case FSP_ERR_ASSERTION:
-		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_NOT_OPEN:
-		return TEE_ERROR_BAD_STATE;
-	case FSP_ERR_INVALID_STATE:
-		return TEE_ERROR_BAD_STATE;
-	case FSP_ERR_INVALID_SIZE:
-		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_CRYPTO_RSIP_FAIL:
-		return TEE_ERROR_GENERIC;
-	case FSP_ERR_CRYPTO_RSIP_AUTHENTICATION:
-		return TEE_ERROR_MAC_INVALID;
-	case FSP_ERR_CRYPTO_RSIP_FATAL:
-		return TEE_ERROR_GENERIC;
-	default:
-		return TEE_ERROR_BAD_STATE;
+	/* GCM Final must return same size as input tail */
+	if (res == TEE_SUCCESS && plain_max != cipher_len)
+		res = TEE_ERROR_GENERIC;
+
+	if (res == TEE_SUCCESS && plain_max) {
+		memcpy(plain, plain_tail, plain_max);
 	}
 
-	params[0].memref.size = remaining_length;
+	return res;
+}
+
+static TEE_Result cmac_gen_init(uint32_t types,
+				TEE_Param params[TEE_NUM_PARAMS])
+{
+	TEE_Result res = TEE_SUCCESS;
+	fsp_err_t err = FSP_ERR_CRYPTO_RSIP_FAIL;
+
+	const rsip_wrapped_key_t *wrapped_key = NULL;
+
+	uint32_t exp_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
+					     TEE_PARAM_TYPE_NONE,
+					     TEE_PARAM_TYPE_NONE,
+					     TEE_PARAM_TYPE_NONE);
+	if (types != exp_types)
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	res = get_aes_wrapped_key(&params[0], &wrapped_key);
+	if (res != TEE_SUCCESS)
+		return res;
+
+	err = R_RSIP_AES_CMAC_GenerateInit(&rsip_instance_ctrl, wrapped_key);
+	if (err != FSP_SUCCESS)
+		return rsip_err_to_tee(err);
 
 	return TEE_SUCCESS;
 }
 
-static TEE_Result aes128ecb_encryptinit(uint32_t types,
-					TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result cmac_gen_update(uint32_t types,
+				  TEE_Param params[TEE_NUM_PARAMS])
 {
-	return aes_cipher_encryptinit(types, params, RSIP_AES_MODE_ECB,
-				      RSIP_BYTE_SIZE_WRAPPED_KEY_AES_128);
+	fsp_err_t err = FSP_ERR_CRYPTO_RSIP_FAIL;
+
+	uint8_t *msg = NULL;
+	uint32_t msg_len = 0;
+
+	uint32_t exp_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
+					     TEE_PARAM_TYPE_NONE,
+					     TEE_PARAM_TYPE_NONE,
+					     TEE_PARAM_TYPE_NONE);
+	if (types != exp_types)
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	msg = params[0].memref.buffer;
+	msg_len = (uint32_t)params[0].memref.size;
+	if (msg_len && (!msg || !IS_ALIGNED_WITH_UINT32(msg)))
+		return TEE_ERROR_BAD_PARAMETERS;
+	if (!IS_ALIGNED(msg_len, AES_BLOCK_SIZE))
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	err = R_RSIP_AES_CMAC_GenerateUpdate(&rsip_instance_ctrl, msg, msg_len);
+	if (err != FSP_SUCCESS)
+		return rsip_err_to_tee(err);
+
+	return TEE_SUCCESS;
 }
 
-static TEE_Result aes256ecb_encryptinit(uint32_t types,
-					TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result cmac_gen_final(uint32_t types,
+				 TEE_Param params[TEE_NUM_PARAMS])
 {
-	return aes_cipher_encryptinit(types, params, RSIP_AES_MODE_ECB,
-				      RSIP_BYTE_SIZE_WRAPPED_KEY_AES_256);
+	TEE_Result res = TEE_SUCCESS;
+	fsp_err_t err = FSP_ERR_CRYPTO_RSIP_FAIL;
+
+	uint8_t *msg = NULL;
+	uint32_t msg_len = 0;
+	uint32_t msg_tail[AES_BLOCK_SIZE / sizeof(uint32_t)] = { 0 };
+	uint8_t *mac = NULL;
+	uint32_t mac_max = 0;
+	uint32_t mac_buff[AES_BLOCK_SIZE / sizeof(uint32_t)] = { 0 };
+
+	uint32_t exp_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
+					     TEE_PARAM_TYPE_MEMREF_OUTPUT,
+					     TEE_PARAM_TYPE_NONE,
+					     TEE_PARAM_TYPE_NONE);
+	if (types != exp_types)
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	msg = params[0].memref.buffer;
+	msg_len = (uint32_t)params[0].memref.size;
+	if (msg_len && (!msg || !IS_ALIGNED_WITH_UINT32(msg)))
+		return TEE_ERROR_BAD_PARAMETERS;
+	if (msg_len >= AES_BLOCK_SIZE)
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	mac = params[1].memref.buffer;
+	mac_max = (uint32_t)params[1].memref.size;
+	params[1].memref.size = AES_BLOCK_SIZE;
+	if (!mac || !IS_ALIGNED_WITH_UINT32(mac))
+		return TEE_ERROR_BAD_PARAMETERS;
+	if (mac_max < params[1].memref.size)
+		return TEE_ERROR_SHORT_BUFFER;
+
+	if (msg_len) {
+		memcpy(msg_tail, msg, msg_len);
+		err = R_RSIP_AES_CMAC_GenerateUpdate(
+			&rsip_instance_ctrl, (uint8_t *)msg_tail, msg_len);
+		if (err != FSP_SUCCESS)
+			res = rsip_err_to_tee(err);
+	}
+
+	err = R_RSIP_AES_CMAC_GenerateFinal(&rsip_instance_ctrl,
+					    (uint8_t *)mac_buff);
+	if (res == TEE_SUCCESS && err != FSP_SUCCESS)
+		res = rsip_err_to_tee(err);
+
+	if (res == TEE_SUCCESS)
+		memcpy(mac, mac_buff, AES_BLOCK_SIZE);
+
+	return res;
 }
 
-static TEE_Result aes128cbc_encryptinit(uint32_t types,
-					TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result cmac_verify_init(uint32_t types,
+				   TEE_Param params[TEE_NUM_PARAMS])
 {
-	return aes_cipher_encryptinit(types, params, RSIP_AES_MODE_CBC,
-				      RSIP_BYTE_SIZE_WRAPPED_KEY_AES_128);
+	TEE_Result res = TEE_SUCCESS;
+	fsp_err_t err = FSP_ERR_CRYPTO_RSIP_FAIL;
+
+	const rsip_wrapped_key_t *wrapped_key = NULL;
+
+	uint32_t exp_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
+					     TEE_PARAM_TYPE_NONE,
+					     TEE_PARAM_TYPE_NONE,
+					     TEE_PARAM_TYPE_NONE);
+	if (types != exp_types)
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	res = get_aes_wrapped_key(&params[0], &wrapped_key);
+	if (res != TEE_SUCCESS)
+		return res;
+
+	err = R_RSIP_AES_CMAC_VerifyInit(&rsip_instance_ctrl, wrapped_key);
+	if (err != FSP_SUCCESS)
+		return rsip_err_to_tee(err);
+
+	return TEE_SUCCESS;
 }
 
-static TEE_Result aes256cbc_encryptinit(uint32_t types,
-					TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result cmac_verify_update(uint32_t types,
+				     TEE_Param params[TEE_NUM_PARAMS])
 {
-	return aes_cipher_encryptinit(types, params, RSIP_AES_MODE_CBC,
-				      RSIP_BYTE_SIZE_WRAPPED_KEY_AES_256);
+	fsp_err_t err = FSP_ERR_CRYPTO_RSIP_FAIL;
+
+	uint8_t *msg = NULL;
+	uint32_t msg_len = 0;
+
+	uint32_t exp_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
+					     TEE_PARAM_TYPE_NONE,
+					     TEE_PARAM_TYPE_NONE,
+					     TEE_PARAM_TYPE_NONE);
+	if (types != exp_types)
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	msg = params[0].memref.buffer;
+	msg_len = (uint32_t)params[0].memref.size;
+	if (msg_len && (!msg || !IS_ALIGNED_WITH_UINT32(msg)))
+		return TEE_ERROR_BAD_PARAMETERS;
+	if (!IS_ALIGNED(msg_len, AES_BLOCK_SIZE))
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	err = R_RSIP_AES_CMAC_VerifyUpdate(&rsip_instance_ctrl, msg, msg_len);
+	if (err != FSP_SUCCESS)
+		return rsip_err_to_tee(err);
+
+	return TEE_SUCCESS;
 }
 
-static TEE_Result aes128ctr_encryptinit(uint32_t types,
-					TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result cmac_verify_final(uint32_t types,
+				    TEE_Param params[TEE_NUM_PARAMS])
 {
-	return aes_cipher_encryptinit(types, params, RSIP_AES_MODE_CTR,
-				      RSIP_BYTE_SIZE_WRAPPED_KEY_AES_128);
+	TEE_Result res = TEE_SUCCESS;
+	fsp_err_t err = FSP_ERR_CRYPTO_RSIP_FAIL;
+
+	uint8_t *msg = NULL;
+	uint32_t msg_len = 0;
+	uint32_t msg_tail[AES_BLOCK_SIZE / sizeof(uint32_t)] = { 0 };
+	uint8_t *mac = NULL;
+	uint32_t mac_len = 0;
+	uint32_t mac_buff[AES_BLOCK_SIZE / sizeof(uint32_t)] = { 0 };
+
+	uint32_t exp_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
+					     TEE_PARAM_TYPE_MEMREF_INPUT,
+					     TEE_PARAM_TYPE_NONE,
+					     TEE_PARAM_TYPE_NONE);
+	if (types != exp_types)
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	msg = params[0].memref.buffer;
+	msg_len = (uint32_t)params[0].memref.size;
+	if (msg_len && (!msg || !IS_ALIGNED_WITH_UINT32(msg)))
+		return TEE_ERROR_BAD_PARAMETERS;
+	if (msg_len >= AES_BLOCK_SIZE)
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	mac = params[1].memref.buffer;
+	mac_len = (uint32_t)params[1].memref.size;
+	if (!mac || !IS_ALIGNED_WITH_UINT32(mac))
+		return TEE_ERROR_BAD_PARAMETERS;
+	if (mac_len < 2 || mac_len > AES_BLOCK_SIZE)
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	if (msg_len) {
+		memcpy(msg_tail, msg, msg_len);
+		err = R_RSIP_AES_CMAC_VerifyUpdate(
+			&rsip_instance_ctrl, (uint8_t *)msg_tail, msg_len);
+		if (err != FSP_SUCCESS)
+			res = rsip_err_to_tee(err);
+	}
+
+	memcpy(mac_buff, mac, mac_len);
+
+	err = R_RSIP_AES_CMAC_VerifyFinal(&rsip_instance_ctrl,
+					  (uint8_t *)mac_buff, mac_len);
+	if (res == TEE_SUCCESS && err != FSP_SUCCESS)
+		res = rsip_err_to_tee(err);
+
+	return res;
 }
 
-static TEE_Result aes256ctr_encryptinit(uint32_t types,
-					TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result invoke_command_aes(uint32_t cmd, uint32_t ptypes,
+				     TEE_Param params[TEE_NUM_PARAMS])
 {
-	return aes_cipher_encryptinit(types, params, RSIP_AES_MODE_CTR,
-				      RSIP_BYTE_SIZE_WRAPPED_KEY_AES_256);
+	rsip_aes_mode_t mode = RSIP_AES_MODE_ECB;
+
+	TEE_Result res = get_rsip_aes_mode(cmd, &mode);
+	if (res != TEE_SUCCESS)
+		return res;
+
+	switch (cmd) {
+	case PTA_CMD_AES_ECB_EncryptInit:
+	case PTA_CMD_AES_CBC_EncryptInit:
+	case PTA_CMD_AES_CTR_EncryptInit:
+		return aes_enc_init(ptypes, params, mode);
+	case PTA_CMD_AES_ECB_EncryptUpdate:
+	case PTA_CMD_AES_CBC_EncryptUpdate:
+	case PTA_CMD_AES_CTR_EncryptUpdate:
+		return aes_enc_update(ptypes, params);
+	case PTA_CMD_AES_ECB_EncryptFinal:
+	case PTA_CMD_AES_CBC_EncryptFinal:
+	case PTA_CMD_AES_CTR_EncryptFinal:
+		return aes_enc_final(ptypes, params, mode);
+	case PTA_CMD_AES_ECB_DecryptInit:
+	case PTA_CMD_AES_CBC_DecryptInit:
+	case PTA_CMD_AES_CTR_DecryptInit:
+		return aes_dec_init(ptypes, params, mode);
+	case PTA_CMD_AES_ECB_DecryptUpdate:
+	case PTA_CMD_AES_CBC_DecryptUpdate:
+	case PTA_CMD_AES_CTR_DecryptUpdate:
+		return aes_dec_update(ptypes, params);
+	case PTA_CMD_AES_ECB_DecryptFinal:
+	case PTA_CMD_AES_CBC_DecryptFinal:
+	case PTA_CMD_AES_CTR_DecryptFinal:
+		return aes_dec_final(ptypes, params, mode);
+	default:
+		return TEE_ERROR_NOT_SUPPORTED;
+	}
 }
 
-static TEE_Result aes128xts_encryptinit(uint32_t types,
-					TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result invoke_command_xts(uint32_t cmd, uint32_t ptypes,
+				     TEE_Param params[TEE_NUM_PARAMS])
 {
-	return aes_cipher_encryptinit(types, params, RSIP_AES_MODE_XTS,
-				      RSIP_BYTE_SIZE_WRAPPED_KEY_AES_128_XTS);
+	switch (cmd) {
+	case PTA_CMD_AES_XTS_EncryptInit:
+		return xts_enc_init(ptypes, params);
+	case PTA_CMD_AES_XTS_EncryptUpdate:
+		return aes_enc_update(ptypes, params);
+	case PTA_CMD_AES_XTS_EncryptFinal:
+		return xts_enc_final(ptypes, params);
+	case PTA_CMD_AES_XTS_DecryptInit:
+		return xts_dec_init(ptypes, params);
+	case PTA_CMD_AES_XTS_DecryptUpdate:
+		return aes_dec_update(ptypes, params);
+	case PTA_CMD_AES_XTS_DecryptFinal:
+		return xts_dec_final(ptypes, params);
+	default:
+		return TEE_ERROR_NOT_SUPPORTED;
+	}
 }
 
-static TEE_Result aes256xts_encryptinit(uint32_t types,
-					TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result invoke_command_gcm(uint32_t cmd, uint32_t ptypes,
+				     TEE_Param params[TEE_NUM_PARAMS])
 {
-	return aes_cipher_encryptinit(types, params, RSIP_AES_MODE_XTS,
-				      RSIP_BYTE_SIZE_WRAPPED_KEY_AES_256_XTS);
+	switch (cmd) {
+	case PTA_CMD_AES_GCM_EncryptInit:
+		return gcm_enc_init(ptypes, params);
+	case PTA_CMD_AES_GCM_EncryptAADUpdate:
+		return gcm_enc_aad(ptypes, params);
+	case PTA_CMD_AES_GCM_EncryptAADFinal:
+		return gcm_enc_aad_final(ptypes, params);
+	case PTA_CMD_AES_GCM_EncryptUpdate:
+		return gcm_enc_update(ptypes, params);
+	case PTA_CMD_AES_GCM_EncryptFinal:
+		return gcm_enc_final(ptypes, params);
+	case PTA_CMD_AES_GCM_DecryptInit:
+		return gcm_dec_init(ptypes, params);
+	case PTA_CMD_AES_GCM_DecryptAADUpdate:
+		return gcm_dec_aad(ptypes, params);
+	case PTA_CMD_AES_GCM_DecryptAADFinal:
+		return gcm_dec_aad_final(ptypes, params);
+	case PTA_CMD_AES_GCM_DecryptUpdate:
+		return gcm_dec_update(ptypes, params);
+	case PTA_CMD_AES_GCM_DecryptFinal:
+		return gcm_dec_final(ptypes, params);
+	default:
+		return TEE_ERROR_NOT_SUPPORTED;
+	}
 }
 
-static TEE_Result aes128ecb_decryptinit(uint32_t types,
-					TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result invoke_command_cmac(uint32_t cmd, uint32_t ptypes,
+				      TEE_Param params[TEE_NUM_PARAMS])
 {
-	return aes_cipher_decryptinit(types, params, RSIP_AES_MODE_ECB,
-				      RSIP_BYTE_SIZE_WRAPPED_KEY_AES_128);
-}
-
-static TEE_Result aes256ecb_decryptinit(uint32_t types,
-					TEE_Param params[TEE_NUM_PARAMS])
-{
-	return aes_cipher_decryptinit(types, params, RSIP_AES_MODE_ECB,
-				      RSIP_BYTE_SIZE_WRAPPED_KEY_AES_256);
-}
-
-static TEE_Result aes128cbc_decryptinit(uint32_t types,
-					TEE_Param params[TEE_NUM_PARAMS])
-{
-	return aes_cipher_decryptinit(types, params, RSIP_AES_MODE_CBC,
-				      RSIP_BYTE_SIZE_WRAPPED_KEY_AES_128);
-}
-
-static TEE_Result aes256cbc_decryptinit(uint32_t types,
-					TEE_Param params[TEE_NUM_PARAMS])
-{
-	return aes_cipher_decryptinit(types, params, RSIP_AES_MODE_CBC,
-				      RSIP_BYTE_SIZE_WRAPPED_KEY_AES_256);
-}
-
-static TEE_Result aes128ctr_decryptinit(uint32_t types,
-					TEE_Param params[TEE_NUM_PARAMS])
-{
-	return aes_cipher_decryptinit(types, params, RSIP_AES_MODE_CTR,
-				      RSIP_BYTE_SIZE_WRAPPED_KEY_AES_128);
-}
-
-static TEE_Result aes256ctr_decryptinit(uint32_t types,
-					TEE_Param params[TEE_NUM_PARAMS])
-{
-	return aes_cipher_decryptinit(types, params, RSIP_AES_MODE_CTR,
-				      RSIP_BYTE_SIZE_WRAPPED_KEY_AES_256);
-}
-
-static TEE_Result aes128xts_decryptinit(uint32_t types,
-					TEE_Param params[TEE_NUM_PARAMS])
-{
-	return aes_cipher_decryptinit(types, params, RSIP_AES_MODE_XTS,
-				      RSIP_BYTE_SIZE_WRAPPED_KEY_AES_128_XTS);
-}
-
-static TEE_Result aes256xts_decryptinit(uint32_t types,
-					TEE_Param params[TEE_NUM_PARAMS])
-{
-	return aes_cipher_decryptinit(types, params, RSIP_AES_MODE_XTS,
-				      RSIP_BYTE_SIZE_WRAPPED_KEY_AES_256_XTS);
-}
-
-static TEE_Result aes128cmac_generateinit(uint32_t types,
-					  TEE_Param params[TEE_NUM_PARAMS])
-{
-	return aes_cmac_generateinit(types, params,
-				     RSIP_BYTE_SIZE_WRAPPED_KEY_AES_128);
-}
-
-static TEE_Result aes256cmac_generateinit(uint32_t types,
-					  TEE_Param params[TEE_NUM_PARAMS])
-{
-	return aes_cmac_generateinit(types, params,
-				     RSIP_BYTE_SIZE_WRAPPED_KEY_AES_256);
-}
-
-static TEE_Result aes128cmac_verifyinit(uint32_t types,
-					TEE_Param params[TEE_NUM_PARAMS])
-{
-	return aes_cmac_verifyinit(types, params,
-				   RSIP_BYTE_SIZE_WRAPPED_KEY_AES_128);
-}
-
-static TEE_Result aes256cmac_verifyinit(uint32_t types,
-					TEE_Param params[TEE_NUM_PARAMS])
-{
-	return aes_cmac_verifyinit(types, params,
-				   RSIP_BYTE_SIZE_WRAPPED_KEY_AES_256);
-}
-
-static TEE_Result aes128gcm_encryptinit(uint32_t types,
-					TEE_Param params[TEE_NUM_PARAMS])
-{
-	return aes_gcm_encryptinit(types, params,
-				   RSIP_BYTE_SIZE_WRAPPED_KEY_AES_128);
-}
-
-static TEE_Result aes256gcm_encryptinit(uint32_t types,
-					TEE_Param params[TEE_NUM_PARAMS])
-{
-	return aes_gcm_encryptinit(types, params,
-				   RSIP_BYTE_SIZE_WRAPPED_KEY_AES_256);
-}
-
-static TEE_Result aes128gcm_decryptinit(uint32_t types,
-					TEE_Param params[TEE_NUM_PARAMS])
-{
-	return aes_gcm_decryptinit(types, params,
-				   RSIP_BYTE_SIZE_WRAPPED_KEY_AES_128);
-}
-
-static TEE_Result aes256gcm_decryptinit(uint32_t types,
-					TEE_Param params[TEE_NUM_PARAMS])
-{
-	return aes_gcm_decryptinit(types, params,
-				   RSIP_BYTE_SIZE_WRAPPED_KEY_AES_256);
+	switch (cmd) {
+	case PTA_CMD_AES_CMAC_GenerateInit:
+		return cmac_gen_init(ptypes, params);
+	case PTA_CMD_AES_CMAC_GenerateUpdate:
+		return cmac_gen_update(ptypes, params);
+	case PTA_CMD_AES_CMAC_GenerateFinal:
+		return cmac_gen_final(ptypes, params);
+	case PTA_CMD_AES_CMAC_VerifyInit:
+		return cmac_verify_init(ptypes, params);
+	case PTA_CMD_AES_CMAC_VerifyUpdate:
+		return cmac_verify_update(ptypes, params);
+	case PTA_CMD_AES_CMAC_VerifyFinal:
+		return cmac_verify_final(ptypes, params);
+	default:
+		return TEE_ERROR_NOT_SUPPORTED;
+	}
 }
 
 static TEE_Result invoke_command(void *session __unused, uint32_t cmd,
 				 uint32_t ptypes,
 				 TEE_Param params[TEE_NUM_PARAMS])
 {
-	EMSG(PTA_NAME " command %#" PRIx32 " ptypes %#" PRIx32, cmd, ptypes);
+	DMSG(PTA_NAME " command %#" PRIx32 " ptypes %#" PRIx32, cmd, ptypes);
 
-	switch (cmd) {
-	case PTA_CMD_AES128ECB_EncryptInit:
-		return aes128ecb_encryptinit(ptypes, params);
-	case PTA_CMD_AES256ECB_EncryptInit:
-		return aes256ecb_encryptinit(ptypes, params);
-
-	case PTA_CMD_AES128CBC_EncryptInit:
-		return aes128cbc_encryptinit(ptypes, params);
-	case PTA_CMD_AES256CBC_EncryptInit:
-		return aes256cbc_encryptinit(ptypes, params);
-
-	case PTA_CMD_AES128CTR_EncryptInit:
-		return aes128ctr_encryptinit(ptypes, params);
-	case PTA_CMD_AES256CTR_EncryptInit:
-		return aes256ctr_encryptinit(ptypes, params);
-
-	case PTA_CMD_AES128XTS_EncryptInit:
-		return aes128xts_encryptinit(ptypes, params);
-	case PTA_CMD_AES256XTS_EncryptInit:
-		return aes256xts_encryptinit(ptypes, params);
-
-	case PTA_CMD_AES128ECB_EncryptUpdate:
-	case PTA_CMD_AES256ECB_EncryptUpdate:
-	case PTA_CMD_AES128CBC_EncryptUpdate:
-	case PTA_CMD_AES256CBC_EncryptUpdate:
-	case PTA_CMD_AES128CTR_EncryptUpdate:
-	case PTA_CMD_AES256CTR_EncryptUpdate:
-	case PTA_CMD_AES128XTS_EncryptUpdate:
-	case PTA_CMD_AES256XTS_EncryptUpdate:
-		return aes_cipher_encryptupdate(ptypes, params);
-
-	case PTA_CMD_AES128ECB_EncryptFinal:
-	case PTA_CMD_AES256ECB_EncryptFinal:
-	case PTA_CMD_AES128CBC_EncryptFinal:
-	case PTA_CMD_AES256CBC_EncryptFinal:
-	case PTA_CMD_AES128CTR_EncryptFinal:
-	case PTA_CMD_AES256CTR_EncryptFinal:
-	case PTA_CMD_AES128XTS_EncryptFinal:
-	case PTA_CMD_AES256XTS_EncryptFinal:
-		return aes_cipher_encryptfinal(ptypes, params);
-
-	case PTA_CMD_AES128ECB_DecryptInit:
-		return aes128ecb_decryptinit(ptypes, params);
-	case PTA_CMD_AES256ECB_DecryptInit:
-		return aes256ecb_decryptinit(ptypes, params);
-
-	case PTA_CMD_AES128CBC_DecryptInit:
-		return aes128cbc_decryptinit(ptypes, params);
-	case PTA_CMD_AES256CBC_DecryptInit:
-		return aes256cbc_decryptinit(ptypes, params);
-
-	case PTA_CMD_AES128CTR_DecryptInit:
-		return aes128ctr_decryptinit(ptypes, params);
-	case PTA_CMD_AES256CTR_DecryptInit:
-		return aes256ctr_decryptinit(ptypes, params);
-
-	case PTA_CMD_AES128XTS_DecryptInit:
-		return aes128xts_decryptinit(ptypes, params);
-	case PTA_CMD_AES256XTS_DecryptInit:
-		return aes256xts_decryptinit(ptypes, params);
-
-	case PTA_CMD_AES128ECB_DecryptUpdate:
-	case PTA_CMD_AES256ECB_DecryptUpdate:
-	case PTA_CMD_AES128CBC_DecryptUpdate:
-	case PTA_CMD_AES256CBC_DecryptUpdate:
-	case PTA_CMD_AES128CTR_DecryptUpdate:
-	case PTA_CMD_AES256CTR_DecryptUpdate:
-	case PTA_CMD_AES128XTS_DecryptUpdate:
-	case PTA_CMD_AES256XTS_DecryptUpdate:
-		return aes_cipher_decryptupdate(ptypes, params);
-	case PTA_CMD_AES128ECB_DecryptFinal:
-	case PTA_CMD_AES256ECB_DecryptFinal:
-	case PTA_CMD_AES128CBC_DecryptFinal:
-	case PTA_CMD_AES256CBC_DecryptFinal:
-	case PTA_CMD_AES128CTR_DecryptFinal:
-	case PTA_CMD_AES256CTR_DecryptFinal:
-	case PTA_CMD_AES128XTS_DecryptFinal:
-	case PTA_CMD_AES256XTS_DecryptFinal:
-		return aes_cipher_decryptfinal(ptypes, params);
-
-	case PTA_CMD_AES128CMAC_GenerateInit:
-		return aes128cmac_generateinit(ptypes, params);
-	case PTA_CMD_AES256CMAC_GenerateInit:
-		return aes256cmac_generateinit(ptypes, params);
-	case PTA_CMD_AES128CMAC_GenerateUpdate:
-	case PTA_CMD_AES256CMAC_GenerateUpdate:
-		return aes_cmac_generateupdate(ptypes, params);
-	case PTA_CMD_AES128CMAC_GenerateFinal:
-	case PTA_CMD_AES256CMAC_GenerateFinal:
-		return aes_cmac_generatefinal(ptypes, params);
-	case PTA_CMD_AES128CMAC_VerifyInit:
-		return aes128cmac_verifyinit(ptypes, params);
-	case PTA_CMD_AES256CMAC_VerifyInit:
-		return aes256cmac_verifyinit(ptypes, params);
-	case PTA_CMD_AES128CMAC_VerifyUpdate:
-	case PTA_CMD_AES256CMAC_VerifyUpdate:
-		return aes_cmac_verifyupdate(ptypes, params);
-	case PTA_CMD_AES128CMAC_VerifyFinal:
-	case PTA_CMD_AES256CMAC_VerifyFinal:
-		return aes_cmac_verifyfinal(ptypes, params);
-
-	case PTA_CMD_AES128GCM_EncryptInit:
-		return aes128gcm_encryptinit(ptypes, params);
-	case PTA_CMD_AES256GCM_EncryptInit:
-		return aes256gcm_encryptinit(ptypes, params);
-
-	case PTA_CMD_AES128GCM_EncryptUpdate:
-	case PTA_CMD_AES256GCM_EncryptUpdate:
-		return aes_gcm_encryptupdate(ptypes, params);
-
-	case PTA_CMD_AES128GCM_EncryptFinal:
-	case PTA_CMD_AES256GCM_EncryptFinal:
-		return aes_gcm_encryptfinal(ptypes, params);
-
-	case PTA_CMD_AES128GCM_DecryptInit:
-		return aes128gcm_decryptinit(ptypes, params);
-	case PTA_CMD_AES256GCM_DecryptInit:
-		return aes256gcm_decryptinit(ptypes, params);
-
-	case PTA_CMD_AES128GCM_DecryptUpdate:
-	case PTA_CMD_AES256GCM_DecryptUpdate:
-		return aes_gcm_decryptupdate(ptypes, params);
-
-	case PTA_CMD_AES128GCM_DecryptFinal:
-	case PTA_CMD_AES256GCM_DecryptFinal:
-		return aes_gcm_decryptfinal(ptypes, params);
-
+	switch (PTA_CMD_GET_VARIANT(cmd)) {
+	case PTA_VARIANT_AES_XTS:
+		return invoke_command_xts(cmd, ptypes, params);
+	case PTA_VARIANT_AES_GCM:
+		return invoke_command_gcm(cmd, ptypes, params);
+	case PTA_VARIANT_AES_CMAC:
+		return invoke_command_cmac(cmd, ptypes, params);
 	default:
-		return TEE_ERROR_NOT_SUPPORTED;
+		return invoke_command_aes(cmd, ptypes, params);
 	}
 }
 

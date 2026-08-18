@@ -33,6 +33,7 @@
 #define SPI_SIZE 0x00010000
 #define SFLASH_BASE 0x20000000U
 #define SFLASH_SIZE 0x10000000
+#define SFLASH_KUK_ADDR 0x20A00000U
 
 #if defined(PLATFORM_FLAVOR_v2h_evk_1) || defined(PLATFORM_FLAVOR_v2n_evk)
 /* DDR 8Gbyte x2 */
