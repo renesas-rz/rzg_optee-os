@@ -122,9 +122,9 @@ static TEE_Result sha_final(struct sha_ctx *ctx, uint32_t types,
 	uint8_t *msg = NULL;
 	uint32_t msg_len = 0;
 	uint32_t msg_tail[1] = { 0 };
-	uint8_t *dgst = NULL;
-	uint32_t dgst_max = 0;
-	uint32_t dgst_buff[RSIP_DIGEST_SIZE_MAX / sizeof(uint32_t)] = { 0 };
+	uint8_t *digest = NULL;
+	uint32_t digest_max = 0;
+	uint32_t digest_buff[RSIP_DIGEST_SIZE_MAX / sizeof(uint32_t)] = { 0 };
 
 	uint32_t exp_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
 					     TEE_PARAM_TYPE_MEMREF_OUTPUT,
@@ -140,12 +140,12 @@ static TEE_Result sha_final(struct sha_ctx *ctx, uint32_t types,
 	if (msg_len >= sizeof(msg_tail))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	dgst = params[1].memref.buffer;
-	dgst_max = (uint32_t)params[1].memref.size;
+	digest = params[1].memref.buffer;
+	digest_max = (uint32_t)params[1].memref.size;
 	params[1].memref.size = ctx->desc.digest_size;
-	if (!dgst || !IS_ALIGNED_WITH_UINT32(dgst))
+	if (!digest || !IS_ALIGNED_WITH_UINT32(digest))
 		return TEE_ERROR_BAD_PARAMETERS;
-	if (dgst_max < params[1].memref.size)
+	if (digest_max < params[1].memref.size)
 		return TEE_ERROR_SHORT_BUFFER;
 
 	if (msg_len) {
@@ -159,12 +159,12 @@ static TEE_Result sha_final(struct sha_ctx *ctx, uint32_t types,
 	}
 
 	err = R_RSIP_SHA_GenerateFinal(&rsip_instance_ctrl, &ctx->handle,
-				       (uint8_t *)dgst_buff);
+				       (uint8_t *)digest_buff);
 	if (res == TEE_SUCCESS && err != FSP_SUCCESS)
 		res = rsip_err_to_tee(err);
 
 	if (res == TEE_SUCCESS)
-		memcpy(dgst, dgst_buff, ctx->desc.digest_size);
+		memcpy(digest, digest_buff, ctx->desc.digest_size);
 
 	return res;
 }

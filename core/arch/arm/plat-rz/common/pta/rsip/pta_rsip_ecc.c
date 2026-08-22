@@ -113,9 +113,9 @@ static TEE_Result ecdsa_sign(uint32_t types, TEE_Param params[TEE_NUM_PARAMS],
 
 	struct rsip_ecc_desc ecc_desc = { 0 };
 
-	size_t dgst_len = 0;
-	uint8_t *dgst = NULL;
-	uint32_t dgst_buff[RSIP_DIGEST_SIZE_MAX / sizeof(uint32_t)] = { 0 };
+	size_t digest_len = 0;
+	uint8_t *digest = NULL;
+	uint32_t digest_buff[RSIP_DIGEST_SIZE_MAX / sizeof(uint32_t)] = { 0 };
 	size_t sig_max = 0;
 	uint8_t *sig = NULL;
 	uint32_t sig_buff[RSIP_ECDSA_SIG_SIZE_MAX / sizeof(uint32_t)] = { 0 };
@@ -137,11 +137,11 @@ static TEE_Result ecdsa_sign(uint32_t types, TEE_Param params[TEE_NUM_PARAMS],
 	if (res != TEE_SUCCESS)
 		return res;
 
-	dgst = params[0].memref.buffer;
-	dgst_len = params[0].memref.size;
-	if (!dgst || !IS_ALIGNED_WITH_UINT32(dgst))
+	digest = params[0].memref.buffer;
+	digest_len = params[0].memref.size;
+	if (!digest || !IS_ALIGNED_WITH_UINT32(digest))
 		return TEE_ERROR_BAD_PARAMETERS;
-	if (dgst_len != ecc_desc.digest_size)
+	if (digest_len != ecc_desc.digest_size)
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	sig = params[1].memref.buffer;
@@ -152,10 +152,10 @@ static TEE_Result ecdsa_sign(uint32_t types, TEE_Param params[TEE_NUM_PARAMS],
 	if (sig_max < params[1].memref.size)
 		return TEE_ERROR_SHORT_BUFFER;
 
-	ecc_digest_pack((uint8_t *)dgst_buff, dgst, &ecc_desc);
+	ecc_digest_pack((uint8_t *)digest_buff, digest, &ecc_desc);
 
 	err = R_RSIP_ECDSA_Sign(&rsip_instance_ctrl, wrapped_key,
-				(uint8_t *)dgst_buff, (uint8_t *)sig_buff);
+				(uint8_t *)digest_buff, (uint8_t *)sig_buff);
 	if (err != FSP_SUCCESS)
 		return rsip_err_to_tee(err);
 
@@ -172,9 +172,9 @@ static TEE_Result ecdsa_verify(uint32_t types, TEE_Param params[TEE_NUM_PARAMS],
 
 	struct rsip_ecc_desc ecc_desc = { 0 };
 
-	size_t dgst_len = 0;
-	uint8_t *dgst = NULL;
-	uint32_t dgst_buff[RSIP_DIGEST_SIZE_MAX / sizeof(uint32_t)] = { 0 };
+	size_t digest_len = 0;
+	uint8_t *digest = NULL;
+	uint32_t digest_buff[RSIP_DIGEST_SIZE_MAX / sizeof(uint32_t)] = { 0 };
 	size_t sig_len = 0;
 	uint8_t *sig = NULL;
 	uint32_t sig_buff[RSIP_ECDSA_SIG_SIZE_MAX / sizeof(uint32_t)] = { 0 };
@@ -196,11 +196,11 @@ static TEE_Result ecdsa_verify(uint32_t types, TEE_Param params[TEE_NUM_PARAMS],
 	if (res != TEE_SUCCESS)
 		return res;
 
-	dgst = params[0].memref.buffer;
-	dgst_len = params[0].memref.size;
-	if (!dgst || !IS_ALIGNED_WITH_UINT32(dgst))
+	digest = params[0].memref.buffer;
+	digest_len = params[0].memref.size;
+	if (!digest || !IS_ALIGNED_WITH_UINT32(digest))
 		return TEE_ERROR_BAD_PARAMETERS;
-	if (dgst_len != ecc_desc.digest_size)
+	if (digest_len != ecc_desc.digest_size)
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	sig = params[1].memref.buffer;
@@ -210,12 +210,12 @@ static TEE_Result ecdsa_verify(uint32_t types, TEE_Param params[TEE_NUM_PARAMS],
 	if (sig_len != ecc_desc.signature_size)
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	ecc_digest_pack((void *)dgst_buff, dgst, &ecc_desc);
+	ecc_digest_pack((void *)digest_buff, digest, &ecc_desc);
 
 	ecc_signature_pack((void *)sig_buff, sig, &ecc_desc);
 
 	err = R_RSIP_ECDSA_Verify(&rsip_instance_ctrl, wrapped_key,
-				  (uint8_t *)dgst_buff, (uint8_t *)sig_buff);
+				  (uint8_t *)digest_buff, (uint8_t *)sig_buff);
 	if (err != FSP_SUCCESS)
 		return rsip_verify_err_to_tee(err, RSIP_VERIFY_ECC);
 

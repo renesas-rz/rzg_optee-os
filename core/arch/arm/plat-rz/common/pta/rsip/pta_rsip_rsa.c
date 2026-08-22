@@ -22,7 +22,7 @@ struct rsip_rsa_desc {
 
 struct rsip_rsa_hash_desc {
 	size_t hash_size;
-	size_t salt_len;
+	int32_t salt_len;
 	rsip_mgf_type_t mgf_type;
 };
 
@@ -86,7 +86,7 @@ static TEE_Result get_rsa_hash_desc(rsip_hash_type_t hash_type,
 	if (res != TEE_SUCCESS)
 		return res;
 
-	desc->salt_len = desc->hash_size;
+	desc->salt_len = RSIP_RSA_SALT_LENGTH_AUTO;
 
 	switch (hash_type) {
 	case RSIP_HASH_TYPE_SHA1:
