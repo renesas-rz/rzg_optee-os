@@ -33,4 +33,4 @@ static TEE_Result init_tsip(void)
 	return TEE_SUCCESS;
 }
 
-driver_init(init_tsip);
+service_init_crypto(init_tsip);
