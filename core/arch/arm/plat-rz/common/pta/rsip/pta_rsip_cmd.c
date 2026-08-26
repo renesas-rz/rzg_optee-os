@@ -156,7 +156,7 @@ static rsip_key_pair_type_t get_ecc_keypair_type(uint32_t cmd)
 			return RSIP_KEY_PAIR_TYPE_INVALID;
 		}
 	case PTA_VARIANT_ECC_BRAINPOOL:
-		switch (PTA_CMD_GET_TYPE(cmd & 0xF)) {
+		switch (PTA_CMD_GET_TYPE(cmd) & 0xF) {
 		case PTA_KEY_SIZE_256:
 			return RSIP_KEY_PAIR_TYPE_ECC_BRAINPOOLP256R1;
 		default:

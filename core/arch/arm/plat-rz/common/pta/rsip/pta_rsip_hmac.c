@@ -151,23 +151,33 @@ static TEE_Result hmac_gen_final(struct hmac_ctx *ctx, uint32_t types,
 					     TEE_PARAM_TYPE_NONE,
 					     TEE_PARAM_TYPE_NONE);
 
-	if (types != exp_types)
-		return TEE_ERROR_BAD_PARAMETERS;
+	if (types != exp_types) {
+		res = TEE_ERROR_BAD_PARAMETERS;
+		goto cleanup;
+	}
 
 	msg = params[0].memref.buffer;
 	msg_len = (uint32_t)params[0].memref.size;
-	if (msg_len && (!msg || !IS_ALIGNED_WITH_UINT32(msg)))
-		return TEE_ERROR_BAD_PARAMETERS;
-	if (msg_len >= sizeof(msg_tail))
-		return TEE_ERROR_BAD_PARAMETERS;
+	if (msg_len && (!msg || !IS_ALIGNED_WITH_UINT32(msg))) {
+		res = TEE_ERROR_BAD_PARAMETERS;
+		goto cleanup;
+	}
+	if (msg_len >= sizeof(msg_tail)) {
+		res = TEE_ERROR_BAD_PARAMETERS;
+		goto cleanup;
+	}
 
 	mac = params[1].memref.buffer;
 	mac_max = params[1].memref.size;
 	params[1].memref.size = ctx->desc.mac_size;
-	if (!mac || !IS_ALIGNED_WITH_UINT32(mac))
-		return TEE_ERROR_BAD_PARAMETERS;
-	if (mac_max < params[1].memref.size)
-		return TEE_ERROR_SHORT_BUFFER;
+	if (!mac || !IS_ALIGNED_WITH_UINT32(mac)) {
+		res = TEE_ERROR_BAD_PARAMETERS;
+		goto cleanup;
+	}
+	if (mac_max < params[1].memref.size) {
+		res = TEE_ERROR_SHORT_BUFFER;
+		goto cleanup;
+	}
 
 	if (msg_len) {
 		memcpy(msg_tail, msg, msg_len);
@@ -175,18 +185,23 @@ static TEE_Result hmac_gen_final(struct hmac_ctx *ctx, uint32_t types,
 		err = R_RSIP_HMAC_GenerateUpdate(&rsip_instance_ctrl,
 						 &ctx->handle,
 						 (uint8_t *)msg_tail, msg_len);
-		if (err != FSP_SUCCESS)
+		if (err != FSP_SUCCESS) {
 			res = rsip_err_to_tee(err);
+			goto cleanup;
+		}
 	}
 
 	err = R_RSIP_HMAC_GenerateFinal(&rsip_instance_ctrl, &ctx->handle,
 					(uint8_t *)mac_buff);
-	if (res == TEE_SUCCESS && err != FSP_SUCCESS)
-		res = rsip_err_to_tee(err);
+	res = rsip_err_to_tee(err);
 
 	if (res == TEE_SUCCESS)
 		memcpy(mac, mac_buff, ctx->desc.mac_size);
 
+	return res;
+cleanup:
+	R_RSIP_HMAC_GenerateFinal(&rsip_instance_ctrl, &ctx->handle,
+				  (uint8_t *)mac_buff);
 	return res;
 }
 
@@ -270,24 +285,36 @@ static TEE_Result hmac_verify_final(struct hmac_ctx *ctx, uint32_t types,
 					     TEE_PARAM_TYPE_NONE,
 					     TEE_PARAM_TYPE_NONE);
 
-	if (types != exp_types)
-		return TEE_ERROR_BAD_PARAMETERS;
+	if (types != exp_types) {
+		res = TEE_ERROR_BAD_PARAMETERS;
+		goto cleanup;
+	}
 
 	msg = params[0].memref.buffer;
 	msg_len = (uint32_t)params[0].memref.size;
-	if (msg_len && (!msg || !IS_ALIGNED_WITH_UINT32(msg)))
-		return TEE_ERROR_BAD_PARAMETERS;
-	if (msg_len >= sizeof(msg_tail))
-		return TEE_ERROR_BAD_PARAMETERS;
+	if (msg_len && (!msg || !IS_ALIGNED_WITH_UINT32(msg))) {
+		res = TEE_ERROR_BAD_PARAMETERS;
+		goto cleanup;
+	}
+	if (msg_len >= sizeof(msg_tail)) {
+		res = TEE_ERROR_BAD_PARAMETERS;
+		goto cleanup;
+	}
 
 	mac = params[1].memref.buffer;
 	mac_len = (uint32_t)params[1].memref.size;
-	if (!mac || !IS_ALIGNED_WITH_UINT32(mac))
-		return TEE_ERROR_BAD_PARAMETERS;
-	if (mac_len < RSIP_HMAC_MAC_SIZE_MIN)
-		return TEE_ERROR_BAD_PARAMETERS;
-	if (mac_len > ctx->desc.mac_size)
-		return TEE_ERROR_BAD_PARAMETERS;
+	if (!mac || !IS_ALIGNED_WITH_UINT32(mac)) {
+		res = TEE_ERROR_BAD_PARAMETERS;
+		goto cleanup;
+	}
+	if (mac_len < RSIP_HMAC_MAC_SIZE_MIN) {
+		res = TEE_ERROR_BAD_PARAMETERS;
+		goto cleanup;
+	}
+	if (mac_len > ctx->desc.mac_size) {
+		res = TEE_ERROR_BAD_PARAMETERS;
+		goto cleanup;
+	}
 
 	if (msg_len) {
 		memcpy(msg_tail, msg, msg_len);
@@ -295,16 +322,20 @@ static TEE_Result hmac_verify_final(struct hmac_ctx *ctx, uint32_t types,
 		err = R_RSIP_HMAC_VerifyUpdate(&rsip_instance_ctrl,
 					       &ctx->handle,
 					       (uint8_t *)msg_tail, msg_len);
-		if (err != FSP_SUCCESS)
+		if (err != FSP_SUCCESS) {
 			res = rsip_err_to_tee(err);
+			goto cleanup;
+		}
 	}
 
 	memcpy(mac_buff, mac, mac_len);
 	err = R_RSIP_HMAC_VerifyFinal(&rsip_instance_ctrl, &ctx->handle,
 				      (uint8_t *)mac_buff, mac_len);
-	if (res == TEE_SUCCESS && err != FSP_SUCCESS)
-		res = rsip_verify_err_to_tee(err, RSIP_VERIFY_MAC);
-
+	return rsip_verify_err_to_tee(err, RSIP_VERIFY_MAC);
+cleanup:
+	mac_len = ctx->desc.mac_size;
+	R_RSIP_HMAC_VerifyFinal(&rsip_instance_ctrl, &ctx->handle,
+				(uint8_t *)mac_buff, mac_len);
 	return res;
 }
 

@@ -638,6 +638,8 @@ static TEE_Result rsa_raw_encrypt(uint32_t types,
 
 	uint8_t *plain = NULL;
 	uint32_t plain_len = 0;
+	uint32_t plain_buff[RSIP_RSA_MOD_SIZE_MAX / sizeof(uint32_t)] = { 0 };
+	uint32_t plain_lpad = 0;
 	uint8_t *cipher = NULL;
 	uint32_t cipher_max = 0;
 
@@ -662,7 +664,7 @@ static TEE_Result rsa_raw_encrypt(uint32_t types,
 	plain_len = (uint32_t)params[0].memref.size;
 	if (!plain || !IS_ALIGNED_WITH_UINT32(plain))
 		return TEE_ERROR_BAD_PARAMETERS;
-	if (plain_len != rsa_desc.modulus_size)
+	if (!plain_len || plain_len > rsa_desc.modulus_size)
 		return TEE_ERROR_BAD_PARAMETERS;
 
 	cipher = params[1].memref.buffer;
@@ -673,8 +675,11 @@ static TEE_Result rsa_raw_encrypt(uint32_t types,
 	if (cipher_max < params[1].memref.size)
 		return TEE_ERROR_SHORT_BUFFER;
 
-	err = R_RSIP_RSA_Encrypt(&rsip_instance_ctrl, wrapped_key, plain,
-				 cipher);
+	plain_lpad = (uint32_t)rsa_desc.modulus_size - plain_len;
+	memcpy((uint8_t *)plain_buff + plain_lpad, plain, plain_len);
+
+	err = R_RSIP_RSA_Encrypt(&rsip_instance_ctrl, wrapped_key,
+				 (uint8_t *)plain_buff, cipher);
 	if (err != FSP_SUCCESS)
 		return rsip_err_to_tee(err);
 

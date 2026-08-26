@@ -33,7 +33,7 @@
  *                  Length must be equal to the RSA modulus size.
  * memref[2] (in): Wrapped private key buffer.
  */
-#define PTA_CMD_RSASSA_PKCS1_SHA1_Sign (0x48642010)
+#define PTA_CMD_RSASSA_PKCS1_SHA1_Sign (0x48242010)
 
 /*
  * Verify RSASSA-PKCS1-v1_5 SHA-1 signature.
@@ -42,7 +42,7 @@
  *                 Length must be equal to the RSA modulus size.
  * memref[2] (in): Wrapped public key buffer.
  */
-#define PTA_CMD_RSASSA_PKCS1_SHA1_Verify (0x48641018)
+#define PTA_CMD_RSASSA_PKCS1_SHA1_Verify (0x48241018)
 
 /*
  * Generate RSASSA-PKCS1-v1_5 SHA-224 signature.
@@ -51,7 +51,7 @@
  *                  Length must be equal to the RSA modulus size.
  * memref[2] (in): Wrapped private key buffer.
  */
-#define PTA_CMD_RSASSA_PKCS1_SHA224_Sign (0x48642020)
+#define PTA_CMD_RSASSA_PKCS1_SHA224_Sign (0x48242020)
 
 /*
  * Verify RSASSA-PKCS1-v1_5 SHA-224 signature.
@@ -60,7 +60,7 @@
  *                 Length must be equal to the RSA modulus size.
  * memref[2] (in): Wrapped public key buffer.
  */
-#define PTA_CMD_RSASSA_PKCS1_SHA224_Verify (0x48641028)
+#define PTA_CMD_RSASSA_PKCS1_SHA224_Verify (0x48241028)
 
 /*
  * Generate RSASSA-PKCS1-v1_5 SHA-256 signature.
@@ -69,7 +69,7 @@
  *                  Length must be equal to the RSA modulus size.
  * memref[2] (in): Wrapped private key buffer.
  */
-#define PTA_CMD_RSASSA_PKCS1_SHA256_Sign (0x48642030)
+#define PTA_CMD_RSASSA_PKCS1_SHA256_Sign (0x48242030)
 
 /*
  * Verify RSASSA-PKCS1-v1_5 SHA-256 signature.
@@ -78,7 +78,7 @@
  *                 Length must be equal to the RSA modulus size.
  * memref[2] (in): Wrapped public key buffer.
  */
-#define PTA_CMD_RSASSA_PKCS1_SHA256_Verify (0x48641038)
+#define PTA_CMD_RSASSA_PKCS1_SHA256_Verify (0x48241038)
 
 /*
  * Generate RSASSA-PKCS1-v1_5 SHA-384 signature.
@@ -87,7 +87,7 @@
  *                  Length must be equal to the RSA modulus size.
  * memref[2] (in): Wrapped private key buffer.
  */
-#define PTA_CMD_RSASSA_PKCS1_SHA384_Sign (0x48642040)
+#define PTA_CMD_RSASSA_PKCS1_SHA384_Sign (0x48242040)
 
 /*
  * Verify RSASSA-PKCS1-v1_5 SHA-384 signature.
@@ -96,7 +96,7 @@
  *                 Length must be equal to the RSA modulus size.
  * memref[2] (in): Wrapped public key buffer.
  */
-#define PTA_CMD_RSASSA_PKCS1_SHA384_Verify (0x48641048)
+#define PTA_CMD_RSASSA_PKCS1_SHA384_Verify (0x48241048)
 
 /*
  * Generate RSASSA-PKCS1-v1_5 SHA-512 signature.
@@ -105,7 +105,7 @@
  *                  Length must be equal to the RSA modulus size.
  * memref[2] (in): Wrapped private key buffer.
  */
-#define PTA_CMD_RSASSA_PKCS1_SHA512_Sign (0x48642050)
+#define PTA_CMD_RSASSA_PKCS1_SHA512_Sign (0x48242050)
 
 /*
  * Verify RSASSA-PKCS1-v1_5 SHA-512 signature.
@@ -114,7 +114,7 @@
  *                 Length must be equal to the RSA modulus size.
  * memref[2] (in): Wrapped public key buffer.
  */
-#define PTA_CMD_RSASSA_PKCS1_SHA512_Verify (0x48641058)
+#define PTA_CMD_RSASSA_PKCS1_SHA512_Verify (0x48241058)
 
 /*
  * Generate RSASSA-PSS SHA-1 signature.
@@ -123,7 +123,7 @@
  *                  Length must be equal to the RSA modulus size.
  * memref[2] (in): Wrapped private key buffer.
  */
-#define PTA_CMD_RSASSA_PSS_SHA1_Sign (0x48742010)
+#define PTA_CMD_RSASSA_PSS_SHA1_Sign (0x48442010)
 
 /*
  * Verify RSASSA-PSS SHA-1 signature.
@@ -132,7 +132,7 @@
  *                 Length must be equal to the RSA modulus size.
  * memref[2] (in): Wrapped public key buffer.
  */
-#define PTA_CMD_RSASSA_PSS_SHA1_Verify (0x48741018)
+#define PTA_CMD_RSASSA_PSS_SHA1_Verify (0x48441018)
 
 /*
  * Generate RSASSA-PSS SHA-224 signature.
@@ -141,7 +141,7 @@
  *                  Length must be equal to the RSA modulus size.
  * memref[2] (in): Wrapped private key buffer.
  */
-#define PTA_CMD_RSASSA_PSS_SHA224_Sign (0x48742020)
+#define PTA_CMD_RSASSA_PSS_SHA224_Sign (0x48442020)
 
 /*
  * Verify RSASSA-PSS SHA-224 signature.
@@ -150,7 +150,7 @@
  *                 Length must be equal to the RSA modulus size.
  * memref[2] (in): Wrapped public key buffer.
  */
-#define PTA_CMD_RSASSA_PSS_SHA224_Verify (0x48741028)
+#define PTA_CMD_RSASSA_PSS_SHA224_Verify (0x48441028)
 
 /*
  * Generate RSASSA-PSS SHA-256 signature.
@@ -159,7 +159,7 @@
  *                  Length must be equal to the RSA modulus size.
  * memref[2] (in): Wrapped private key buffer.
  */
-#define PTA_CMD_RSASSA_PSS_SHA256_Sign (0x48742030)
+#define PTA_CMD_RSASSA_PSS_SHA256_Sign (0x48442030)
 
 /*
  * Verify RSASSA-PSS SHA-256 signature.
@@ -168,7 +168,7 @@
  *                 Length must be equal to the RSA modulus size.
  * memref[2] (in): Wrapped public key buffer.
  */
-#define PTA_CMD_RSASSA_PSS_SHA256_Verify (0x48741038)
+#define PTA_CMD_RSASSA_PSS_SHA256_Verify (0x48441038)
 
 /*
  * Generate RSASSA-PSS SHA-384 signature.
@@ -177,7 +177,7 @@
  *                  Length must be equal to the RSA modulus size.
  * memref[2] (in): Wrapped private key buffer.
  */
-#define PTA_CMD_RSASSA_PSS_SHA384_Sign (0x48742040)
+#define PTA_CMD_RSASSA_PSS_SHA384_Sign (0x48442040)
 
 /*
  * Verify RSASSA-PSS SHA-384 signature.
@@ -186,7 +186,7 @@
  *                 Length must be equal to the RSA modulus size.
  * memref[2] (in): Wrapped public key buffer.
  */
-#define PTA_CMD_RSASSA_PSS_SHA384_Verify (0x48741048)
+#define PTA_CMD_RSASSA_PSS_SHA384_Verify (0x48441048)
 
 /*
  * Generate RSASSA-PSS SHA-512 signature.
@@ -195,7 +195,7 @@
  *                  Length must be equal to the RSA modulus size.
  * memref[2] (in): Wrapped private key buffer.
  */
-#define PTA_CMD_RSASSA_PSS_SHA512_Sign (0x48742050)
+#define PTA_CMD_RSASSA_PSS_SHA512_Sign (0x48442050)
 
 /*
  * Verify RSASSA-PSS SHA-512 signature.
@@ -204,7 +204,7 @@
  *                 Length must be equal to the RSA modulus size.
  * memref[2] (in): Wrapped public key buffer.
  */
-#define PTA_CMD_RSASSA_PSS_SHA512_Verify (0x48741058)
+#define PTA_CMD_RSASSA_PSS_SHA512_Verify (0x48441058)
 
 /*
  * Encrypt RSAES-PKCS1-v1_5 plaintext.
@@ -327,7 +327,9 @@
 /*
  * Raw RSA encryption.
  * memref[0] (in): Plaintext buffer.
- *                 Length must be equal to the RSA modulus size.
+ *                 Length must be:
+ *                 - 1 to RSA modulus size bytes
+ *                 Inputs shorter than the modulus size are left-padded with zeros.
  * memref[1] (out): Ciphertext buffer.
  *                  Length must be equal to the RSA modulus size.
  * memref[2] (in): Wrapped public key buffer.
