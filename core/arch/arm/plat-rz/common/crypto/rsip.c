@@ -10,6 +10,7 @@
 #include <mm/core_memprot.h>
 #include <kernel/panic.h>
 #include <hw_crypto.h>
+#include <tee/tee_cryp_utl.h>
 #include <sflash.h>
 #include <r_rsip.h>
 #include <r_rsip_addr.h>
@@ -68,4 +69,11 @@ static TEE_Result rsip_init(void)
 	return TEE_SUCCESS;
 }
 
+#ifdef CFG_INSECURE
 service_init_crypto(rsip_init);
+#else
+void plat_rng_init(void)
+{
+	rsip_init();
+}
+#endif

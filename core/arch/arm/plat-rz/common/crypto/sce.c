@@ -10,6 +10,7 @@
 #include <mm/core_memprot.h>
 #include <kernel/panic.h>
 #include <hw_crypto.h>
+#include <tee/tee_cryp_utl.h>
 #include <sflash.h>
 #include <r_sce.h>
 #include <platform_config.h>
@@ -78,4 +79,11 @@ static TEE_Result sce_init(void)
 	return TEE_SUCCESS;
 }
 
+#ifdef CFG_INSECURE
 service_init_crypto(sce_init);
+#else
+void plat_rng_init(void)
+{
+	sce_init();
+}
+#endif
