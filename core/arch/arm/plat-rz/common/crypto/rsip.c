@@ -69,11 +69,7 @@ static TEE_Result rsip_init(void)
 	return TEE_SUCCESS;
 }
 
-#ifdef CFG_INSECURE
-service_init_crypto(rsip_init);
-#else
 void plat_rng_init(void)
 {
 	rsip_init();
 }
-#endif
