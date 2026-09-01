@@ -7,6 +7,7 @@
 #include <io.h>
 #include <mm/core_memprot.h>
 #include <kernel/panic.h>
+#include <tee/tee_cryp_utl.h>
 #include "drivers/tsip.h"
 #include "drivers/R_TSIP_Core_Lib.h"
 
@@ -33,4 +34,7 @@ static TEE_Result init_tsip(void)
 	return TEE_SUCCESS;
 }
 
-service_init_crypto(init_tsip);
+void plat_rng_init(void)
+{
+	init_tsip();
+}
