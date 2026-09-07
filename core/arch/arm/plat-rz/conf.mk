@@ -6,6 +6,7 @@ PLAT_FLAVORS_G3E := smarc_rzg3e
 PLAT_FLAVORS_G3L := smarc_rzg3l
 PLAT_FLAVORS_V2H := v2h_evk_1 v2n_evk
 PLAT_FLAVORS_T2H := t2h_dev_1 n2h_eval
+PLAT_FLAVORS_T2N := rzt2n_dev_537 rzt2n_dev_489
 
 ifneq ($(filter $(PLATFORM_FLAVOR),$(PLAT_FLAVORS_G2L)),)
     $(call force,CFG_PLATFORM_DEV,g2l)
@@ -19,6 +20,8 @@ else ifneq ($(filter $(PLATFORM_FLAVOR),$(PLAT_FLAVORS_V2H)),)
     $(call force,CFG_PLATFORM_DEV,v2h)
 else ifneq ($(filter $(PLATFORM_FLAVOR),$(PLAT_FLAVORS_T2H)),)
     $(call force,CFG_PLATFORM_DEV,t2h)
+else ifneq ($(filter $(PLATFORM_FLAVOR),$(PLAT_FLAVORS_T2N)),)
+    $(call force,CFG_PLATFORM_DEV,t2n)
 else
     $(error Unsupported PLATFORM_FLAVOR "$(PLATFORM_FLAVOR)")
 endif
