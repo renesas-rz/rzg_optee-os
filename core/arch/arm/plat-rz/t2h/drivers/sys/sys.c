@@ -22,7 +22,7 @@ static void sys_prcr_lock(vaddr_t base, uint32_t offset, uint32_t mask)
 	uint32_t value;
 
 	value = io_read32(base + offset) & SYS_PRCR_MASK;
-	value |= mask;
+	value &= ~mask;
 	io_write32(base + offset, value | SYS_PRCR_KEY_CODE);
 }
 
@@ -31,7 +31,7 @@ static void sys_prcr_unlock(vaddr_t base, uint32_t offset, uint32_t mask)
 	uint32_t value;
 
 	value = io_read32(base + offset) & SYS_PRCR_MASK;
-	value &= ~mask;
+	value |= mask;
 	io_write32(base + offset, value | SYS_PRCR_KEY_CODE);
 }
 

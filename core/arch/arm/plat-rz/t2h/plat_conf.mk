@@ -10,13 +10,13 @@ $(call force,CFG_CORE_LARGE_PHYS_ADDR,y)
 $(call force,CFG_CORE_ARM64_PA_BITS,36)
 $(call force,CFG_GIC,y)
 $(call force,CFG_ARM_GICV3,y)
+$(call force,CFG_RZ_HUK,y)
 $(call force,CFG_RZ_XSPI,y)
 $(call force,CFG_RZ_OTP_PUCCINI,y)
 $(call force,CFG_RZ_MBXSEM,y)
 
 CFG_TEE_CORE_NB_CORE ?= 4
 CFG_NUM_THREADS ?= 4
-CFG_MMAP_REGIONS ?= 32
 
 CFG_TZDRAM_START ?= 0xC0100000
 CFG_TZDRAM_SIZE ?= 0x03D00000
