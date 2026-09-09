@@ -71,6 +71,9 @@ TEE_Result sflash_write_buffer(uintptr_t addr, uintptr_t buff, size_t len)
 	if (!dev)
 		return TEE_ERROR_BAD_PARAMETERS;
 
+	if (xspi_setup(dev->ch) != XSPI_OK)
+		return TEE_ERROR_GENERIC;
+
 	/* Calculate affected sector range */
 	sector_count =
 		((last_sector_addr - base_sector_addr) / XSPI_SECTOR_SIZE) + 1;
@@ -129,6 +132,9 @@ TEE_Result sflash_read(uintptr_t addr, uintptr_t buff, size_t len)
 	if (!dev)
 		return TEE_ERROR_BAD_PARAMETERS;
 
+	if (xspi_setup(dev->ch) != XSPI_OK)
+		return TEE_ERROR_GENERIC;
+
 	/* Convert flash address to mapped virtual address */
 	offset = addr - dev->base;
 
@@ -141,15 +147,6 @@ TEE_Result sflash_open(void)
 {
 	/* Enable XSPI controller and initialize flash devices */
 	cpg_xspi_start();
-
-	for (size_t i = 0; i < ARRAY_SIZE(sflash_devices); i++) {
-		struct sflash_dev *dev = &sflash_devices[i];
-
-		if (xspi_setup(dev->ch) != XSPI_OK) {
-			cpg_xspi_stop();
-			return TEE_ERROR_GENERIC;
-		}
-	}
 	return TEE_SUCCESS;
 }
 

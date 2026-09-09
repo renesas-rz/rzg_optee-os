@@ -48,7 +48,8 @@ TEE_Result plat_crypto_get_random_bytes(void *buf, size_t len)
 TEE_Result plat_crypto_get_key_update_key(uint8_t *key, size_t len)
 {
 	sflash_open();
-	sflash_read(SFLASH_KUK_ADDR, (uintptr_t)key, len);
+	if (sflash_read(SFLASH_KUK_ADDR, (uintptr_t)key, len) != TEE_SUCCESS)
+		panic();
 	sflash_close();
 	return TEE_SUCCESS;
 }
