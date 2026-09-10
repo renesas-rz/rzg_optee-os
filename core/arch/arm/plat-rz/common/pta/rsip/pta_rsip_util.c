@@ -184,8 +184,10 @@ TEE_Result rsip_err_to_tee(fsp_err_t err)
 		return TEE_ERROR_BUSY;
 	case FSP_ERR_CRYPTO_RSIP_AUTHENTICATION:
 		return TEE_ERROR_MAC_INVALID;
+	case FSP_ERR_CRYPTO_RSIP_FAIL:
+		return TEE_ERROR_BAD_FORMAT;
 	default:
-		EMSG("Unhandled RSIP error: %#" PRIx32, (uint32_t)err);
+		DMSG("Unhandled RSIP error: %#" PRIx32, (uint32_t)err);
 		return TEE_ERROR_GENERIC;
 	}
 }
