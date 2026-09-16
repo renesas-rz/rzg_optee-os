@@ -35,7 +35,7 @@
 #define SFLASH_SIZE 0x10000000
 #define SFLASH_KUK_ADDR 0x20A00000U
 
-#if defined(PLATFORM_FLAVOR_v2h_evk_1) || defined(PLATFORM_FLAVOR_v2n_evk)
+#if defined(PLATFORM_FLAVOR_rzv2h_evk) || defined(PLATFORM_FLAVOR_rzv2n_evk)
 /* DDR 8Gbyte x2 */
 #define NSEC_DDR_0_BASE 0x47E00000U
 #define NSEC_DDR_0_SIZE 0x1F8200000U

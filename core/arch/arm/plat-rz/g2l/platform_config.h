@@ -35,45 +35,15 @@
 #define SFLASH_SIZE 0x10000000
 #define SFLASH_KUK_ADDR 0x20A00000U
 
-#if defined(PLATFORM_FLAVOR_g2l_dev13_1)
-/* DDR 512Mbyte x2 */
-#define NSEC_DDR_0_BASE 0x47E00000U
-#define NSEC_DDR_0_SIZE 0x18200000
-#define NSEC_DDR_1_BASE 0x60000000U
-#define NSEC_DDR_1_SIZE 0x20000000
-
-#elif defined(PLATFORM_FLAVOR_g2l_dev15_4)
-/* DDR 2Gbyte x2 */
+#if defined(PLATFORM_FLAVOR_smarc_rzg2l) || defined(PLATFORM_FLAVOR_smarc_rzv2l)
+/* DDR 2Gbyte x1 */
 #define NSEC_DDR_0_BASE 0x47E00000U
 #define NSEC_DDR_0_SIZE 0x78200000
-#define NSEC_DDR_1_BASE 0xC0000000U
-#define NSEC_DDR_1_SIZE 0x80000000
-
-#elif defined(PLATFORM_FLAVOR_g2l_dev21_4)
-/* DDR 2Gbyte x2 */
-#define NSEC_DDR_0_BASE 0x47E00000U
-#define NSEC_DDR_0_SIZE 0x78200000
-#define NSEC_DDR_1_BASE 0xC0000000U
-#define NSEC_DDR_1_SIZE 0x80000000
 
 #elif defined(PLATFORM_FLAVOR_smarc_rzg2lc)
 /* DDR 1Gbyte x1 */
 #define NSEC_DDR_0_BASE 0x47E00000U
 #define NSEC_DDR_0_SIZE 0x38200000
-
-#elif defined(PLATFORM_FLAVOR_smarc_rzg2l)
-/* DDR 1Gbyte x2 */
-#define NSEC_DDR_0_BASE 0x47E00000U
-#define NSEC_DDR_0_SIZE 0x38200000
-#define NSEC_DDR_1_BASE 0x80000000U
-#define NSEC_DDR_1_SIZE 0x40000000
-
-#elif defined(PLATFORM_FLAVOR_g2l_smarc_4)
-/* DDR 2Gbyte x2 */
-#define NSEC_DDR_0_BASE 0x47E00000U
-#define NSEC_DDR_0_SIZE 0x78200000
-#define NSEC_DDR_1_BASE 0xC0000000U
-#define NSEC_DDR_1_SIZE 0x80000000
 
 #elif defined(PLATFORM_FLAVOR_smarc_rzg2ul)
 /* DDR 1Gbyte x1 */

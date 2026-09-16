@@ -51,7 +51,8 @@
 #define MBXSEM_BASE 0x80240000U
 #define MBXSEM_SIZE 0x00001000U
 
-#if defined(PLATFORM_FLAVOR_rzt2n_dev_537) || \
+#if defined(PLATFORM_FLAVOR_rzt2n_dev) ||         \
+	defined(PLATFORM_FLAVOR_rzt2n_dev_537) || \
 	defined(PLATFORM_FLAVOR_rzt2n_dev_489)
 /* DDR 2Gbyte x1 */
 #define NSEC_DDR_0_BASE 0x203E00000U

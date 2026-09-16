@@ -52,8 +52,7 @@
 #define MBXSEM_BASE 0x80240000U
 #define MBXSEM_SIZE 0x00001000U
 
-#if defined(PLATFORM_FLAVOR_t2h_dev_1) || \
-	defined(PLATFORM_FLAVOR_n2h_eval)
+#if defined(PLATFORM_FLAVOR_rzt2h_dev) || defined(PLATFORM_FLAVOR_rzn2h_dev)
 /* DDR 8Gbyte x1 */
 #define NSEC_DDR_0_BASE 0x203E00000
 #define NSEC_DDR_0_SIZE 0x1FC200000
