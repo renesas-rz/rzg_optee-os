@@ -1,455 +1,440 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /*
- * Copyright (c) 2022, Renesas Electronics Corporation
+ * Copyright (c) 2022-2026, Renesas Electronics Corporation
  */
 
+#include <stdint.h>
+#include <string.h>
 #include <kernel/pseudo_ta.h>
-#include <tee/tee_cryp_utl.h>
-
 #include <r_sce.h>
 #include <pta_sce_ecc.h>
 
+#include "pta_sce_cmd.h"
+#include "pta_sce_util.h"
+
 #define PTA_NAME "sce_ecc.pta"
 
-static uint32_t
-	sha512_hash[HW_SCE_SHA512_HASH_LENGTH_BYTE_SIZE / sizeof(uint32_t)];
+struct sce_ecc_desc {
+	size_t digest_size;
+	size_t signature_size;
+};
 
-static TEE_Result
-ecdsa_secp192r1_signaturegenerate(uint32_t types,
-				  TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result get_ecc_desc(sce_key_type_t key_type,
+			       struct sce_ecc_desc *desc)
 {
-	fsp_err_t err;
+	switch (key_type) {
+	case SCE_KEY_INDEX_TYPE_ECC_P192_PUBLIC:
+	case SCE_KEY_INDEX_TYPE_ECC_P192_PRIVATE:
+		desc->digest_size = SCE_ECC_COORD_SIZE_192;
+		desc->signature_size = 2 * SCE_ECC_COORD_SIZE_192;
+		return TEE_SUCCESS;
+	case SCE_KEY_INDEX_TYPE_ECC_P224_PUBLIC:
+	case SCE_KEY_INDEX_TYPE_ECC_P224_PRIVATE:
+		desc->digest_size = SCE_ECC_COORD_SIZE_224;
+		desc->signature_size = 2 * SCE_ECC_COORD_SIZE_224;
+		return TEE_SUCCESS;
+	case SCE_KEY_INDEX_TYPE_ECC_P256_PUBLIC:
+	case SCE_KEY_INDEX_TYPE_ECC_P256_PRIVATE:
+		desc->digest_size = SCE_ECC_COORD_SIZE_256;
+		desc->signature_size = 2 * SCE_ECC_COORD_SIZE_256;
+		return TEE_SUCCESS;
+	case SCE_KEY_INDEX_TYPE_ECC_P512_PUBLIC:
+	case SCE_KEY_INDEX_TYPE_ECC_P512_PRIVATE:
+		desc->digest_size = SCE_ECC_COORD_SIZE_512;
+		desc->signature_size = 2 * SCE_ECC_COORD_SIZE_512;
+		return TEE_SUCCESS;
+	default:
+		return TEE_ERROR_NOT_SUPPORTED;
+	}
+}
 
-	sce_ecdsa_byte_data_t message_hash;
-	sce_ecdsa_byte_data_t signature;
-	sce_ecc_private_wrapped_key_t *wrapped_key;
+static TEE_Result get_ecc_wrapped_key(TEE_Param *p, sce_key_type_t type,
+				      struct sce_wrapped_key **wrapped_key)
+{
+	TEE_Result res = TEE_ERROR_GENERIC;
 
-	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_NONE))
+	const struct sce_key_desc *key_desc = NULL;
+
+	size_t wrapped_len = p->memref.size;
+	struct sce_wrapped_key *key = p->memref.buffer;
+
+	if (!key || !IS_ALIGNED_WITH_UINT32(key))
+		return TEE_ERROR_BAD_PARAMETERS;
+	if (wrapped_len < sizeof(key->type))
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	message_hash.pdata = (uint8_t *)params[0].memref.buffer;
-	message_hash.data_length = params[0].memref.size;
-	message_hash.data_type = 0;
-	if ((NULL == message_hash.pdata) && (0 < message_hash.data_length))
+	res = get_key_desc(key->type, &key_desc);
+	if (res != TEE_SUCCESS)
+		return res;
+	if (wrapped_len != key_desc->wrapped_size)
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	signature.pdata = (uint8_t *)params[1].memref.buffer;
-	signature.data_length = params[1].memref.size;
-	signature.data_type = 0;
-	if ((NULL == signature.pdata) ||
-	    (HW_SCE_ECDSA_DATA_BYTE_SIZE > signature.data_length))
-		return TEE_ERROR_BAD_PARAMETERS;
-
-	wrapped_key = (sce_ecc_private_wrapped_key_t *)params[2].memref.buffer;
-	if ((NULL == wrapped_key) ||
-	    (sizeof(sce_ecc_private_wrapped_key_t) != params[2].memref.size))
-		return TEE_ERROR_BAD_PARAMETERS;
-
-	err = g_sce_protected_on_sce.ECDSA_secp192r1_SignatureGenerate(
-		&message_hash, &signature, wrapped_key);
-	switch (err) {
-	case FSP_SUCCESS:
-		break;
-	case FSP_ERR_CRYPTO_SCE_RESOURCE_CONFLICT:
-		return TEE_ERROR_ACCESS_CONFLICT;
-	case FSP_ERR_CRYPTO_SCE_KEY_SET_FAIL:
-		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_CRYPTO_SCE_PARAMETER:
-		return TEE_ERROR_BAD_PARAMETERS;
-	default: /* FSP_ERR_CRYPTO_SCE_PROHIBIT_FUNCTION */
-		return TEE_ERROR_BAD_STATE;
+	if (key->type == type) {
+		*wrapped_key = key;
+		return TEE_SUCCESS;
 	}
 
-	params[1].memref.size = signature.data_length;
+	return TEE_ERROR_BAD_PARAMETERS;
+}
 
-	return TEE_SUCCESS;
+static void ecc_digest_pack(uint8_t *dst, const uint8_t *src,
+			    const struct sce_ecc_desc *desc)
+{
+	memcpy(dst, src, desc->digest_size);
+}
+
+static void ecc_signature_unpack(uint8_t *dst, const uint8_t *src,
+				 const struct sce_ecc_desc *desc)
+{
+	size_t param_size = desc->signature_size / 2;
+	size_t field_size = ROUNDUP(param_size, 16);
+	size_t field_lpad = field_size - param_size;
+
+	memcpy(dst, src + field_lpad, param_size);
+	memcpy(dst + param_size, src + field_size + field_lpad, param_size);
+}
+
+static void ecc_signature_pack(uint8_t *dst, const uint8_t *src,
+			       const struct sce_ecc_desc *desc)
+{
+	size_t param_size = desc->signature_size / 2;
+	size_t field_size = ROUNDUP(param_size, 16);
+	size_t field_lpad = field_size - param_size;
+
+	memset(dst, 0, field_size * 2);
+	memcpy(dst + field_lpad, src, param_size);
+	memcpy(dst + field_size + field_lpad, src + param_size, param_size);
+}
+
+static TEE_Result sce_secp192r1_sign(sce_ecdsa_byte_data_t *hash,
+				     sce_ecdsa_byte_data_t *sig,
+				     struct sce_wrapped_key *wrapped_key)
+{
+	fsp_err_t err = FSP_ERR_CRYPTO_SCE_FAIL;
+	sce_ecc_private_wrapped_key_t private_key;
+
+	memcpy(&private_key, wrapped_key, sizeof(private_key));
+
+	err = R_SCE_ECDSA_secp192r1_SignatureGenerate(hash, sig, &private_key);
+	return sce_err_to_tee(err);
+}
+
+static TEE_Result sce_secp224r1_sign(sce_ecdsa_byte_data_t *hash,
+				     sce_ecdsa_byte_data_t *sig,
+				     struct sce_wrapped_key *wrapped_key)
+{
+	fsp_err_t err = FSP_ERR_CRYPTO_SCE_FAIL;
+	sce_ecc_private_wrapped_key_t private_key;
+
+	memcpy(&private_key, wrapped_key, sizeof(private_key));
+
+	err = R_SCE_ECDSA_secp224r1_SignatureGenerate(hash, sig, &private_key);
+	return sce_err_to_tee(err);
+}
+
+static TEE_Result sce_secp256r1_sign(sce_ecdsa_byte_data_t *hash,
+				     sce_ecdsa_byte_data_t *sig,
+				     struct sce_wrapped_key *wrapped_key)
+{
+	fsp_err_t err = FSP_ERR_CRYPTO_SCE_FAIL;
+	sce_ecc_private_wrapped_key_t private_key;
+
+	memcpy(&private_key, wrapped_key, sizeof(private_key));
+
+	err = R_SCE_ECDSA_secp256r1_SignatureGenerate(hash, sig, &private_key);
+	return sce_err_to_tee(err);
+}
+
+static TEE_Result sce_brainpoolP512r1_sign(sce_ecdsa_byte_data_t *hash,
+					   sce_ecdsa_byte_data_t *sig,
+					   struct sce_wrapped_key *wrapped_key)
+{
+	fsp_err_t err = FSP_ERR_CRYPTO_SCE_FAIL;
+	sce_ecc_private_wrapped_key_t private_key;
+
+	memcpy(&private_key, wrapped_key, sizeof(private_key));
+
+	err = R_SCE_ECDSA_BrainpoolP512r1_SignatureGenerate(hash, sig,
+							    &private_key);
+	return sce_err_to_tee(err);
+}
+
+static TEE_Result sce_secp192r1_verify(sce_ecdsa_byte_data_t *hash,
+				       sce_ecdsa_byte_data_t *sig,
+				       struct sce_wrapped_key *wrapped_key)
+{
+	fsp_err_t err = FSP_ERR_CRYPTO_SCE_FAIL;
+	sce_ecc_public_wrapped_key_t public_key;
+
+	memcpy(&public_key, wrapped_key, sizeof(public_key));
+
+	err = R_SCE_ECDSA_secp192r1_SignatureVerify(hash, sig, &public_key);
+
+	return sce_verify_err_to_tee(err, SCE_VERIFY_ECC);
+}
+
+static TEE_Result sce_secp224r1_verify(sce_ecdsa_byte_data_t *hash,
+				       sce_ecdsa_byte_data_t *sig,
+				       struct sce_wrapped_key *wrapped_key)
+{
+	fsp_err_t err = FSP_ERR_CRYPTO_SCE_FAIL;
+	sce_ecc_public_wrapped_key_t public_key;
+
+	memcpy(&public_key, wrapped_key, sizeof(public_key));
+
+	err = R_SCE_ECDSA_secp224r1_SignatureVerify(hash, sig, &public_key);
+
+	return sce_verify_err_to_tee(err, SCE_VERIFY_ECC);
+}
+
+static TEE_Result sce_secp256r1_verify(sce_ecdsa_byte_data_t *hash,
+				       sce_ecdsa_byte_data_t *sig,
+				       struct sce_wrapped_key *wrapped_key)
+{
+	fsp_err_t err = FSP_ERR_CRYPTO_SCE_FAIL;
+	sce_ecc_public_wrapped_key_t public_key;
+
+	memcpy(&public_key, wrapped_key, sizeof(public_key));
+
+	err = R_SCE_ECDSA_secp256r1_SignatureVerify(hash, sig, &public_key);
+
+	return sce_verify_err_to_tee(err, SCE_VERIFY_ECC);
 }
 
 static TEE_Result
-ecdsa_secp192r1_signatureverify(uint32_t types,
-				TEE_Param params[TEE_NUM_PARAMS])
+sce_brainpoolP512r1_verify(sce_ecdsa_byte_data_t *hash,
+			   sce_ecdsa_byte_data_t *sig,
+			   struct sce_wrapped_key *wrapped_key)
 {
-	fsp_err_t err;
+	fsp_err_t err = FSP_ERR_CRYPTO_SCE_FAIL;
+	sce_ecc_public_wrapped_key_t public_key;
 
-	sce_ecdsa_byte_data_t signature;
-	sce_ecdsa_byte_data_t message_hash;
-	sce_ecc_public_wrapped_key_t *wrapped_key;
+	memcpy(&public_key, wrapped_key, sizeof(public_key));
 
-	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_NONE))
-		return TEE_ERROR_BAD_PARAMETERS;
+	err = R_SCE_ECDSA_BrainpoolP512r1_SignatureVerify(hash, sig,
+							  &public_key);
+	return sce_verify_err_to_tee(err, SCE_VERIFY_ECC);
+}
 
-	signature.pdata = (uint8_t *)params[0].memref.buffer;
-	signature.data_length = params[0].memref.size;
-	signature.data_type = 0;
-	if ((NULL == signature.pdata) ||
-	    (HW_SCE_ECDSA_DATA_BYTE_SIZE != signature.data_length))
-		return TEE_ERROR_BAD_PARAMETERS;
+static TEE_Result sce_ecdsa_sign(struct sce_ecc_desc *ecc_desc,
+				 struct sce_wrapped_key *wrapped_key,
+				 uint8_t *digest, uint8_t *signature)
+{
+	sce_ecdsa_byte_data_t hash = { 0 };
+	sce_ecdsa_byte_data_t sig = { 0 };
 
-	message_hash.pdata = (uint8_t *)params[1].memref.buffer;
-	message_hash.data_length = params[1].memref.size;
-	message_hash.data_type = 0;
-	if ((NULL == message_hash.pdata) && (0 < message_hash.data_length))
-		return TEE_ERROR_BAD_PARAMETERS;
+	hash.pdata = digest;
+	hash.data_length = ecc_desc->digest_size;
+	hash.data_type = 1;
 
-	wrapped_key = (sce_ecc_public_wrapped_key_t *)params[2].memref.buffer;
-	if ((NULL == wrapped_key) ||
-	    (sizeof(sce_ecc_public_wrapped_key_t) != params[2].memref.size))
-		return TEE_ERROR_BAD_PARAMETERS;
+	sig.pdata = signature;
+	sig.data_length = ecc_desc->signature_size;
+	sig.data_type = 0;
 
-	err = g_sce_protected_on_sce.ECDSA_secp192r1_SignatureVerify(
-		&signature, &message_hash, wrapped_key);
-	switch (err) {
-	case FSP_SUCCESS:
-		break;
-	case FSP_ERR_CRYPTO_SCE_RESOURCE_CONFLICT:
-		return TEE_ERROR_ACCESS_CONFLICT;
-	case FSP_ERR_CRYPTO_SCE_KEY_SET_FAIL:
-		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_CRYPTO_SCE_FAIL:
+	switch (wrapped_key->type) {
+	case SCE_KEY_INDEX_TYPE_ECC_P192_PRIVATE:
+		return sce_secp192r1_sign(&hash, &sig, wrapped_key);
+	case SCE_KEY_INDEX_TYPE_ECC_P224_PRIVATE:
+		return sce_secp224r1_sign(&hash, &sig, wrapped_key);
+	case SCE_KEY_INDEX_TYPE_ECC_P256_PRIVATE:
+		return sce_secp256r1_sign(&hash, &sig, wrapped_key);
+	case SCE_KEY_INDEX_TYPE_ECC_P512_PRIVATE:
+		return sce_brainpoolP512r1_sign(&hash, &sig, wrapped_key);
+	default:
 		return TEE_ERROR_GENERIC;
-	case FSP_ERR_CRYPTO_SCE_PARAMETER:
-		return TEE_ERROR_BAD_PARAMETERS;
-	default: /* FSP_ERR_CRYPTO_SCE_PROHIBIT_FUNCTION */
-		return TEE_ERROR_BAD_STATE;
 	}
-
-	return TEE_SUCCESS;
 }
 
-static TEE_Result
-ecdsa_secp224r1_signaturegenerate(uint32_t types,
-				  TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result sce_ecdsa_verify(struct sce_ecc_desc *ecc_desc,
+				   struct sce_wrapped_key *wrapped_key,
+				   uint8_t *digest, uint8_t *signature)
 {
-	fsp_err_t err;
+	sce_ecdsa_byte_data_t hash = { 0 };
+	sce_ecdsa_byte_data_t sig = { 0 };
 
-	sce_ecdsa_byte_data_t message_hash;
-	sce_ecdsa_byte_data_t signature;
-	sce_ecc_private_wrapped_key_t *wrapped_key;
+	hash.pdata = digest;
+	hash.data_length = ecc_desc->digest_size;
+	hash.data_type = 1;
 
-	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_NONE))
-		return TEE_ERROR_BAD_PARAMETERS;
+	sig.pdata = signature;
+	sig.data_length = ecc_desc->signature_size;
+	sig.data_type = 0;
 
-	message_hash.pdata = (uint8_t *)params[0].memref.buffer;
-	message_hash.data_length = params[0].memref.size;
-	message_hash.data_type = 0;
-	if ((NULL == message_hash.pdata) && (0 < message_hash.data_length))
-		return TEE_ERROR_BAD_PARAMETERS;
-
-	signature.pdata = (uint8_t *)params[1].memref.buffer;
-	signature.data_length = params[1].memref.size;
-	signature.data_type = 0;
-	if ((NULL == signature.pdata) ||
-	    (HW_SCE_ECDSA_DATA_BYTE_SIZE > signature.data_length))
-		return TEE_ERROR_BAD_PARAMETERS;
-
-	wrapped_key = (sce_ecc_private_wrapped_key_t *)params[2].memref.buffer;
-	if ((NULL == wrapped_key) ||
-	    (sizeof(sce_ecc_private_wrapped_key_t) != params[2].memref.size))
-		return TEE_ERROR_BAD_PARAMETERS;
-
-	err = g_sce_protected_on_sce.ECDSA_secp224r1_SignatureGenerate(
-		&message_hash, &signature, wrapped_key);
-	switch (err) {
-	case FSP_SUCCESS:
-		break;
-	case FSP_ERR_CRYPTO_SCE_RESOURCE_CONFLICT:
-		return TEE_ERROR_ACCESS_CONFLICT;
-	case FSP_ERR_CRYPTO_SCE_KEY_SET_FAIL:
-		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_CRYPTO_SCE_PARAMETER:
-		return TEE_ERROR_BAD_PARAMETERS;
-	default: /* FSP_ERR_CRYPTO_SCE_PROHIBIT_FUNCTION */
-		return TEE_ERROR_BAD_STATE;
-	}
-
-	params[1].memref.size = signature.data_length;
-
-	return TEE_SUCCESS;
-}
-
-static TEE_Result
-ecdsa_secp224r1_signatureverify(uint32_t types,
-				TEE_Param params[TEE_NUM_PARAMS])
-{
-	fsp_err_t err;
-
-	sce_ecdsa_byte_data_t signature;
-	sce_ecdsa_byte_data_t message_hash;
-	sce_ecc_public_wrapped_key_t *wrapped_key;
-
-	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_NONE))
-		return TEE_ERROR_BAD_PARAMETERS;
-
-	signature.pdata = (uint8_t *)params[0].memref.buffer;
-	signature.data_length = params[0].memref.size;
-	signature.data_type = 0;
-	if ((NULL == signature.pdata) ||
-	    (HW_SCE_ECDSA_DATA_BYTE_SIZE != signature.data_length))
-		return TEE_ERROR_BAD_PARAMETERS;
-
-	message_hash.pdata = (uint8_t *)params[1].memref.buffer;
-	message_hash.data_length = params[1].memref.size;
-	message_hash.data_type = 0;
-	if ((NULL == message_hash.pdata) && (0 < message_hash.data_length))
-		return TEE_ERROR_BAD_PARAMETERS;
-
-	wrapped_key = (sce_ecc_public_wrapped_key_t *)params[2].memref.buffer;
-	if ((NULL == wrapped_key) ||
-	    (sizeof(sce_ecc_public_wrapped_key_t) != params[2].memref.size))
-		return TEE_ERROR_BAD_PARAMETERS;
-
-	err = g_sce_protected_on_sce.ECDSA_secp224r1_SignatureVerify(
-		&signature, &message_hash, wrapped_key);
-	switch (err) {
-	case FSP_SUCCESS:
-		break;
-	case FSP_ERR_CRYPTO_SCE_RESOURCE_CONFLICT:
-		return TEE_ERROR_ACCESS_CONFLICT;
-	case FSP_ERR_CRYPTO_SCE_KEY_SET_FAIL:
-		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_CRYPTO_SCE_FAIL:
+	switch (wrapped_key->type) {
+	case SCE_KEY_INDEX_TYPE_ECC_P192_PUBLIC:
+		return sce_secp192r1_verify(&sig, &hash, wrapped_key);
+	case SCE_KEY_INDEX_TYPE_ECC_P224_PUBLIC:
+		return sce_secp224r1_verify(&sig, &hash, wrapped_key);
+	case SCE_KEY_INDEX_TYPE_ECC_P256_PUBLIC:
+		return sce_secp256r1_verify(&sig, &hash, wrapped_key);
+	case SCE_KEY_INDEX_TYPE_ECC_P512_PUBLIC:
+		return sce_brainpoolP512r1_verify(&sig, &hash, wrapped_key);
+	default:
 		return TEE_ERROR_GENERIC;
-	case FSP_ERR_CRYPTO_SCE_PARAMETER:
-		return TEE_ERROR_BAD_PARAMETERS;
-	default: /* FSP_ERR_CRYPTO_SCE_PROHIBIT_FUNCTION */
-		return TEE_ERROR_BAD_STATE;
 	}
-
-	return TEE_SUCCESS;
 }
 
-static TEE_Result
-ecdsa_secp256r1_signaturegenerate(uint32_t types,
-				  TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result ecdsa_sign(uint32_t types, TEE_Param params[TEE_NUM_PARAMS],
+			     sce_key_type_t type)
 {
-	fsp_err_t err;
+	TEE_Result res = TEE_ERROR_GENERIC;
 
-	sce_ecdsa_byte_data_t message_hash;
-	sce_ecdsa_byte_data_t signature;
-	sce_ecc_private_wrapped_key_t *wrapped_key;
+	struct sce_ecc_desc ecc_desc = { 0 };
 
-	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_NONE))
+	size_t digest_len = 0;
+	uint8_t *digest = NULL;
+	uint32_t digest_buff[SCE_DIGEST_SIZE_MAX / sizeof(uint32_t)] = { 0 };
+	size_t sig_max = 0;
+	uint8_t *sig = NULL;
+	uint32_t sig_buff[SCE_ECDSA_SIG_SIZE_MAX / sizeof(uint32_t)] = { 0 };
+
+	struct sce_wrapped_key *wrapped_key = NULL;
+
+	uint32_t exp_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
+					     TEE_PARAM_TYPE_MEMREF_OUTPUT,
+					     TEE_PARAM_TYPE_MEMREF_INPUT,
+					     TEE_PARAM_TYPE_NONE);
+	if (types != exp_types)
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	message_hash.pdata = (uint8_t *)params[0].memref.buffer;
-	message_hash.data_length = params[0].memref.size;
-	message_hash.data_type = 0;
-	if ((NULL == message_hash.pdata) && (0 < message_hash.data_length))
+	res = get_ecc_wrapped_key(&params[2], type, &wrapped_key);
+	if (res != TEE_SUCCESS)
+		return res;
+
+	res = get_ecc_desc(wrapped_key->type, &ecc_desc);
+	if (res != TEE_SUCCESS)
+		return res;
+
+	digest = params[0].memref.buffer;
+	digest_len = params[0].memref.size;
+	if (!digest || !IS_ALIGNED_WITH_UINT32(digest))
+		return TEE_ERROR_BAD_PARAMETERS;
+	if (digest_len != ecc_desc.digest_size)
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	signature.pdata = (uint8_t *)params[1].memref.buffer;
-	signature.data_length = params[1].memref.size;
-	signature.data_type = 0;
-	if ((NULL == signature.pdata) ||
-	    (HW_SCE_ECDSA_DATA_BYTE_SIZE > signature.data_length))
+	sig = params[1].memref.buffer;
+	sig_max = params[1].memref.size;
+	params[1].memref.size = ecc_desc.signature_size;
+	if (!sig || !IS_ALIGNED_WITH_UINT32(sig))
 		return TEE_ERROR_BAD_PARAMETERS;
+	if (sig_max < params[1].memref.size)
+		return TEE_ERROR_SHORT_BUFFER;
 
-	wrapped_key = (sce_ecc_private_wrapped_key_t *)params[2].memref.buffer;
-	if ((NULL == wrapped_key) ||
-	    (sizeof(sce_ecc_private_wrapped_key_t) != params[2].memref.size))
-		return TEE_ERROR_BAD_PARAMETERS;
+	ecc_digest_pack((uint8_t *)digest_buff, digest, &ecc_desc);
 
-	err = g_sce_protected_on_sce.ECDSA_secp256r1_SignatureGenerate(
-		&message_hash, &signature, wrapped_key);
-	switch (err) {
-	case FSP_SUCCESS:
-		break;
-	case FSP_ERR_CRYPTO_SCE_RESOURCE_CONFLICT:
-		return TEE_ERROR_ACCESS_CONFLICT;
-	case FSP_ERR_CRYPTO_SCE_KEY_SET_FAIL:
-		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_CRYPTO_SCE_PARAMETER:
-		return TEE_ERROR_BAD_PARAMETERS;
-	default: /* FSP_ERR_CRYPTO_SCE_PROHIBIT_FUNCTION */
-		return TEE_ERROR_BAD_STATE;
-	}
+	res = sce_ecdsa_sign(&ecc_desc, wrapped_key, (uint8_t *)digest_buff,
+			     (uint8_t *)sig_buff);
+	if (res != TEE_SUCCESS)
+		return res;
 
-	params[1].memref.size = signature.data_length;
+	ecc_signature_unpack(sig, (uint8_t *)sig_buff, &ecc_desc);
 
 	return TEE_SUCCESS;
 }
 
-static TEE_Result
-ecdsa_secp256r1_signatureverify(uint32_t types,
-				TEE_Param params[TEE_NUM_PARAMS])
+static TEE_Result ecdsa_verify(uint32_t types, TEE_Param params[TEE_NUM_PARAMS],
+			       sce_key_type_t type)
 {
-	fsp_err_t err;
+	TEE_Result res = TEE_ERROR_GENERIC;
 
-	sce_ecdsa_byte_data_t signature;
-	sce_ecdsa_byte_data_t message_hash;
-	sce_ecc_public_wrapped_key_t *wrapped_key;
+	struct sce_ecc_desc ecc_desc = { 0 };
 
-	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_NONE))
+	size_t digest_len = 0;
+	uint8_t *digest = NULL;
+	uint32_t digest_buff[SCE_DIGEST_SIZE_MAX / sizeof(uint32_t)] = { 0 };
+	size_t sig_len = 0;
+	uint8_t *sig = NULL;
+	uint32_t sig_buff[SCE_ECDSA_SIG_SIZE_MAX / sizeof(uint32_t)] = { 0 };
+
+	struct sce_wrapped_key *wrapped_key = NULL;
+
+	uint32_t exp_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
+					     TEE_PARAM_TYPE_MEMREF_INPUT,
+					     TEE_PARAM_TYPE_MEMREF_INPUT,
+					     TEE_PARAM_TYPE_NONE);
+	if (types != exp_types)
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	signature.pdata = (uint8_t *)params[0].memref.buffer;
-	signature.data_length = params[0].memref.size;
-	signature.data_type = 0;
-	if ((NULL == signature.pdata) ||
-	    (HW_SCE_ECDSA_DATA_BYTE_SIZE != signature.data_length))
+	res = get_ecc_wrapped_key(&params[2], type, &wrapped_key);
+	if (res != TEE_SUCCESS)
+		return res;
+
+	res = get_ecc_desc(wrapped_key->type, &ecc_desc);
+	if (res != TEE_SUCCESS)
+		return res;
+
+	digest = params[0].memref.buffer;
+	digest_len = params[0].memref.size;
+	if (!digest || !IS_ALIGNED_WITH_UINT32(digest))
+		return TEE_ERROR_BAD_PARAMETERS;
+	if (digest_len != ecc_desc.digest_size)
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	message_hash.pdata = (uint8_t *)params[1].memref.buffer;
-	message_hash.data_length = params[1].memref.size;
-	message_hash.data_type = 0;
-	if ((NULL == message_hash.pdata) && (0 < message_hash.data_length))
+	sig = params[1].memref.buffer;
+	sig_len = params[1].memref.size;
+	if (!sig || !IS_ALIGNED_WITH_UINT32(sig))
+		return TEE_ERROR_BAD_PARAMETERS;
+	if (sig_len != ecc_desc.signature_size)
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	wrapped_key = (sce_ecc_public_wrapped_key_t *)params[2].memref.buffer;
-	if ((NULL == wrapped_key) ||
-	    (sizeof(sce_ecc_public_wrapped_key_t) != params[2].memref.size))
-		return TEE_ERROR_BAD_PARAMETERS;
+	ecc_digest_pack((void *)digest_buff, digest, &ecc_desc);
 
-	err = g_sce_protected_on_sce.ECDSA_secp256r1_SignatureVerify(
-		&signature, &message_hash, wrapped_key);
-	switch (err) {
-	case FSP_SUCCESS:
-		break;
-	case FSP_ERR_CRYPTO_SCE_RESOURCE_CONFLICT:
-		return TEE_ERROR_ACCESS_CONFLICT;
-	case FSP_ERR_CRYPTO_SCE_KEY_SET_FAIL:
-		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_CRYPTO_SCE_FAIL:
-		return TEE_ERROR_GENERIC;
-	case FSP_ERR_CRYPTO_SCE_PARAMETER:
-		return TEE_ERROR_BAD_PARAMETERS;
-	default: /* FSP_ERR_CRYPTO_SCE_PROHIBIT_FUNCTION */
-		return TEE_ERROR_BAD_STATE;
-	}
+	ecc_signature_pack((void *)sig_buff, sig, &ecc_desc);
+
+	res = sce_ecdsa_verify(&ecc_desc, wrapped_key, (uint8_t *)digest_buff,
+			       (uint8_t *)sig_buff);
+	if (res != TEE_SUCCESS)
+		return res;
 
 	return TEE_SUCCESS;
 }
 
-static TEE_Result
-ecdsa_brainpoolp512r1_signaturegenerate(uint32_t types,
-					TEE_Param params[TEE_NUM_PARAMS])
-{
-	fsp_err_t err;
-
-	sce_ecdsa_byte_data_t message_hash;
-	sce_ecdsa_byte_data_t signature;
-	sce_ecc_private_wrapped_key_t *wrapped_key;
-
-	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_MEMREF_INOUT,
-				     TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_NONE))
-		return TEE_ERROR_BAD_PARAMETERS;
-
-	message_hash.pdata = (uint8_t *)sha512_hash;
-	message_hash.data_length = HW_SCE_SHA512_HASH_LENGTH_BYTE_SIZE;
-	message_hash.data_type = 1;
-	err = tee_hash_createdigest(TEE_ALG_SHA512, params[0].memref.buffer,
-				    params[0].memref.size, message_hash.pdata,
-				    message_hash.data_length);
-	if (err)
-		return err;
-
-	signature.pdata = (uint8_t *)params[1].memref.buffer;
-	signature.data_length = params[1].memref.size;
-	signature.data_type = 0;
-	if ((NULL == signature.pdata) ||
-	    (HW_SCE_ECDSA_P512_DATA_BYTE_SIZE > signature.data_length))
-		return TEE_ERROR_BAD_PARAMETERS;
-
-	wrapped_key = (sce_ecc_private_wrapped_key_t *)params[2].memref.buffer;
-	if ((NULL == wrapped_key) ||
-	    (sizeof(sce_ecc_private_wrapped_key_t) != params[2].memref.size))
-		return TEE_ERROR_BAD_PARAMETERS;
-
-	err = g_sce_protected_on_sce.ECDSA_BrainpoolP512r1_SignatureGenerate(
-		&message_hash, &signature, wrapped_key);
-	switch (err) {
-	case FSP_SUCCESS:
-		break;
-	case FSP_ERR_CRYPTO_SCE_RESOURCE_CONFLICT:
-		return TEE_ERROR_ACCESS_CONFLICT;
-	case FSP_ERR_CRYPTO_SCE_KEY_SET_FAIL:
-		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_CRYPTO_SCE_PARAMETER:
-		return TEE_ERROR_BAD_PARAMETERS;
-	default: /* FSP_ERR_CRYPTO_SCE_PROHIBIT_FUNCTION */
-		return TEE_ERROR_BAD_STATE;
-	}
-
-	params[1].memref.size = signature.data_length;
-
-	return TEE_SUCCESS;
-}
-
-static TEE_Result
-ecdsa_brainpoolp512r1_signatureverify(uint32_t types,
+static TEE_Result invoke_command_secp(uint32_t cmd, uint32_t ptypes,
 				      TEE_Param params[TEE_NUM_PARAMS])
 {
-	fsp_err_t err;
+	TEE_Result res = TEE_ERROR_GENERIC;
+	sce_key_type_t type = SCE_KEY_INDEX_TYPE_INVALID;
 
-	sce_ecdsa_byte_data_t signature;
-	sce_ecdsa_byte_data_t message_hash;
-	sce_ecc_public_wrapped_key_t *wrapped_key;
+	res = get_sce_key_type(cmd, &type);
+	if (res != TEE_SUCCESS)
+		return res;
 
-	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_MEMREF_INPUT,
-				     TEE_PARAM_TYPE_NONE))
-		return TEE_ERROR_BAD_PARAMETERS;
+	switch (cmd) {
+	case PTA_CMD_ECDSA_secp192r1_SignatureGenerate:
+	case PTA_CMD_ECDSA_secp224r1_SignatureGenerate:
+	case PTA_CMD_ECDSA_secp256r1_SignatureGenerate:
+		return ecdsa_sign(ptypes, params, type);
 
-	signature.pdata = (uint8_t *)params[0].memref.buffer;
-	signature.data_length = params[0].memref.size;
-	signature.data_type = 0;
-	if ((NULL == signature.pdata) ||
-	    (HW_SCE_ECDSA_P512_DATA_BYTE_SIZE != signature.data_length))
-		return TEE_ERROR_BAD_PARAMETERS;
+	case PTA_CMD_ECDSA_secp192r1_SignatureVerify:
+	case PTA_CMD_ECDSA_secp224r1_SignatureVerify:
+	case PTA_CMD_ECDSA_secp256r1_SignatureVerify:
+		return ecdsa_verify(ptypes, params, type);
 
-	message_hash.pdata = (uint8_t *)sha512_hash;
-	message_hash.data_length = HW_SCE_SHA512_HASH_LENGTH_BYTE_SIZE;
-	message_hash.data_type = 1;
-	err = tee_hash_createdigest(TEE_ALG_SHA512, params[1].memref.buffer,
-				    params[1].memref.size, message_hash.pdata,
-				    message_hash.data_length);
-	if (err)
-		return err;
-
-	wrapped_key = (sce_ecc_public_wrapped_key_t *)params[2].memref.buffer;
-	if ((NULL == wrapped_key) ||
-	    (sizeof(sce_ecc_public_wrapped_key_t) != params[2].memref.size))
-		return TEE_ERROR_BAD_PARAMETERS;
-
-	err = g_sce_protected_on_sce.ECDSA_BrainpoolP512r1_SignatureVerify(
-		&signature, &message_hash, wrapped_key);
-	switch (err) {
-	case FSP_SUCCESS:
-		break;
-	case FSP_ERR_CRYPTO_SCE_RESOURCE_CONFLICT:
-		return TEE_ERROR_ACCESS_CONFLICT;
-	case FSP_ERR_CRYPTO_SCE_KEY_SET_FAIL:
-		return TEE_ERROR_BAD_PARAMETERS;
-	case FSP_ERR_CRYPTO_SCE_FAIL:
-		return TEE_ERROR_GENERIC;
-	case FSP_ERR_CRYPTO_SCE_PARAMETER:
-		return TEE_ERROR_BAD_PARAMETERS;
-	default: /* FSP_ERR_CRYPTO_SCE_PROHIBIT_FUNCTION */
-		return TEE_ERROR_BAD_STATE;
+	default:
+		return TEE_ERROR_NOT_SUPPORTED;
 	}
+}
 
-	return TEE_SUCCESS;
+static TEE_Result invoke_command_brainpool(uint32_t cmd, uint32_t ptypes,
+					   TEE_Param params[TEE_NUM_PARAMS])
+{
+	TEE_Result res = TEE_ERROR_GENERIC;
+	sce_key_type_t type = SCE_KEY_INDEX_TYPE_INVALID;
+
+	res = get_sce_key_type(cmd, &type);
+	if (res != TEE_SUCCESS)
+		return res;
+
+	switch (cmd) {
+	case PTA_CMD_ECDSA_BrainpoolP512r1_SignatureGenerate:
+		return ecdsa_sign(ptypes, params, type);
+
+	case PTA_CMD_ECDSA_BrainpoolP512r1_SignatureVerify:
+		return ecdsa_verify(ptypes, params, type);
+
+	default:
+		return TEE_ERROR_NOT_SUPPORTED;
+	}
 }
 
 static TEE_Result invoke_command(void *session __unused, uint32_t cmd,
@@ -458,23 +443,11 @@ static TEE_Result invoke_command(void *session __unused, uint32_t cmd,
 {
 	DMSG(PTA_NAME " command %#" PRIx32 " ptypes %#" PRIx32, cmd, ptypes);
 
-	switch (cmd) {
-	case PTA_CMD_ECDSA_secp192r1_SignatureGenerate:
-		return ecdsa_secp192r1_signaturegenerate(ptypes, params);
-	case PTA_CMD_ECDSA_secp192r1_SignatureVerify:
-		return ecdsa_secp192r1_signatureverify(ptypes, params);
-	case PTA_CMD_ECDSA_secp224r1_SignatureGenerate:
-		return ecdsa_secp224r1_signaturegenerate(ptypes, params);
-	case PTA_CMD_ECDSA_secp224r1_SignatureVerify:
-		return ecdsa_secp224r1_signatureverify(ptypes, params);
-	case PTA_CMD_ECDSA_secp256r1_SignatureGenerate:
-		return ecdsa_secp256r1_signaturegenerate(ptypes, params);
-	case PTA_CMD_ECDSA_secp256r1_SignatureVerify:
-		return ecdsa_secp256r1_signatureverify(ptypes, params);
-	case PTA_CMD_ECDSA_BrainpoolP512r1_SignatureGenerate:
-		return ecdsa_brainpoolp512r1_signaturegenerate(ptypes, params);
-	case PTA_CMD_ECDSA_BrainpoolP512r1_SignatureVerify:
-		return ecdsa_brainpoolp512r1_signatureverify(ptypes, params);
+	switch (PTA_CMD_GET_VARIANT(cmd)) {
+	case PTA_VARIANT_ECC_SECP:
+		return invoke_command_secp(cmd, ptypes, params);
+	case PTA_VARIANT_ECC_BRAINPOOL:
+		return invoke_command_brainpool(cmd, ptypes, params);
 	default:
 		return TEE_ERROR_NOT_SUPPORTED;
 	}

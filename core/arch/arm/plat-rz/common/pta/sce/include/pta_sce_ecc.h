@@ -1,75 +1,105 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Copyright (c) 2022, Renesas Electronics Corporation
+ * Copyright (c) 2022-2026, Renesas Electronics Corporation
  */
 
 #ifndef __PTA_SCE_ECC_H
 #define __PTA_SCE_ECC_H
 
-#include <r_sce_api.h>
-
 #define PTA_SCE_ECC_UUID                                                \
 	{                                                               \
-		0xa0c74f91, 0xbaac, 0x4ba3,                             \
+		0x39e9043e, 0x3e80, 0x4a3c,                             \
 		{                                                       \
-			0x96, 0xbe, 0x58, 0xe5, 0x1f, 0xb1, 0xd1, 0xba, \
+			0x8a, 0x67, 0x6c, 0xb9, 0xc9, 0x0d, 0x27, 0xb3, \
 		}                                                       \
 	}
 
 /*
- * [in]      memref[0] : Message
- * [in/out]  memref[1] : Signature (64byte)
- * [in]	     memref[2] : Wrapped key (sce_ecc_private_wrapped_key_t)
+ * Generate ECDSA secp192r1 signature.
+ * memref[0] (in): Hash buffer.
+ *                 Length must be 24 bytes.
+ * memref[1] (out): Signature buffer.
+ *                  Length must be 48 bytes.
+ * memref[2] (in): Wrapped private key buffer.
+ *                 Length must be 100 bytes.
  */
-#define PTA_CMD_ECDSA_secp192r1_SignatureGenerate (0x00050000)
+#define PTA_CMD_ECDSA_secp192r1_SignatureGenerate (0x58152200)
 
 /*
- * [in]      memref[0] : Signature (64byte)
- * [in]      memref[1] : Message
- * [in]	     memref[2] : Wrapped key (sce_ecc_public_wrapped_key_t)
+ * Verify ECDSA secp192r1 signature.
+ * memref[0] (in): Hash buffer.
+ *                 Length must be 24 bytes.
+ * memref[1] (in): Signature buffer.
+ *                 Length must be 48 bytes.
+ * memref[2] (in): Wrapped public key buffer.
+ *                 Length must be 164 bytes.
  */
-#define PTA_CMD_ECDSA_secp192r1_SignatureVerify (0x00050010)
+#define PTA_CMD_ECDSA_secp192r1_SignatureVerify (0x58151208)
 
 /*
- * [in]      memref[0] : Message
- * [in/out]  memref[1] : Signature (64byte)
- * [in]      memref[2] : Wrapped key (sce_ecc_private_wrapped_key_t)
+ * Generate ECDSA secp224r1 signature.
+ * memref[0] (in): Hash buffer.
+ *                 Length must be 28 bytes.
+ * memref[1] (out): Signature buffer.
+ *                  Length must be 56 bytes.
+ * memref[2] (in): Wrapped private key buffer.
+ *                 Length must be 100 bytes.
  */
-#define PTA_CMD_ECDSA_secp224r1_SignatureGenerate (0x00050100)
+#define PTA_CMD_ECDSA_secp224r1_SignatureGenerate (0x58152300)
 
 /*
- * [in]      memref[0] : Signature (64byte)
- * [in]      memref[1] : Message
- * [in]      memref[2] : Wrapped key (sce_ecc_public_wrapped_key_t)
+ * Verify ECDSA secp224r1 signature.
+ * memref[0] (in): Hash buffer.
+ *                 Length must be 28 bytes.
+ * memref[1] (in): Signature buffer.
+ *                 Length must be 56 bytes.
+ * memref[2] (in): Wrapped public key buffer.
+ *                 Length must be 164 bytes.
  */
-#define PTA_CMD_ECDSA_secp224r1_SignatureVerify (0x00050110)
+#define PTA_CMD_ECDSA_secp224r1_SignatureVerify (0x58151308)
 
 /*
- * [in]      memref[0] : Message
- * [in/out]  memref[1] : Signature (64byte)
- * [in]      memref[2] : Wrapped key (sce_ecc_private_wrapped_key_t)
+ * Generate ECDSA secp256r1 signature.
+ * memref[0] (in): Hash buffer.
+ *                 Length must be 32 bytes.
+ * memref[1] (out): Signature buffer.
+ *                  Length must be 64 bytes.
+ * memref[2] (in): Wrapped private key buffer.
+ *                 Length must be 100 bytes.
  */
-#define PTA_CMD_ECDSA_secp256r1_SignatureGenerate (0x00050200)
+#define PTA_CMD_ECDSA_secp256r1_SignatureGenerate (0x58152400)
 
 /*
- * [in]      memref[0] : Signature (64byte)
- * [in]      memref[1] : Message
- * [in]      memref[2] : Wrapped key (sce_ecc_public_wrapped_key_t)
+ * Verify ECDSA secp256r1 signature.
+ * memref[0] (in): Hash buffer.
+ *                 Length must be 32 bytes.
+ * memref[1] (in): Signature buffer.
+ *                 Length must be 64 bytes.
+ * memref[2] (in): Wrapped public key buffer.
+ *                 Length must be 164 bytes.
  */
-#define PTA_CMD_ECDSA_secp256r1_SignatureVerify (0x00050210)
+#define PTA_CMD_ECDSA_secp256r1_SignatureVerify (0x58151408)
 
 /*
- * [in]      memref[0] : Message
- * [in/out]  memref[1] : Signature (64byte)
- * [in]      memref[2] : Wrapped key (sce_ecc_private_wrapped_key_t)
+ * Generate ECDSA BrainpoolP512r1 signature.
+ * memref[0] (in): Hash buffer.
+ *                 Length must be 64 bytes.
+ * memref[1] (out): Signature buffer.
+ *                  Length must be 128 bytes.
+ * memref[2] (in): Wrapped private key buffer.
+ *                 Length must be 100 bytes.
  */
-#define PTA_CMD_ECDSA_BrainpoolP512r1_SignatureGenerate (0x00051000)
+#define PTA_CMD_ECDSA_BrainpoolP512r1_SignatureGenerate (0x58252600)
 
 /*
- * [in]      memref[0] : Signature (64byte)
- * [in]      memref[1] : Message
- * [in]      memref[2] : Wrapped key (sce_ecc_public_wrapped_key_t)
+ * Verify ECDSA BrainpoolP512r1 signature.
+ * memref[0] (in): Hash buffer.
+ *                 Length must be 64 bytes.
+ * memref[1] (in): Signature buffer.
+ *                 Length must be 128 bytes.
+ * memref[2] (in): Wrapped public key buffer.
+ *                 Length must be 164 bytes.
  */
-#define PTA_CMD_ECDSA_BrainpoolP512r1_SignatureVerify (0x00051010)
+#define PTA_CMD_ECDSA_BrainpoolP512r1_SignatureVerify (0x58251608)
 
 #endif /* __PTA_SCE_ECC_H */
